@@ -1,0 +1,347 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Privacy API implementation for local_unifiedgrader.
+ *
+ * @package    local_unifiedgrader
+ * @copyright  2026 South African Theological Seminary
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+namespace local_unifiedgrader\privacy;
+
+defined('MOODLE_INTERNAL') || die();
+
+use core_privacy\local\metadata\collection;
+use core_privacy\local\request\approved_contextlist;
+use core_privacy\local\request\approved_userlist;
+use core_privacy\local\request\contextlist;
+use core_privacy\local\request\userlist;
+use core_privacy\local\request\writer;
+
+/**
+ * Privacy provider declaring what personal data the plugin stores.
+ */
+class provider implements
+    \core_privacy\local\metadata\provider,
+    \core_privacy\local\request\plugin\provider,
+    \core_privacy\local\request\core_userlist_provider {
+
+    /**
+     * Describe the personal data stored by this plugin.
+     *
+     * @param collection $collection
+     * @return collection
+     */
+    public static function get_metadata(collection $collection): collection {
+        $collection->add_database_table('local_unifiedgrader_notes', [
+            'cmid' => 'privacy:metadata:notes:cmid',
+            'userid' => 'privacy:metadata:notes:userid',
+            'authorid' => 'privacy:metadata:notes:authorid',
+            'content' => 'privacy:metadata:notes:content',
+        ], 'privacy:metadata:notes');
+
+        $collection->add_database_table('local_unifiedgrader_comments', [
+            'userid' => 'privacy:metadata:comments:userid',
+            'content' => 'privacy:metadata:comments:content',
+        ], 'privacy:metadata:comments');
+
+        $collection->add_database_table('local_unifiedgrader_annot', [
+            'cmid' => 'privacy:metadata:annotations:cmid',
+            'userid' => 'privacy:metadata:annotations:userid',
+            'authorid' => 'privacy:metadata:annotations:authorid',
+            'annotationdata' => 'privacy:metadata:annotations:data',
+        ], 'privacy:metadata:annotations');
+
+        $collection->add_database_table('local_unifiedgrader_prefs', [
+            'userid' => 'privacy:metadata:preferences:userid',
+            'preferences' => 'privacy:metadata:preferences:data',
+        ], 'privacy:metadata:preferences');
+
+        return $collection;
+    }
+
+    /**
+     * Get the list of contexts that contain user information for the specified user.
+     *
+     * @param int $userid
+     * @return contextlist
+     */
+    public static function get_contexts_for_userid(int $userid): contextlist {
+        $contextlist = new contextlist();
+
+        // Notes where user is the subject or the author.
+        $sql = "SELECT DISTINCT ctx.id
+                  FROM {local_unifiedgrader_notes} n
+                  JOIN {course_modules} cm ON cm.id = n.cmid
+                  JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
+                 WHERE n.userid = :userid1 OR n.authorid = :userid2";
+
+        $contextlist->add_from_sql($sql, [
+            'contextlevel' => CONTEXT_MODULE,
+            'userid1' => $userid,
+            'userid2' => $userid,
+        ]);
+
+        // Annotations where user is the subject or the author.
+        $sql = "SELECT DISTINCT ctx.id
+                  FROM {local_unifiedgrader_annot} a
+                  JOIN {course_modules} cm ON cm.id = a.cmid
+                  JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
+                 WHERE a.userid = :userid1 OR a.authorid = :userid2";
+
+        $contextlist->add_from_sql($sql, [
+            'contextlevel' => CONTEXT_MODULE,
+            'userid1' => $userid,
+            'userid2' => $userid,
+        ]);
+
+        return $contextlist;
+    }
+
+    /**
+     * Get the list of users who have data within a context.
+     *
+     * @param userlist $userlist
+     */
+    public static function get_users_in_context(userlist $userlist): void {
+        $context = $userlist->get_context();
+
+        if ($context->contextlevel !== CONTEXT_MODULE) {
+            return;
+        }
+
+        $sql = "SELECT DISTINCT n.userid
+                  FROM {local_unifiedgrader_notes} n
+                  JOIN {course_modules} cm ON cm.id = n.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('userid', $sql, ['cmid' => $context->instanceid]);
+
+        $sql = "SELECT DISTINCT n.authorid
+                  FROM {local_unifiedgrader_notes} n
+                  JOIN {course_modules} cm ON cm.id = n.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('authorid', $sql, ['cmid' => $context->instanceid]);
+
+        // Annotations: subjects and authors.
+        $sql = "SELECT DISTINCT a.userid
+                  FROM {local_unifiedgrader_annot} a
+                  JOIN {course_modules} cm ON cm.id = a.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('userid', $sql, ['cmid' => $context->instanceid]);
+
+        $sql = "SELECT DISTINCT a.authorid
+                  FROM {local_unifiedgrader_annot} a
+                  JOIN {course_modules} cm ON cm.id = a.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('authorid', $sql, ['cmid' => $context->instanceid]);
+    }
+
+    /**
+     * Export personal data for the given approved_contextlist.
+     *
+     * @param approved_contextlist $contextlist
+     */
+    public static function export_user_data(approved_contextlist $contextlist): void {
+        global $DB;
+
+        $userid = $contextlist->get_user()->id;
+
+        foreach ($contextlist->get_contexts() as $context) {
+            if ($context->contextlevel !== CONTEXT_MODULE) {
+                continue;
+            }
+
+            $cm = get_coursemodule_from_id('', $context->instanceid);
+            if (!$cm) {
+                continue;
+            }
+
+            // Export notes about this user.
+            $notes = $DB->get_records('local_unifiedgrader_notes', [
+                'cmid' => $cm->id,
+                'userid' => $userid,
+            ]);
+
+            if ($notes) {
+                $exportdata = array_map(function($note) {
+                    return [
+                        'content' => $note->content,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($note->timecreated),
+                    ];
+                }, $notes);
+
+                writer::with_context($context)->export_data(
+                    [get_string('notes', 'local_unifiedgrader')],
+                    (object) ['notes' => array_values($exportdata)],
+                );
+            }
+
+            // Export notes authored by this user.
+            $authored = $DB->get_records('local_unifiedgrader_notes', [
+                'cmid' => $cm->id,
+                'authorid' => $userid,
+            ]);
+
+            if ($authored) {
+                $exportdata = array_map(function($note) {
+                    return [
+                        'content' => $note->content,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($note->timecreated),
+                    ];
+                }, $authored);
+
+                writer::with_context($context)->export_data(
+                    [get_string('notes', 'local_unifiedgrader'), 'authored'],
+                    (object) ['authored_notes' => array_values($exportdata)],
+                );
+            }
+
+            // Export annotations about this user.
+            $annotations = $DB->get_records('local_unifiedgrader_annot', [
+                'cmid' => $cm->id,
+                'userid' => $userid,
+            ]);
+
+            if ($annotations) {
+                $exportdata = array_map(function($annot) {
+                    return [
+                        'fileid' => (int) $annot->fileid,
+                        'pagenum' => (int) $annot->pagenum,
+                        'annotationdata' => $annot->annotationdata,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($annot->timecreated),
+                    ];
+                }, $annotations);
+
+                writer::with_context($context)->export_data(
+                    [get_string('annotations', 'local_unifiedgrader')],
+                    (object) ['annotations' => array_values($exportdata)],
+                );
+            }
+        }
+
+        // Export comment library (user-level, not context-specific).
+        $comments = $DB->get_records('local_unifiedgrader_comments', ['userid' => $userid]);
+        if ($comments) {
+            $exportdata = array_map(function($comment) {
+                return [
+                    'content' => $comment->content,
+                    'timecreated' => \core_privacy\local\request\transform::datetime($comment->timecreated),
+                ];
+            }, $comments);
+
+            writer::with_context(\context_system::instance())->export_data(
+                [get_string('commentlibrary', 'local_unifiedgrader')],
+                (object) ['comments' => array_values($exportdata)],
+            );
+        }
+
+        // Export preferences.
+        $prefs = $DB->get_record('local_unifiedgrader_prefs', ['userid' => $userid]);
+        if ($prefs) {
+            writer::with_context(\context_system::instance())->export_data(
+                [get_string('pluginname', 'local_unifiedgrader'), 'preferences'],
+                (object) ['preferences' => $prefs->preferences],
+            );
+        }
+    }
+
+    /**
+     * Delete all data for all users in the specified context.
+     *
+     * @param \context $context
+     */
+    public static function delete_data_for_all_users_in_context(\context $context): void {
+        global $DB;
+
+        if ($context->contextlevel !== CONTEXT_MODULE) {
+            return;
+        }
+
+        $DB->delete_records('local_unifiedgrader_notes', ['cmid' => $context->instanceid]);
+        $DB->delete_records('local_unifiedgrader_annot', ['cmid' => $context->instanceid]);
+    }
+
+    /**
+     * Delete all data for the specified user, in the specified contexts.
+     *
+     * @param approved_contextlist $contextlist
+     */
+    public static function delete_data_for_user(approved_contextlist $contextlist): void {
+        global $DB;
+
+        $userid = $contextlist->get_user()->id;
+
+        foreach ($contextlist->get_contexts() as $context) {
+            if ($context->contextlevel !== CONTEXT_MODULE) {
+                continue;
+            }
+
+            $DB->delete_records('local_unifiedgrader_notes', [
+                'cmid' => $context->instanceid,
+                'userid' => $userid,
+            ]);
+            $DB->delete_records('local_unifiedgrader_notes', [
+                'cmid' => $context->instanceid,
+                'authorid' => $userid,
+            ]);
+            $DB->delete_records('local_unifiedgrader_annot', [
+                'cmid' => $context->instanceid,
+                'userid' => $userid,
+            ]);
+        }
+
+        // Delete user-level data.
+        $DB->delete_records('local_unifiedgrader_comments', ['userid' => $userid]);
+        $DB->delete_records('local_unifiedgrader_prefs', ['userid' => $userid]);
+    }
+
+    /**
+     * Delete multiple users' data for a single context.
+     *
+     * @param approved_userlist $userlist
+     */
+    public static function delete_data_for_users(approved_userlist $userlist): void {
+        global $DB;
+
+        $context = $userlist->get_context();
+        if ($context->contextlevel !== CONTEXT_MODULE) {
+            return;
+        }
+
+        $userids = $userlist->get_userids();
+        if (empty($userids)) {
+            return;
+        }
+
+        [$insql, $inparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
+
+        $DB->delete_records_select('local_unifiedgrader_notes',
+            "cmid = :cmid AND (userid {$insql} OR authorid {$insql})",
+            array_merge(['cmid' => $context->instanceid], $inparams),
+        );
+
+        $DB->delete_records_select('local_unifiedgrader_annot',
+            "cmid = :cmid AND userid {$insql}",
+            array_merge(['cmid' => $context->instanceid], $inparams),
+        );
+
+        // Delete user-level data.
+        $DB->delete_records_list('local_unifiedgrader_comments', 'userid', $userids);
+        $DB->delete_records_list('local_unifiedgrader_prefs', 'userid', $userids);
+    }
+}

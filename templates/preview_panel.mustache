@@ -1,0 +1,35 @@
+{{!
+    @template local_unifiedgrader/preview_panel
+
+    Left panel showing submission content preview.
+
+    This template is rendered as a partial of grading_interface.
+    Content is populated dynamically by the preview_panel JS component.
+
+    For PDF files, the iframe is replaced by the pdf_viewer component
+    which renders via PDF.js and supports annotations.
+}}
+<div data-region="preview-content" class="h-100 d-flex flex-column">
+
+    {{! No submission message }}
+    <div data-region="no-submission" class="d-none flex-grow-1 d-flex align-items-center justify-content-center">
+        <div class="text-center text-muted">
+            <div class="mb-2">{{#pix}} i/warning, core {{/pix}}</div>
+            <p>{{#str}} nosubmission, local_unifiedgrader {{/str}}</p>
+        </div>
+    </div>
+
+    {{! PDF viewer (PDF.js) — shown for PDF files }}
+    <div data-region="pdf-viewer-wrapper" class="d-none flex-grow-1" style="min-height: 0;">
+        {{> local_unifiedgrader/pdf_viewer }}
+    </div>
+
+    {{! Document preview (iframe) — shown for images, text, etc. }}
+    <div data-region="document-preview" class="d-none flex-grow-1" style="min-height: 0;">
+        <iframe data-region="preview-iframe"
+                class="w-100 h-100 border-0"
+                title="{{#str}} previewpanel, local_unifiedgrader {{/str}}">
+        </iframe>
+    </div>
+
+</div>

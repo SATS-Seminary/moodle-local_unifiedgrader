@@ -1,0 +1,75 @@
+{{!
+    @template local_unifiedgrader/student_navigator
+
+    Student navigation controls embedded in the header bar.
+    Includes prev/next navigation, student count, and a dropdown filter/search panel.
+
+    This template is rendered as a partial of grading_interface.
+    Dynamic content is managed by the student_navigator JS component.
+}}
+<div data-region="student-navigator" class="d-flex align-items-center position-relative px-3 border-start">
+
+    {{! Prev/Next + counter }}
+    <div class="d-flex align-items-center gap-1">
+        <button data-action="prev-student"
+                class="btn btn-sm btn-outline-secondary"
+                type="button"
+                title="{{#str}} previousstudent, local_unifiedgrader {{/str}}">
+            &#8249;
+        </button>
+
+        <small data-region="student-counter" class="text-muted text-nowrap mx-1">0 / 0</small>
+
+        <button data-action="next-student"
+                class="btn btn-sm btn-outline-secondary"
+                type="button"
+                title="{{#str}} nextstudent, local_unifiedgrader {{/str}}">
+            &#8250;
+        </button>
+
+        <button data-action="toggle-filters"
+                class="btn btn-sm btn-outline-secondary ms-2"
+                type="button"
+                title="{{#str}} expandfilters, local_unifiedgrader {{/str}}">
+            &#9776;
+        </button>
+    </div>
+
+    {{! Hidden element for JS reference (name displayed in header center) }}
+    <span data-region="current-student-name" class="d-none">--</span>
+
+    {{! Expandable filter/search dropdown }}
+    <div data-region="filter-controls" class="d-none local-unifiedgrader-nav-dropdown">
+
+        {{! Search }}
+        <div class="mb-2">
+            <input type="search"
+                   data-action="search-participants"
+                   class="form-control form-control-sm"
+                   placeholder="{{#str}} search, local_unifiedgrader {{/str}}">
+        </div>
+
+        {{! Status filter + sort }}
+        <div class="d-flex gap-2 mb-2">
+            <select data-action="filter-status" class="form-select form-select-sm">
+                <option value="all">{{#str}} filter_all, local_unifiedgrader {{/str}}</option>
+                <option value="submitted">{{#str}} filter_submitted, local_unifiedgrader {{/str}}</option>
+                <option value="nosubmission">{{#str}} filter_notsubmitted, local_unifiedgrader {{/str}}</option>
+                <option value="graded">{{#str}} filter_graded, local_unifiedgrader {{/str}}</option>
+            </select>
+            <select data-action="sort-field" class="form-select form-select-sm">
+                <option value="fullname">{{#str}} sortby_fullname, local_unifiedgrader {{/str}}</option>
+                <option value="submittedat" selected>{{#str}} sortby_submittedat, local_unifiedgrader {{/str}}</option>
+                <option value="status">{{#str}} sortby_status, local_unifiedgrader {{/str}}</option>
+            </select>
+        </div>
+
+        {{! Participant list }}
+        <div data-region="participant-list"
+             class="list-group list-group-flush border rounded"
+             style="max-height: 300px; overflow-y: auto;">
+        </div>
+
+    </div>
+
+</div>

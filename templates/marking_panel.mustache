@@ -1,0 +1,132 @@
+{{!
+    @template local_unifiedgrader/marking_panel
+
+    Right panel containing grade input, feedback, comment library, and teacher notes.
+
+    This template is rendered as a partial of grading_interface.
+    Dynamic content is managed by the marking_panel JS component.
+}}
+<div data-region="marking-content" class="p-3">
+
+    {{! Grade section }}
+    <div class="card mb-3">
+        <div class="card-header py-2">
+            <h6 class="mb-0">{{#str}} grade, local_unifiedgrader {{/str}}</h6>
+        </div>
+        <div class="card-body">
+
+            {{! Simple grading: number input }}
+            <div data-region="simple-grade" class="mb-3">
+                <div class="input-group">
+                    <input type="number"
+                           data-action="grade-input"
+                           class="form-control"
+                           step="any"
+                           min="0"
+                           placeholder="{{#str}} grade, local_unifiedgrader {{/str}}"
+                           aria-label="{{#str}} grade, local_unifiedgrader {{/str}}">
+                    <span class="input-group-text" data-region="max-grade">/ --</span>
+                </div>
+            </div>
+
+            {{! Advanced grading placeholder (rubric/marking guide) }}
+            <div data-region="advanced-grading" class="d-none mb-3"></div>
+
+            {{! Feedback }}
+            <div class="mb-3">
+                <label for="feedback-editor-{{uniqid}}" class="form-label small fw-bold">
+                    {{#str}} feedback, local_unifiedgrader {{/str}}
+                </label>
+                <textarea id="feedback-editor-{{uniqid}}"
+                          data-action="feedback-input"
+                          class="form-control"
+                          rows="5"
+                          placeholder="{{#str}} feedback, local_unifiedgrader {{/str}}"></textarea>
+            </div>
+
+            {{! Comment library }}
+            <div data-region="comment-library" class="mb-3">
+                <details class="border rounded">
+                    <summary class="px-3 py-2 bg-light small fw-bold" style="cursor: pointer;">
+                        {{#str}} commentlibrary, local_unifiedgrader {{/str}}
+                    </summary>
+                    <div class="p-2">
+                        <div data-region="comment-list" class="list-group list-group-flush mb-2"
+                             style="max-height: 200px; overflow-y: auto;">
+                            <div data-region="no-comments" class="text-muted small p-2 text-center">
+                                {{#str}} nocomments, local_unifiedgrader {{/str}}
+                            </div>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <input type="text"
+                                   data-action="new-comment-input"
+                                   class="form-control"
+                                   placeholder="{{#str}} newcomment, local_unifiedgrader {{/str}}">
+                            <button data-action="save-comment" class="btn btn-outline-primary" type="button">
+                                +
+                            </button>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            {{! Save button }}
+            <button data-action="save-grade" class="btn btn-primary w-100" type="button">
+                {{#str}} savegrade, local_unifiedgrader {{/str}}
+            </button>
+
+        </div>
+    </div>
+
+    {{! Rubric / Marking guide section (populated by JS when advanced grading is active) }}
+    <div data-region="rubric-section" class="d-none card mb-3">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0" data-region="rubric-title"></h6>
+            <span class="badge bg-primary" data-region="rubric-total"></span>
+        </div>
+        <div class="card-body p-0" data-region="rubric-body"></div>
+    </div>
+
+    {{! Teacher notes section }}
+    {{#canviewnotes}}
+    <div data-region="notes-section" class="card mb-3">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">{{#str}} notes, local_unifiedgrader {{/str}}</h6>
+            {{#canmanagenotes}}
+            <button data-action="add-note" class="btn btn-sm btn-outline-primary" type="button">
+                {{#str}} addnote, local_unifiedgrader {{/str}}
+            </button>
+            {{/canmanagenotes}}
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">{{#str}} notes_desc, local_unifiedgrader {{/str}}</p>
+
+            {{! Note editor (hidden by default) }}
+            {{#canmanagenotes}}
+            <div data-region="note-editor" class="d-none mb-3">
+                <textarea data-action="note-input"
+                          class="form-control mb-2"
+                          rows="3"
+                          placeholder="{{#str}} addnote, local_unifiedgrader {{/str}}"></textarea>
+                <div class="d-flex gap-2">
+                    <button data-action="save-note" class="btn btn-sm btn-primary" type="button">
+                        {{#str}} savenote, local_unifiedgrader {{/str}}
+                    </button>
+                    <button data-action="cancel-note" class="btn btn-sm btn-outline-secondary" type="button">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+            {{/canmanagenotes}}
+
+            {{! Notes list }}
+            <div data-region="notes-list">
+                <div data-region="no-notes" class="text-muted small text-center py-2">
+                    {{#str}} nonotes, local_unifiedgrader {{/str}}
+                </div>
+            </div>
+        </div>
+    </div>
+    {{/canviewnotes}}
+
+</div>

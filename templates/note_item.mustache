@@ -1,0 +1,40 @@
+{{!
+    @template local_unifiedgrader/note_item
+
+    Renders a single teacher note. Used by JS to populate the notes list.
+
+    Context variables required:
+    * id - int - Note ID
+    * authorname - string - Author full name
+    * content - string - Formatted note content
+    * timecreated - int - Timestamp
+    * canmanagenotes - bool - Whether the current user can delete this note
+
+    Example context (json):
+    {
+        "id": 1,
+        "authorname": "Prof Smith",
+        "content": "Student needs additional support.",
+        "timecreated": 1708000000,
+        "canmanagenotes": true
+    }
+}}
+<div class="note-item mb-2 p-2 rounded" data-noteid="{{id}}">
+    <div class="d-flex justify-content-between align-items-start">
+        <small class="text-muted">
+            <strong>{{authorname}}</strong>
+            &middot;
+            <span data-region="note-time">{{timecreated}}</span>
+        </small>
+        {{#canmanagenotes}}
+        <button data-action="delete-note"
+                data-noteid="{{id}}"
+                class="btn btn-sm btn-link text-danger p-0"
+                type="button"
+                title="{{#str}} deletenote, local_unifiedgrader {{/str}}">
+            &times;
+        </button>
+        {{/canmanagenotes}}
+    </div>
+    <div class="mt-1 small">{{{content}}}</div>
+</div>

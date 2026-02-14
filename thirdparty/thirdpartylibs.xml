@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<libraries>
+    <library>
+        <location>pdfjs</location>
+        <name>PDF.js</name>
+        <version>4.10.38</version>
+        <license>Apache-2.0</license>
+        <licenseversion>2.0</licenseversion>
+    </library>
+    <library>
+        <location>fabric</location>
+        <name>Fabric.js</name>
+        <version>6.9.1</version>
+        <license>MIT</license>
+        <licenseversion></licenseversion>
+    </library>
+</libraries>

@@ -1,0 +1,95 @@
+{{!
+    @template local_unifiedgrader/pdf_viewer
+
+    PDF viewer component with page navigation, zoom controls, and annotation toolbar.
+    Renders PDF pages via PDF.js with a Fabric.js overlay canvas for annotations.
+
+    This template is embedded inside the preview panel.
+}}
+<div data-region="pdf-viewer" class="h-100 d-flex flex-column">
+
+    {{! Annotation toolbar — hidden until a PDF is loaded }}
+    <div data-region="annotation-toolbar" class="d-none">
+        {{> local_unifiedgrader/annotation_toolbar }}
+    </div>
+
+    {{! PDF page display area }}
+    <div data-region="pdf-page-container" class="flex-grow-1 position-relative overflow-auto bg-light"
+         style="min-height: 0;">
+        <div data-region="pdf-page-wrapper" class="d-flex justify-content-center py-2">
+            <div data-region="pdf-canvas-wrapper" class="position-relative" style="display: inline-block;">
+                <canvas data-region="pdf-canvas"></canvas>
+                {{! Fabric.js annotation canvas gets layered on top (Phase 4B) }}
+                <canvas data-region="annotation-canvas"
+                        class="position-absolute top-0 start-0"
+                        style="pointer-events: none;"></canvas>
+            </div>
+        </div>
+
+        {{! Loading spinner for page rendering }}
+        <div data-region="pdf-loading" class="d-none position-absolute top-0 start-0 w-100 h-100
+             d-flex align-items-center justify-content-center" style="background: rgba(255,255,255,0.6);">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">{{#str}} loading, local_unifiedgrader {{/str}}</span>
+            </div>
+        </div>
+    </div>
+
+    {{! Bottom controls: page navigation + zoom }}
+    <div data-region="pdf-controls" class="d-flex align-items-center justify-content-between
+         px-3 py-1 border-top bg-white" style="min-height: 36px;">
+
+        {{! Page navigation }}
+        <div class="d-flex align-items-center gap-2">
+            <button data-action="prev-page" type="button"
+                    class="btn btn-sm btn-outline-secondary p-1" disabled
+                    title="{{#str}} pdf_prevpage, local_unifiedgrader {{/str}}">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                </svg>
+            </button>
+            <span class="small text-nowrap">
+                <span data-region="current-page">1</span>
+                /
+                <span data-region="total-pages">1</span>
+            </span>
+            <button data-action="next-page" type="button"
+                    class="btn btn-sm btn-outline-secondary p-1" disabled
+                    title="{{#str}} pdf_nextpage, local_unifiedgrader {{/str}}">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                </svg>
+            </button>
+        </div>
+
+        {{! Zoom controls }}
+        <div class="d-flex align-items-center gap-2">
+            <button data-action="zoom-out" type="button"
+                    class="btn btn-sm btn-outline-secondary p-1"
+                    title="{{#str}} pdf_zoomout, local_unifiedgrader {{/str}}">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8z"/>
+                </svg>
+            </button>
+            <span data-region="zoom-level" class="small text-nowrap" style="min-width: 40px; text-align: center;">
+                100%
+            </span>
+            <button data-action="zoom-in" type="button"
+                    class="btn btn-sm btn-outline-secondary p-1"
+                    title="{{#str}} pdf_zoomin, local_unifiedgrader {{/str}}">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                </svg>
+            </button>
+            <button data-action="zoom-fit" type="button"
+                    class="btn btn-sm btn-outline-secondary p-1"
+                    title="{{#str}} pdf_zoomfit, local_unifiedgrader {{/str}}">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4A1.5 1.5 0 0 1 1.5 0h4a.5.5 0 0 1 0 1h-4zM10 .5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 16 1.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5zM.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 0 14.5v-4a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5z"/>
+                </svg>
+            </button>
+        </div>
+
+    </div>
+
+</div>

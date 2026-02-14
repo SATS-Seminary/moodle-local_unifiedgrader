@@ -1,0 +1,20 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2020": true,
+    "amd": true
+  },
+  "globals": {
+    "M": true,
+    "Y": true
+  },
+  "parserOptions": {
+    "sourceType": "module",
+    "ecmaVersion": 2020
+  },
+  "rules": {
+    "no-console": "error",
+    "no-unused-vars": ["error", { "caughtErrors": "none" }]
+  }
+}

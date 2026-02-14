@@ -1,0 +1,120 @@
+{{!
+    @template local_unifiedgrader/annotation_toolbar
+
+    Annotation toolbar with tool selection, colour picker, and undo/redo controls.
+    Rendered inside the pdf_viewer template.
+}}
+<div class="d-flex align-items-center gap-2 px-2 py-1 border-bottom bg-white flex-wrap"
+     data-region="annotation-toolbar-inner">
+
+    {{! Tool selection buttons }}
+    <div class="btn-group btn-group-sm" role="group"
+         aria-label="{{#str}} annotate_tools, local_unifiedgrader {{/str}}"
+         data-region="tool-selector">
+        <button type="button" class="btn btn-outline-secondary active" data-tool="select"
+                title="{{#str}} annotate_select, local_unifiedgrader {{/str}}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M3 2l10 6-4 1-2 5z"/>
+            </svg>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" data-tool="comment"
+                title="{{#str}} annotate_comment, local_unifiedgrader {{/str}}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1a7 7 0 0 0-7 7c0 1.6.5 3 1.5 4.2L1 15l3.2-1c1 .6 2.3 1 3.8 1a7 7 0 0 0 0-14z"/>
+            </svg>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" data-tool="highlight"
+                title="{{#str}} annotate_highlight, local_unifiedgrader {{/str}}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <rect x="1" y="5" width="14" height="6" rx="1" opacity="0.5"/>
+            </svg>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" data-tool="pen"
+                title="{{#str}} annotate_pen, local_unifiedgrader {{/str}}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708L5.707 13.293l-3-3L12.146.854zM2 11l3 3-3.5 1.5L.5 14 2 11z"/>
+            </svg>
+        </button>
+    </div>
+
+    {{! Stamp palette }}
+    <div class="btn-group btn-group-sm" role="group"
+         aria-label="{{#str}} annotate_stamps, local_unifiedgrader {{/str}}"
+         data-region="stamp-selector">
+        <button type="button" class="btn btn-outline-secondary" data-tool="stamp" data-stamp="CHECK"
+                title="{{#str}} annotate_stamp_check, local_unifiedgrader {{/str}}">&#10003;</button>
+        <button type="button" class="btn btn-outline-secondary" data-tool="stamp" data-stamp="CROSS"
+                title="{{#str}} annotate_stamp_cross, local_unifiedgrader {{/str}}">&#10007;</button>
+        <button type="button" class="btn btn-outline-secondary" data-tool="stamp" data-stamp="QUESTION"
+                title="{{#str}} annotate_stamp_question, local_unifiedgrader {{/str}}">?</button>
+    </div>
+
+    {{! Separator }}
+    <div class="vr mx-1" style="height: 24px;"></div>
+
+    {{! Colour picker }}
+    <div class="d-flex align-items-center gap-1" data-region="color-picker">
+        <button type="button" class="btn btn-sm p-0 rounded-circle annotation-color-btn active"
+                data-color="#EF4540" style="background:#EF4540;"
+                title="{{#str}} annotate_red, local_unifiedgrader {{/str}}">
+            <span class="visually-hidden">{{#str}} annotate_red, local_unifiedgrader {{/str}}</span>
+        </button>
+        <button type="button" class="btn btn-sm p-0 rounded-circle annotation-color-btn"
+                data-color="#FFCF35" style="background:#FFCF35;"
+                title="{{#str}} annotate_yellow, local_unifiedgrader {{/str}}">
+            <span class="visually-hidden">{{#str}} annotate_yellow, local_unifiedgrader {{/str}}</span>
+        </button>
+        <button type="button" class="btn btn-sm p-0 rounded-circle annotation-color-btn"
+                data-color="#98CA3E" style="background:#98CA3E;"
+                title="{{#str}} annotate_green, local_unifiedgrader {{/str}}">
+            <span class="visually-hidden">{{#str}} annotate_green, local_unifiedgrader {{/str}}</span>
+        </button>
+        <button type="button" class="btn btn-sm p-0 rounded-circle annotation-color-btn"
+                data-color="#7D9FD3" style="background:#7D9FD3;"
+                title="{{#str}} annotate_blue, local_unifiedgrader {{/str}}">
+            <span class="visually-hidden">{{#str}} annotate_blue, local_unifiedgrader {{/str}}</span>
+        </button>
+        <button type="button" class="btn btn-sm p-0 rounded-circle annotation-color-btn"
+                data-color="#333333" style="background:#333333;"
+                title="{{#str}} annotate_black, local_unifiedgrader {{/str}}">
+            <span class="visually-hidden">{{#str}} annotate_black, local_unifiedgrader {{/str}}</span>
+        </button>
+    </div>
+
+    {{! Separator }}
+    <div class="vr mx-1" style="height: 24px;"></div>
+
+    {{! Undo / Redo }}
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-secondary" data-action="undo" disabled
+                title="{{#str}} annotate_undo, local_unifiedgrader {{/str}}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.418A6 6 0 1 0 8 2v1z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+            </svg>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" data-action="redo" disabled
+                title="{{#str}} annotate_redo, local_unifiedgrader {{/str}}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="transform: scaleX(-1);">
+                <path d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.418A6 6 0 1 0 8 2v1z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+            </svg>
+        </button>
+    </div>
+
+    {{! Delete selected }}
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="delete-selected" disabled
+            title="{{#str}} annotate_delete, local_unifiedgrader {{/str}}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+        </svg>
+    </button>
+
+    {{! Clear all }}
+    <button type="button" class="btn btn-sm btn-outline-danger" data-action="clear-annotations"
+            title="{{#str}} annotate_clearall, local_unifiedgrader {{/str}}">
+        {{#str}} annotate_clearall, local_unifiedgrader {{/str}}
+    </button>
+
+</div>
