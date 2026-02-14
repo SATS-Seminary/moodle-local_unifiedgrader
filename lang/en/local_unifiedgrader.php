@@ -74,6 +74,7 @@ $string['filter_submitted'] = 'Submitted';
 $string['filter_needsgrading'] = 'Needs grading';
 $string['filter_notsubmitted'] = 'Not submitted';
 $string['filter_graded'] = 'Graded';
+$string['filter_allgroups'] = 'All groups';
 $string['studentcount'] = '{$a->current} of {$a->total}';
 
 // Statuses.
@@ -120,6 +121,9 @@ $string['viewallsubmissions'] = 'View all submissions';
 $string['layout_both'] = 'Split view';
 $string['layout_preview'] = 'Preview only';
 $string['layout_grade'] = 'Grading only';
+$string['manualquestions'] = 'Manual questions';
+$string['response'] = 'Response';
+$string['teachercomment'] = 'Teacher comment';
 
 // Privacy.
 $string['privacy:metadata:notes'] = 'Private teacher notes stored per student per activity in the Unified Grader.';

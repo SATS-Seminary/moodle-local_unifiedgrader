@@ -50,8 +50,12 @@ export const init = (containerId) => {
     const canviewnotes = container.dataset.canviewnotes === '1';
     const canmanagenotes = container.dataset.canmanagenotes === '1';
 
+    const hasGroupMode = container.dataset.hasgroupmode === '1';
+    const currentGroup = parseInt(container.dataset.currentgroup, 10) || 0;
+
     let activityinfo = {};
     let participants = [];
+    let groups = [];
 
     try {
         activityinfo = JSON.parse(container.dataset.activityinfo || '{}');
@@ -63,6 +67,12 @@ export const init = (containerId) => {
         participants = JSON.parse(container.dataset.participants || '[]');
     } catch (e) {
         participants = [];
+    }
+
+    try {
+        groups = JSON.parse(container.dataset.groups || '[]');
+    } catch (e) {
+        groups = [];
     }
 
     // Create the reactive instance.
@@ -110,12 +120,14 @@ export const init = (containerId) => {
         },
         notes: [],
         commentLibrary: [],
+        groups: groups,
         filters: {
             status: 'all',
-            group: 0,
+            group: currentGroup,
             sort: 'submittedat',
             sortdir: 'asc',
             search: '',
+            hasGroupMode: hasGroupMode,
         },
         ui: {
             loading: false,

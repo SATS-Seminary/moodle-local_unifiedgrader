@@ -34,9 +34,8 @@ class adapter_factory {
     /** @var array<string, class-string<base_adapter>> Registered adapter classes. */
     private const ADAPTERS = [
         'assign' => assign_adapter::class,
-        // Future phases:
-        // 'forum' => forum_adapter::class,
-        // 'quiz'  => quiz_adapter::class,
+        'forum' => forum_adapter::class,
+        'quiz' => quiz_adapter::class,
     ];
 
     /**

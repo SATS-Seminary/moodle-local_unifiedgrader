@@ -58,9 +58,30 @@ $PAGE->navbar->add(
 );
 $PAGE->navbar->add(get_string('grading_interface', 'local_unifiedgrader'));
 
+// Resolve group mode and available groups.
+$groupmode = groups_get_activity_groupmode($cm, $course);
+$availablegroups = [];
+$currentgroup = 0;
+if ($groupmode != NOGROUPS) {
+    $aag = has_capability('moodle/site:accessallgroups', $context);
+    $availablegroups = groups_get_all_groups($course->id, 0, $cm->groupingid, 'g.id, g.name');
+    // If the user cannot access all groups, restrict to their own groups.
+    if (!$aag) {
+        global $USER;
+        $usergroups = groups_get_all_groups($course->id, $USER->id, $cm->groupingid, 'g.id, g.name');
+        $availablegroups = $usergroups;
+        // Default to the user's first group.
+        $currentgroup = !empty($usergroups) ? (int) reset($usergroups)->id : 0;
+    }
+}
+
 // Load initial data server-side to avoid loading flash.
 $activityinfo = $adapter->get_activity_info();
-$participants = $adapter->get_participants(['sort' => 'submittedat', 'sortdir' => 'asc']);
+$participants = $adapter->get_participants([
+    'sort' => 'submittedat',
+    'sortdir' => 'asc',
+    'group' => $currentgroup,
+]);
 $initialuserid = $userid ?: ($participants[0]['id'] ?? 0);
 
 // Capability flags for the template.
@@ -86,11 +107,17 @@ $templatedata = [
     'courseshortname' => format_string($course->shortname),
     'courseurl' => (new moodle_url('/course/view.php', ['id' => $course->id]))->out(false),
     'activityurl' => (new moodle_url('/mod/' . $cm->modname . '/view.php', ['id' => $cm->id]))->out(false),
-    'submissionsurl' => (new moodle_url('/mod/' . $cm->modname . '/view.php', [
-        'id' => $cm->id,
-        'action' => 'grading',
-    ]))->out(false),
+    'submissionsurl' => match ($cm->modname) {
+        'assign' => (new moodle_url('/mod/assign/view.php', ['id' => $cm->id, 'action' => 'grading']))->out(false),
+        'quiz' => (new moodle_url('/mod/quiz/report.php', ['id' => $cm->id, 'mode' => 'grading']))->out(false),
+        default => (new moodle_url('/mod/' . $cm->modname . '/view.php', ['id' => $cm->id]))->out(false),
+    },
     'uniqid' => uniqid(),
+    'hasgroupmode' => $groupmode != NOGROUPS,
+    'groupsjson' => json_encode(array_values(array_map(function ($g) {
+        return ['id' => (int) $g->id, 'name' => format_string($g->name)];
+    }, $availablegroups))),
+    'currentgroup' => $currentgroup,
 ];
 
 // Output.

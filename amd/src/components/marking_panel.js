@@ -368,7 +368,7 @@ export default class extends BaseComponent {
         // Render based on method.
         if (definition.method === 'rubric') {
             this._renderRubric(definition, fillData);
-        } else if (definition.method === 'guide') {
+        } else if (definition.method === 'guide' || definition.method === 'quizmanual') {
             this._renderGuide(definition, fillData);
         }
 
@@ -667,6 +667,18 @@ export default class extends BaseComponent {
                 };
             }
             return JSON.stringify({criteria});
+        }
+
+        if (method === 'quizmanual') {
+            const questions = {};
+            for (const criterion of this._gradingDefinition.criteria) {
+                const id = criterion.id;
+                questions[id] = {
+                    mark: this._guideScores[id] || '',
+                    comment: this._guideRemarks[id] || '',
+                };
+            }
+            return JSON.stringify({method: 'quizmanual', questions});
         }
 
         return '';

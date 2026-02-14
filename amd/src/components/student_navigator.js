@@ -40,6 +40,8 @@ export default class extends BaseComponent {
             SEARCH_INPUT: '[data-action="search-participants"]',
             FILTER_STATUS: '[data-action="filter-status"]',
             SORT_FIELD: '[data-action="sort-field"]',
+            GROUP_FILTER: '[data-region="group-filter"]',
+            GROUP_SELECT: '[data-action="filter-group"]',
             PARTICIPANT_LIST: '[data-region="participant-list"]',
         };
         this._searchTimeout = null;
@@ -67,6 +69,7 @@ export default class extends BaseComponent {
     stateReady(state) {
         this._container = this.element.closest('.local-unifiedgrader-container');
         this._setupEventListeners();
+        this._initGroupSelector(state);
         this._renderParticipants({state});
         this._updateCurrentStudent({state});
     }
@@ -124,6 +127,14 @@ export default class extends BaseComponent {
             });
         }
 
+        // Group filter.
+        const groupSelect = this.getElement(this.selectors.GROUP_SELECT);
+        if (groupSelect) {
+            groupSelect.addEventListener('change', () => {
+                this._applyFilters({group: parseInt(groupSelect.value, 10)});
+            });
+        }
+
         // Keyboard navigation.
         document.addEventListener('keydown', (e) => {
             // Only handle if no input is focused.
@@ -138,6 +149,38 @@ export default class extends BaseComponent {
                 this._navigateStudent(1);
             }
         });
+    }
+
+    /**
+     * Populate the group selector dropdown from state data.
+     *
+     * @param {object} state Current state.
+     */
+    _initGroupSelector(state) {
+        if (!state.filters.hasGroupMode) {
+            return;
+        }
+
+        const wrapper = this.getElement(this.selectors.GROUP_FILTER);
+        const select = this.getElement(this.selectors.GROUP_SELECT);
+        if (!wrapper || !select) {
+            return;
+        }
+
+        // Show the group filter row.
+        wrapper.classList.remove('d-none');
+
+        // Populate group options. The "All groups" option is already in the template.
+        const groups = [...state.groups.values()];
+        groups.forEach((group) => {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.name;
+            select.appendChild(option);
+        });
+
+        // Set current selection.
+        select.value = state.filters.group;
     }
 
     /**

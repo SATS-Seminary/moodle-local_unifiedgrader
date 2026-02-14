@@ -49,6 +49,13 @@
                    placeholder="{{#str}} search, local_unifiedgrader {{/str}}">
         </div>
 
+        {{! Group filter (only shown when activity has group mode) }}
+        <div data-region="group-filter" class="mb-2 d-none">
+            <select data-action="filter-group" class="form-select form-select-sm">
+                <option value="0">{{#str}} filter_allgroups, local_unifiedgrader {{/str}}</option>
+            </select>
+        </div>
+
         {{! Status filter + sort }}
         <div class="d-flex gap-2 mb-2">
             <select data-action="filter-status" class="form-select form-select-sm">

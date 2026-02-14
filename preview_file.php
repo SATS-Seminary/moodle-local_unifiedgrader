@@ -63,7 +63,11 @@ $safetypes = [
 ];
 
 $mimetype = $file->get_mimetype();
-if (!in_array($mimetype, $safetypes)) {
+$issafe = in_array($mimetype, $safetypes)
+    || str_starts_with($mimetype, 'audio/')
+    || str_starts_with($mimetype, 'video/');
+
+if (!$issafe) {
     throw new moodle_exception('filenotfound', 'error');
 }
 

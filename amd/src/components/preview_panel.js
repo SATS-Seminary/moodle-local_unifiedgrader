@@ -124,6 +124,22 @@ export default class extends BaseComponent {
             const firstPreviewable = files.find(f => this._isPreviewable(f.mimetype));
             if (firstPreviewable) {
                 this._previewFile(firstPreviewable);
+                return;
+            }
+        }
+
+        // Show submission content in an iframe via a proper Moodle page.
+        // This ensures submission plugin CSS, JS, and AMD modules load correctly
+        // (e.g. ytsubmission's YouTube player and timestamped feedback interface).
+        if (submission.status && submission.status !== 'nosubmission') {
+            const iframe = this.getElement(this.selectors.PREVIEW_IFRAME);
+            const cmid = this.reactive.state.activity?.cmid;
+            const userid = submission.userid;
+            if (cmid && userid) {
+                iframe.src = `${M.cfg.wwwroot}/local/unifiedgrader/preview_submission.php`
+                    + `?cmid=${cmid}&userid=${userid}`;
+                docPreview.classList.remove('d-none');
+                return;
             }
         }
     }
@@ -203,6 +219,13 @@ export default class extends BaseComponent {
                 parseInt(file.fileid, 10),
             );
             this._pdfViewer.loadPdf(file.previewurl || file.url);
+        } else if (file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
+            // Use styled media player page for audio/video.
+            const iframe = this.getElement(this.selectors.PREVIEW_IFRAME);
+            const cmid = this.reactive.state.activity?.cmid;
+            iframe.src = `${M.cfg.wwwroot}/local/unifiedgrader/preview_media.php`
+                + `?fileid=${file.fileid}&cmid=${cmid}`;
+            docPreview.classList.remove('d-none');
         } else {
             // Use iframe for images, text, etc.
             const iframe = this.getElement(this.selectors.PREVIEW_IFRAME);
@@ -243,14 +266,18 @@ export default class extends BaseComponent {
      * @return {boolean}
      */
     _isPreviewable(mimetype) {
-        return [
+        if ([
             'application/pdf',
             'image/jpeg',
             'image/png',
             'image/gif',
             'image/webp',
             'text/plain',
-        ].includes(mimetype);
+        ].includes(mimetype)) {
+            return true;
+        }
+        // Audio and video types are previewable via HTML5 media elements.
+        return mimetype.startsWith('audio/') || mimetype.startsWith('video/');
     }
 
     /**
