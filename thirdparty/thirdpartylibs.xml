@@ -14,4 +14,11 @@
         <license>MIT</license>
         <licenseversion></licenseversion>
     </library>
+    <library>
+        <location>pdflib</location>
+        <name>pdf-lib</name>
+        <version>1.17.1</version>
+        <license>MIT</license>
+        <licenseversion></licenseversion>
+    </library>
 </libraries>

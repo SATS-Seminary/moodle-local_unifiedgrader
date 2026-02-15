@@ -122,6 +122,17 @@ abstract class base_adapter {
     abstract public function supports_feature(string $feature): bool;
 
     /**
+     * Check whether the grade for a user has been released and is visible to the student.
+     *
+     * This checks that a grade exists, the gradebook item is not hidden, and
+     * (for activities with marking workflow) the workflow state is "released".
+     *
+     * @param int $userid The student user ID.
+     * @return bool True if the grade is released and visible to the student.
+     */
+    abstract public function is_grade_released(int $userid): bool;
+
+    /**
      * Get the activity type identifier.
      *
      * @return string e.g., 'assign', 'forum', 'quiz'.

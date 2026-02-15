@@ -63,4 +63,14 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+    'local/unifiedgrader:viewfeedback' => [
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => [
+            'student' => CAP_ALLOW,
+            'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        ],
+    ],
 ];

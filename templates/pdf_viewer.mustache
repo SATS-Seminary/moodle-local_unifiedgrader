@@ -28,10 +28,18 @@
 
         {{! Loading spinner for page rendering }}
         <div data-region="pdf-loading" class="d-none position-absolute top-0 start-0 w-100 h-100
-             d-flex align-items-center justify-content-center" style="background: rgba(255,255,255,0.6);">
+             d-flex flex-column align-items-center justify-content-center"
+             style="background: rgba(255,255,255,0.6); z-index: 5;">
             <div class="spinner-border spinner-border-sm text-primary" role="status">
                 <span class="visually-hidden">{{#str}} loading, local_unifiedgrader {{/str}}</span>
             </div>
+            <small data-region="pdf-loading-message" class="d-none text-muted mt-2"></small>
+        </div>
+
+        {{! Error message overlay (shown when PDF loading or conversion fails) }}
+        <div data-region="pdf-error" class="d-none position-absolute top-0 start-0 w-100 h-100
+             d-flex align-items-center justify-content-center text-center text-danger p-4"
+             style="background: rgba(255,255,255,0.9); z-index: 5;">
         </div>
     </div>
 

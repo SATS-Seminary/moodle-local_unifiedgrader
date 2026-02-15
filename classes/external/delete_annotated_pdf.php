@@ -15,7 +15,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * External function: get submission data.
+ * External function: delete a flattened annotated PDF from file storage.
+ *
+ * Called when a teacher clears all annotations for a file, removing the
+ * previously stored flattened PDF so students see the original file.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary
@@ -28,15 +31,13 @@ defined('MOODLE_INTERNAL') || die();
 
 use core_external\external_api;
 use core_external\external_function_parameters;
-use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use local_unifiedgrader\adapter\adapter_factory;
 
 /**
- * Returns submission content for a specific student.
+ * Deletes a flattened annotated PDF from Moodle file storage.
  */
-class get_submission_data extends external_api {
+class delete_annotated_pdf extends external_api {
 
     /**
      * Parameter definition.
@@ -45,7 +46,8 @@ class get_submission_data extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
-            'userid' => new external_value(PARAM_INT, 'User ID'),
+            'userid' => new external_value(PARAM_INT, 'Student user ID'),
+            'fileid' => new external_value(PARAM_INT, 'Original submission file ID'),
         ]);
     }
 
@@ -54,20 +56,40 @@ class get_submission_data extends external_api {
      *
      * @param int $cmid
      * @param int $userid
+     * @param int $fileid
      * @return array
      */
-    public static function execute(int $cmid, int $userid): array {
+    public static function execute(int $cmid, int $userid, int $fileid): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'userid' => $userid,
+            'fileid' => $fileid,
         ]);
 
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
 
-        $adapter = adapter_factory::create($params['cmid']);
-        return $adapter->get_submission_data($params['userid']);
+        $fs = get_file_storage();
+
+        // Delete all files for this combination (any filename).
+        $files = $fs->get_area_files(
+            $context->id,
+            'local_unifiedgrader',
+            'annotatedpdf',
+            $params['fileid'],
+            'id',
+            false,
+        );
+
+        foreach ($files as $file) {
+            // Only delete files in this student's path.
+            if ($file->get_filepath() === '/' . $params['userid'] . '/') {
+                $file->delete();
+            }
+        }
+
+        return ['success' => true];
     }
 
     /**
@@ -76,24 +98,7 @@ class get_submission_data extends external_api {
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'userid' => new external_value(PARAM_INT, 'User ID'),
-            'status' => new external_value(PARAM_TEXT, 'Submission status'),
-            'content' => new external_value(PARAM_RAW, 'Rendered submission content HTML'),
-            'files' => new external_multiple_structure(
-                new external_single_structure([
-                    'fileid' => new external_value(PARAM_INT, 'File ID'),
-                    'filename' => new external_value(PARAM_TEXT, 'File name'),
-                    'mimetype' => new external_value(PARAM_TEXT, 'MIME type'),
-                    'filesize' => new external_value(PARAM_INT, 'File size in bytes'),
-                    'url' => new external_value(PARAM_URL, 'Download URL'),
-                    'previewurl' => new external_value(PARAM_URL, 'Inline preview URL'),
-                    'convertible' => new external_value(PARAM_BOOL, 'Whether file can be converted to PDF'),
-                ]),
-            ),
-            'onlinetext' => new external_value(PARAM_RAW, 'Online text submission'),
-            'timecreated' => new external_value(PARAM_INT, 'Time created'),
-            'timemodified' => new external_value(PARAM_INT, 'Time modified'),
-            'attemptnumber' => new external_value(PARAM_INT, 'Attempt number'),
+            'success' => new external_value(PARAM_BOOL, 'Whether the deletion succeeded'),
         ]);
     }
 }

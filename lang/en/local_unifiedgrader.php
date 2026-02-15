@@ -35,6 +35,7 @@ $string['unifiedgrader:grade'] = 'Use the Unified Grader to grade';
 $string['unifiedgrader:viewall'] = 'View all students in the Unified Grader';
 $string['unifiedgrader:viewnotes'] = 'View private teacher notes';
 $string['unifiedgrader:managenotes'] = 'Create and edit private teacher notes';
+$string['unifiedgrader:viewfeedback'] = 'View annotated feedback from the Unified Grader';
 
 // Settings.
 $string['setting_enable_assign'] = 'Enable for Assignments';
@@ -124,6 +125,18 @@ $string['layout_grade'] = 'Grading only';
 $string['manualquestions'] = 'Manual questions';
 $string['response'] = 'Response';
 $string['teachercomment'] = 'Teacher comment';
+
+// Student feedback view.
+$string['view_feedback'] = 'View feedback';
+$string['view_annotated_feedback'] = 'View Annotated Feedback';
+$string['feedback_not_available'] = 'Your feedback is not yet available. Please check back after your submission has been graded and released.';
+$string['no_annotated_files'] = 'There are no annotated PDF files for your submission.';
+
+// Document conversion.
+$string['conversion_failed'] = 'This file could not be converted to PDF for preview.';
+$string['converting_file'] = 'Converting document to PDF...';
+$string['conversion_timeout'] = 'Document conversion is taking too long. Please try again later.';
+$string['download_annotated_pdf'] = 'Download annotated PDF';
 
 // Privacy.
 $string['privacy:metadata:notes'] = 'Private teacher notes stored per student per activity in the Unified Grader.';

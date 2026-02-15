@@ -392,6 +392,17 @@ class quiz_adapter extends base_adapter {
         };
     }
 
+    /**
+     * Quizzes do not support PDF annotations, so grades are never "released"
+     * in the annotation feedback sense.
+     *
+     * @param int $userid
+     * @return bool Always false.
+     */
+    public function is_grade_released(int $userid): bool {
+        return false;
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers.
     // -------------------------------------------------------------------------

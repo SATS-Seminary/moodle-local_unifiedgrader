@@ -1,0 +1,101 @@
+{{!
+    @template local_unifiedgrader/feedback_view
+
+    Student read-only feedback view with annotated PDF and grade/feedback display.
+
+    Context variables required:
+    - cmid: Course module ID
+    - activityname: Activity name
+    - activityurl: URL to the activity
+    - gradedisplay: Formatted grade string (e.g. "85 / 100")
+    - feedback: HTML feedback text
+    - hasfeedback: Whether feedback text exists
+    - selectedfileid: Currently selected file ID
+    - selectedfileurl: Preview URL of the selected PDF (annotated if available)
+    - selectedfilename: Filename of the selected PDF
+    - pdffiles: Array of PDF files
+    - hasmultiplefiles: Whether there are multiple PDF files
+    - pdffilesjson: JSON-encoded array of PDF files
+    - hasannotatedpdf: Whether an annotated PDF exists for the selected file
+    - annotatedpdfurl: URL of the annotated PDF (for download)
+    - annotatedpdfmapjson: JSON map of fileid to annotated PDF URL
+}}
+<div class="local-unifiedgrader-feedback" data-region="feedback-viewer"
+     data-cmid="{{cmid}}" data-fileid="{{selectedfileid}}"
+     data-pdfurl="{{selectedfileurl}}" data-pdffiles="{{pdffilesjson}}"
+     data-annotatedpdfmap="{{annotatedpdfmapjson}}">
+
+    {{! Header bar with back button, activity name, grade badge }}
+    <div class="d-flex align-items-center justify-content-between border-bottom py-2 px-3 mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{activityurl}}" class="btn btn-sm btn-outline-secondary"
+               title="{{#str}} backtocourse, local_unifiedgrader {{/str}}">
+                <i class="fa fa-arrow-left" aria-hidden="true"></i>
+            </a>
+            <h5 class="mb-0">{{activityname}}</h5>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            {{#hasannotatedpdf}}
+                <a href="{{annotatedpdfurl}}" class="btn btn-sm btn-outline-primary" download>
+                    <i class="fa fa-download me-1" aria-hidden="true"></i>
+                    {{#str}} download_annotated_pdf, local_unifiedgrader {{/str}}
+                </a>
+            {{/hasannotatedpdf}}
+            {{#gradedisplay}}
+                <span class="badge bg-primary fs-6">
+                    {{#str}} grade, local_unifiedgrader {{/str}}: {{gradedisplay}}
+                </span>
+            {{/gradedisplay}}
+        </div>
+    </div>
+
+    <div class="row g-3 px-3">
+        {{! Left: PDF viewer (read-only) }}
+        <div class="{{#hasfeedback}}col-lg-8{{/hasfeedback}}{{^hasfeedback}}col-12{{/hasfeedback}}">
+            {{! File selector for multiple PDFs }}
+            {{#hasmultiplefiles}}
+                <div class="mb-2">
+                    <select data-action="file-selector" class="form-select form-select-sm">
+                        {{#pdffiles}}
+                            <option value="{{fileid}}" data-url="{{previewurl}}"
+                                    {{#selected}}selected{{/selected}}>
+                                {{filename}}
+                            </option>
+                        {{/pdffiles}}
+                    </select>
+                </div>
+            {{/hasmultiplefiles}}
+
+            {{! PDF viewer with read-only annotation layer }}
+            <div data-region="pdf-viewer-wrapper"
+                 style="height: calc(100vh - 200px); border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 0.375rem; overflow: hidden;">
+                <div data-region="pdf-viewer-component" data-readonly="1">
+                    {{> local_unifiedgrader/pdf_viewer }}
+                </div>
+            </div>
+        </div>
+
+        {{! Right: Feedback panel }}
+        {{#hasfeedback}}
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header py-2">
+                        <h6 class="mb-0">
+                            <i class="fa fa-comment-o me-1" aria-hidden="true"></i>
+                            {{#str}} feedback, local_unifiedgrader {{/str}}
+                        </h6>
+                    </div>
+                    <div class="card-body" style="max-height: calc(100vh - 250px); overflow-y: auto;">
+                        {{{feedback}}}
+                    </div>
+                </div>
+            </div>
+        {{/hasfeedback}}
+    </div>
+</div>
+
+{{#js}}
+    require(['local_unifiedgrader/feedback_viewer'], function(FeedbackViewer) {
+        FeedbackViewer.init();
+    });
+{{/js}}

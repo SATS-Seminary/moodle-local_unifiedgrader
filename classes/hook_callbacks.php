@@ -29,21 +29,70 @@ defined('MOODLE_INTERNAL') || die();
 class hook_callbacks {
 
     /**
-     * Inject any needed HTML before the body content on our grading page.
+     * Inject a visible "View Annotated Feedback" banner for students on
+     * graded assignment pages.
+     *
+     * Uses a PSR-14 output hook to load a JS module that creates a Bootstrap
+     * card at the top of the main content area. Students don't have a secondary
+     * navigation bar on the assignment view, so this banner is the primary way
+     * they discover the annotated feedback viewer.
+     *
+     * NOTE: Do NOT use isset($PAGE->context) — moodle_page lacks __isset(),
+     * so isset() always returns false for magic properties. Use try/catch.
      *
      * @param \core\hook\output\before_standard_top_of_body_html_generation $hook
      */
     public static function before_standard_top_of_body_html(
         \core\hook\output\before_standard_top_of_body_html_generation $hook,
     ): void {
-        global $PAGE;
+        global $PAGE, $USER;
 
-        // Only act on our grading page.
-        if ($PAGE->pagetype !== 'local-unifiedgrader-grade') {
+        // Access context via __get() with try/catch.
+        try {
+            $context = $PAGE->context;
+        } catch (\Throwable $e) {
             return;
         }
 
-        // Future: inject any extra HTML needed for the grading interface
-        // (e.g., toast notifications container, modal templates).
+        // Only act on module pages (loose comparison — contextlevel may be string).
+        if ($context->contextlevel != CONTEXT_MODULE) {
+            return;
+        }
+
+        try {
+            $cm = $PAGE->cm;
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        if (!$cm || $cm->modname !== 'assign') {
+            return;
+        }
+
+        if (!get_config('local_unifiedgrader', 'enable_assign')) {
+            return;
+        }
+
+        $cangrade = has_capability('local/unifiedgrader:grade', $context);
+        $canviewfeedback = has_capability('local/unifiedgrader:viewfeedback', $context);
+
+        if ($cangrade || !$canviewfeedback) {
+            return;
+        }
+
+        try {
+            $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
+            if (!$adapter->is_grade_released((int) $USER->id)) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        $url = new \moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cm->id]);
+        $PAGE->requires->js_call_amd('local_unifiedgrader/feedback_banner', 'init', [
+            $url->out(false),
+            get_string('view_annotated_feedback', 'local_unifiedgrader'),
+        ]);
     }
 }

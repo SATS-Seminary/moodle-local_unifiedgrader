@@ -37,12 +37,15 @@ export default class AnnotationLayer {
      * @param {object} fabric The Fabric.js library namespace.
      * @param {HTMLCanvasElement} canvasEl The annotation canvas element.
      * @param {HTMLElement} wrapperEl The canvas wrapper element (for popup positioning).
+     * @param {boolean} readOnly If true, annotations are non-editable (student view).
      */
-    constructor(fabric, canvasEl, wrapperEl) {
+    constructor(fabric, canvasEl, wrapperEl, readOnly = false) {
         /** @type {object} */
         this._fabric = fabric;
         /** @type {HTMLElement} */
         this._wrapperEl = wrapperEl;
+        /** @type {boolean} */
+        this._readOnly = readOnly;
         /** @type {string} */
         this._currentTool = TOOLS.SELECT;
         /** @type {string} */
@@ -91,12 +94,20 @@ export default class AnnotationLayer {
 
         // Initialise Fabric.js canvas.
         this._canvas = new fabric.Canvas(canvasEl, {
-            selection: false,
+            selection: readOnly ? false : false,
             renderOnAddRemove: true,
             preserveObjectStacking: true,
         });
 
-        this._setupEventHandlers();
+        // In read-only mode, disable interaction except hover for tooltips.
+        if (readOnly) {
+            this._canvas.selection = false;
+            this._canvas.hoverCursor = 'default';
+            this._canvas.defaultCursor = 'default';
+            this._setupReadOnlyEventHandlers();
+        } else {
+            this._setupEventHandlers();
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -109,6 +120,9 @@ export default class AnnotationLayer {
      * @param {string} tool One of TOOLS values.
      */
     setTool(tool) {
+        if (this._readOnly) {
+            return;
+        }
         this._closeCommentPopup();
         this._currentTool = tool;
         if (!this._canvas) {
@@ -179,8 +193,10 @@ export default class AnnotationLayer {
      * @param {number} pageNum The new page number (1-based).
      */
     async switchPage(pageNum) {
-        // Save current page.
-        this._saveCurrentPageState();
+        // Save current page (skip in read-only mode — nothing to save).
+        if (!this._readOnly) {
+            this._saveCurrentPageState();
+        }
 
         this._currentPageNum = pageNum;
         this._undoStack = [];
@@ -194,18 +210,24 @@ export default class AnnotationLayer {
         this._canvas.clear();
         if (saved && saved.objects && saved.objects.length > 0) {
             await this._loadFromJSONWithCustomProps(saved);
-            // Re-apply selectability based on current tool.
-            this.setTool(this._currentTool);
+            if (this._readOnly) {
+                this._markAllObjectsReadOnly();
+            } else {
+                // Re-apply selectability based on current tool.
+                this.setTool(this._currentTool);
+            }
         }
         this._canvas.requestRenderAll();
-        this._notifyChange();
+        if (!this._readOnly) {
+            this._notifyChange();
+        }
     }
 
     /**
      * Undo the last annotation operation.
      */
     undo() {
-        if (this._undoStack.length === 0 || !this._canvas) {
+        if (this._readOnly || this._undoStack.length === 0 || !this._canvas) {
             return;
         }
         const action = this._undoStack.pop();
@@ -224,7 +246,7 @@ export default class AnnotationLayer {
      * Redo the last undone operation.
      */
     redo() {
-        if (this._redoStack.length === 0 || !this._canvas) {
+        if (this._readOnly || this._redoStack.length === 0 || !this._canvas) {
             return;
         }
         const action = this._redoStack.pop();
@@ -253,7 +275,7 @@ export default class AnnotationLayer {
      * Remove all annotations from the current page.
      */
     clearAnnotations() {
-        if (!this._canvas) {
+        if (this._readOnly || !this._canvas) {
             return;
         }
         const objects = this._canvas.getObjects().slice();
@@ -270,7 +292,7 @@ export default class AnnotationLayer {
      * Delete the currently selected annotation.
      */
     deleteSelected() {
-        if (!this._canvas) {
+        if (this._readOnly || !this._canvas) {
             return;
         }
         const active = this._canvas.getActiveObject();
@@ -318,7 +340,11 @@ export default class AnnotationLayer {
         this._canvas.clear();
         if (saved && saved.objects && saved.objects.length > 0) {
             await this._loadFromJSONWithCustomProps(saved);
-            this.setTool(this._currentTool);
+            if (this._readOnly) {
+                this._markAllObjectsReadOnly();
+            } else {
+                this.setTool(this._currentTool);
+            }
         }
         this._canvas.requestRenderAll();
     }
@@ -366,6 +392,12 @@ export default class AnnotationLayer {
     // ──────────────────────────────────────────────
     //  Event Handlers
     // ──────────────────────────────────────────────
+
+    /** Set up read-only event handlers (comment tooltips only). */
+    _setupReadOnlyEventHandlers() {
+        this._canvas.on('mouse:over', (opt) => this._onMouseOver(opt));
+        this._canvas.on('mouse:out', () => this._hideCommentTooltip());
+    }
 
     /** Set up Fabric canvas event handlers. */
     _setupEventHandlers() {
@@ -750,10 +782,44 @@ export default class AnnotationLayer {
         }
         const json = this._canvas.toObject(CUSTOM_PROPS);
         if (json.objects && json.objects.length > 0) {
+            // Store viewport dimensions alongside annotations for PDF flattening.
+            json._viewportWidth = this._canvasWidth;
+            json._viewportHeight = this._canvasHeight;
             this._pageAnnotations.set(this._currentPageNum, json);
         } else {
             this._pageAnnotations.delete(this._currentPageNum);
         }
+    }
+
+    /**
+     * Get stored viewport dimensions for all annotated pages.
+     *
+     * @returns {Map<number, {width: number, height: number}>}
+     */
+    getPageDimensions() {
+        this._saveCurrentPageState();
+        const dims = new Map();
+        for (const [pageNum, json] of this._pageAnnotations) {
+            if (json._viewportWidth && json._viewportHeight) {
+                dims.set(pageNum, {
+                    width: json._viewportWidth,
+                    height: json._viewportHeight,
+                });
+            }
+        }
+        return dims;
+    }
+
+    /** Mark all objects on the canvas as non-selectable but hoverable (for tooltips). */
+    _markAllObjectsReadOnly() {
+        if (!this._canvas) {
+            return;
+        }
+        this._canvas.forEachObject((obj) => {
+            obj.selectable = false;
+            obj.evented = true; // Keep hover events for comment tooltips.
+            obj.hoverCursor = 'default';
+        });
     }
 
     /** Notify all change callbacks. */

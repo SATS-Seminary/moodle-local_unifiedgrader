@@ -103,4 +103,22 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_get_student_annotations' => [
+        'classname' => 'local_unifiedgrader\external\get_student_annotations',
+        'description' => 'Get annotations for the current student\'s own submission file (read-only).',
+        'type' => 'read',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_save_annotated_pdf' => [
+        'classname' => 'local_unifiedgrader\external\save_annotated_pdf',
+        'description' => 'Upload a flattened annotated PDF to file storage.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_delete_annotated_pdf' => [
+        'classname' => 'local_unifiedgrader\external\delete_annotated_pdf',
+        'description' => 'Delete a flattened annotated PDF from file storage.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
 ];

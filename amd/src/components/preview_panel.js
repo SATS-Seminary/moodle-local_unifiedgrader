@@ -121,7 +121,7 @@ export default class extends BaseComponent {
             this._renderFileSelector(files);
 
             // Auto-preview the first previewable file.
-            const firstPreviewable = files.find(f => this._isPreviewable(f.mimetype));
+            const firstPreviewable = files.find(f => this._isPreviewable(f));
             if (firstPreviewable) {
                 this._previewFile(firstPreviewable);
                 return;
@@ -182,7 +182,7 @@ export default class extends BaseComponent {
             btn.appendChild(name);
 
             btn.addEventListener('click', () => {
-                if (this._isPreviewable(file.mimetype)) {
+                if (this._isPreviewable(file)) {
                     this._previewFile(file);
                 } else {
                     window.open(file.url, '_blank');
@@ -208,8 +208,8 @@ export default class extends BaseComponent {
         pdfWrapper.classList.add('d-none');
         docPreview.classList.add('d-none');
 
-        if (file.mimetype === 'application/pdf' && this._pdfViewer) {
-            // Use PDF.js viewer for PDF files.
+        if ((file.mimetype === 'application/pdf' || file.convertible) && this._pdfViewer) {
+            // Use PDF.js viewer for PDF files (and files converted to PDF).
             pdfWrapper.classList.remove('d-none');
             // Pass file context for annotation persistence.
             const state = this.reactive.state;
@@ -260,12 +260,16 @@ export default class extends BaseComponent {
     }
 
     /**
-     * Check if a MIME type can be previewed inline.
+     * Check if a file can be previewed inline.
      *
-     * @param {string} mimetype MIME type string.
+     * @param {object} file File info object with mimetype and convertible properties.
      * @return {boolean}
      */
-    _isPreviewable(mimetype) {
+    _isPreviewable(file) {
+        if (file.convertible) {
+            return true;
+        }
+        const mimetype = file.mimetype;
         if ([
             'application/pdf',
             'image/jpeg',

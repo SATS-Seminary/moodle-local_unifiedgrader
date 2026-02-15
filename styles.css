@@ -169,6 +169,31 @@
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.2);
 }
 
+/* Student feedback view — hide annotation toolbar (read-only mode). */
+.local-unifiedgrader-feedback [data-region="annotation-toolbar"] {
+    display: none !important;
+}
+
+/* Student feedback view — PDF viewer needs the same canvas positioning. */
+.local-unifiedgrader-feedback [data-region="pdf-viewer"] {
+    background-color: var(--bs-gray-200, #e9ecef);
+}
+
+.local-unifiedgrader-feedback [data-region="pdf-canvas-wrapper"] {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    background-color: #fff;
+}
+
+.local-unifiedgrader-feedback [data-region="pdf-canvas-wrapper"] .canvas-container {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+}
+
+.local-unifiedgrader-feedback [data-region="pdf-page-container"] {
+    scrollbar-width: thin;
+}
+
 /* Fabric.js canvas container — Fabric creates a wrapper div that needs positioning. */
 .local-unifiedgrader-container [data-region="pdf-canvas-wrapper"] .canvas-container {
     position: absolute !important;

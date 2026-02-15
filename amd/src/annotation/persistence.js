@@ -73,3 +73,52 @@ export async function deleteAnnotations(cmid, userid, fileid) {
         args: {cmid, userid, fileid},
     }])[0];
 }
+
+/**
+ * Load annotations for the current student's own file (read-only student view).
+ *
+ * Uses the student-safe web service which forces userid to $USER->id server-side,
+ * validates grade release, and checks file ownership.
+ *
+ * @param {number} cmid Course module ID.
+ * @param {number} fileid File ID.
+ * @returns {Promise<Array>} Array of annotation records.
+ */
+export async function loadStudentAnnotations(cmid, fileid) {
+    return Ajax.call([{
+        methodname: 'local_unifiedgrader_get_student_annotations',
+        args: {cmid, fileid},
+    }])[0];
+}
+
+/**
+ * Upload a flattened annotated PDF to Moodle file storage.
+ *
+ * @param {number} cmid Course module ID.
+ * @param {number} userid Student user ID.
+ * @param {number} fileid Original submission file ID.
+ * @param {string} pdfdata Base64-encoded flattened PDF bytes.
+ * @param {string} filename Filename for the stored file.
+ * @returns {Promise<object>} {success: boolean}
+ */
+export async function uploadAnnotatedPdf(cmid, userid, fileid, pdfdata, filename) {
+    return Ajax.call([{
+        methodname: 'local_unifiedgrader_save_annotated_pdf',
+        args: {cmid, userid, fileid, pdfdata, filename},
+    }])[0];
+}
+
+/**
+ * Delete the flattened annotated PDF from Moodle file storage.
+ *
+ * @param {number} cmid Course module ID.
+ * @param {number} userid Student user ID.
+ * @param {number} fileid Original submission file ID.
+ * @returns {Promise<object>} {success: boolean}
+ */
+export async function deleteAnnotatedPdf(cmid, userid, fileid) {
+    return Ajax.call([{
+        methodname: 'local_unifiedgrader_delete_annotated_pdf',
+        args: {cmid, userid, fileid},
+    }])[0];
+}

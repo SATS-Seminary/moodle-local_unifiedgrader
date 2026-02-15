@@ -371,6 +371,9 @@ class assign_adapter extends base_adapter {
             false,
         );
 
+        // Check which non-previewable formats can be converted to PDF.
+        $converter = new \core_files\converter();
+
         $result = [];
         foreach ($files as $file) {
             $downloadurl = \moodle_url::make_pluginfile_url(
@@ -381,19 +384,34 @@ class assign_adapter extends base_adapter {
                 $file->get_filepath(),
                 $file->get_filename(),
             );
-            // Moodle's assignsubmission_file hardcodes force-download.
-            // Use our own preview endpoint for inline viewing in the iframe.
-            $previewurl = new \moodle_url('/local/unifiedgrader/preview_file.php', [
+
+            $mimetype = $file->get_mimetype();
+            $extension = pathinfo($file->get_filename(), PATHINFO_EXTENSION);
+
+            // Check if the file can be converted to PDF (for non-PDF files).
+            $convertible = false;
+            if ($mimetype !== 'application/pdf' && $extension) {
+                $convertible = $converter->can_convert_format_to($extension, 'pdf');
+            }
+
+            // Build preview URL: use convert=pdf for convertible files.
+            $previewparams = [
                 'fileid' => $file->get_id(),
                 'cmid' => $this->cm->id,
-            ]);
+            ];
+            if ($convertible) {
+                $previewparams['convert'] = 'pdf';
+            }
+            $previewurl = new \moodle_url('/local/unifiedgrader/preview_file.php', $previewparams);
+
             $result[] = [
                 'fileid' => (int) $file->get_id(),
                 'filename' => $file->get_filename(),
-                'mimetype' => $file->get_mimetype(),
+                'mimetype' => $mimetype,
                 'filesize' => (int) $file->get_filesize(),
                 'url' => $downloadurl->out(false),
                 'previewurl' => $previewurl->out(false),
+                'convertible' => $convertible,
             ];
         }
         return $result;
@@ -417,6 +435,43 @@ class assign_adapter extends base_adapter {
             'annotations' => false,
             default => false,
         };
+    }
+
+    /**
+     * Check whether the grade for a user has been released and visible to the student.
+     *
+     * @param int $userid
+     * @return bool
+     */
+    public function is_grade_released(int $userid): bool {
+        // 1. Check that a grade exists and is non-null.
+        $grade = $this->assign->get_user_grade($userid, false) ?: null;
+        if (!$grade || $grade->grade === null || $grade->grade < 0) {
+            return false;
+        }
+
+        // 2. Check the gradebook item is not hidden.
+        $gradeitem = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => 'assign',
+            'iteminstance' => $this->assign->get_instance()->id,
+            'itemnumber' => 0,
+            'courseid' => $this->course->id,
+        ]);
+        if ($gradeitem && $gradeitem->is_hidden()) {
+            return false;
+        }
+
+        // 3. If marking workflow is enabled, require state = RELEASED.
+        $instance = $this->assign->get_instance();
+        if (!empty($instance->markingworkflow)) {
+            $workflowstate = $this->assign->get_user_flags($userid, false);
+            if (!$workflowstate || $workflowstate->workflowstate !== ASSIGN_MARKING_WORKFLOW_STATE_RELEASED) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

@@ -42,7 +42,8 @@ function local_unifiedgrader_extend_settings_navigation(
     global $PAGE;
 
     // Only act in module context.
-    if ($context->contextlevel !== CONTEXT_MODULE) {
+    // Use loose comparison — database drivers may return contextlevel as string.
+    if ($context->contextlevel != CONTEXT_MODULE) {
         return;
     }
 
@@ -62,18 +63,68 @@ function local_unifiedgrader_extend_settings_navigation(
         return;
     }
 
-    // Only show to users who can grade.
-    if (!has_capability('local/unifiedgrader:grade', $context)) {
+    $cangrade = has_capability('local/unifiedgrader:grade', $context);
+    $canviewfeedback = has_capability('local/unifiedgrader:viewfeedback', $context);
+
+    // Student feedback link — add a node to 'modulesettings' so that the
+    // secondary navigation renders for students (Moodle prunes empty branches,
+    // and without any children modulesettings disappears, taking the entire
+    // secondary nav with it). Adding our node keeps modulesettings alive.
+    if (!$cangrade && $canviewfeedback && $modname === 'assign') {
+        global $USER;
+        try {
+            $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
+            if ($adapter->is_grade_released((int) $USER->id)) {
+                $modulesettings = $settingsnav->find('modulesettings', navigation_node::TYPE_SETTING);
+                if ($modulesettings) {
+                    $url = new moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cm->id]);
+                    $node = navigation_node::create(
+                        get_string('view_annotated_feedback', 'local_unifiedgrader'),
+                        $url,
+                        navigation_node::TYPE_CUSTOM,
+                        null,
+                        'local_unifiedgrader_feedback',
+                        new pix_icon('i/preview', ''),
+                    );
+                    $modulesettings->add_node($node);
+
+                    // Promote the tab out of the "More" overflow and style it.
+                    $PAGE->requires->js_call_amd('local_unifiedgrader/nav_promote', 'init', [
+                        'local_unifiedgrader_feedback',
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            debugging(
+                'local_unifiedgrader: student feedback link failed: ' . $e->getMessage(),
+                DEBUG_DEVELOPER,
+            );
+        }
         return;
     }
 
-    // Find the module settings node in the settings navigation tree.
+    // Teacher grading tab — requires the 'modulesettings' node in the settings
+    // navigation tree (always present for users with editing capabilities).
+    if (!$cangrade) {
+        return;
+    }
+
     $modulesettings = $settingsnav->find('modulesettings', navigation_node::TYPE_SETTING);
     if (!$modulesettings) {
         return;
     }
 
-    // Add the Unified Grader tab.
+    // Insert right after 'modedit' (Edit settings) so the tab appears early
+    // in the secondary navigation bar, before the 5-tab overflow threshold.
+    $keys = $modulesettings->get_children_key_list();
+    $beforekey = null;
+    $i = array_search('modedit', $keys);
+    if ($i !== false && array_key_exists($i + 1, $keys)) {
+        $beforekey = $keys[$i + 1];
+    } else if (!empty($keys)) {
+        $beforekey = $keys[0];
+    }
+
     $url = new moodle_url('/local/unifiedgrader/grade.php', ['cmid' => $cm->id]);
     $node = navigation_node::create(
         get_string('grading_interface', 'local_unifiedgrader'),
@@ -83,5 +134,90 @@ function local_unifiedgrader_extend_settings_navigation(
         'local_unifiedgrader_grade',
         new pix_icon('i/grades', ''),
     );
-    $modulesettings->add_node($node);
+    $modulesettings->add_node($node, $beforekey);
+
+    // Modules with a custom secondary navigation class (e.g. quiz) map their
+    // own nodes into the first 5 visible tab slots. Our unmapped node ends up
+    // in the "More" overflow regardless of its settings-tree position. Load a
+    // small JS module that promotes our tab back into the visible area.
+    $PAGE->requires->js_call_amd('local_unifiedgrader/nav_promote', 'init');
+}
+
+/**
+ * Serve files from the local_unifiedgrader file areas.
+ *
+ * Called by Moodle's pluginfile.php when a URL with component=local_unifiedgrader
+ * is requested. Currently supports the 'annotatedpdf' filearea for serving
+ * flattened annotated PDFs to students and teachers.
+ *
+ * @param stdClass $course Course object.
+ * @param stdClass $cm Course module object.
+ * @param context $context Context object.
+ * @param string $filearea File area name.
+ * @param array $args Remaining URL path parts.
+ * @param bool $forcedownload Whether to force download.
+ * @param array $options Additional options.
+ * @return bool False if file not found.
+ */
+function local_unifiedgrader_pluginfile(
+    $course,
+    $cm,
+    $context,
+    string $filearea,
+    array $args,
+    bool $forcedownload,
+    array $options = [],
+): bool {
+    global $USER;
+
+    if ($context->contextlevel != CONTEXT_MODULE) {
+        return false;
+    }
+
+    if ($filearea !== 'annotatedpdf') {
+        return false;
+    }
+
+    require_login($course, false, $cm);
+
+    $isteacher = has_capability('local/unifiedgrader:grade', $context);
+    $isstudent = !$isteacher && has_capability('local/unifiedgrader:viewfeedback', $context);
+
+    if (!$isteacher && !$isstudent) {
+        return false;
+    }
+
+    // URL args: itemid (=fileid) / userid / filename.
+    $itemid = (int) array_shift($args);
+    $useridpath = (int) array_shift($args);
+    $filename = array_shift($args);
+
+    // Students can only access their own annotated PDFs.
+    if ($isstudent) {
+        if ($useridpath !== (int) $USER->id) {
+            return false;
+        }
+        // Verify grade is released.
+        $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
+        if (!$adapter->is_grade_released((int) $USER->id)) {
+            return false;
+        }
+    }
+
+    $fs = get_file_storage();
+    $file = $fs->get_file(
+        $context->id,
+        'local_unifiedgrader',
+        'annotatedpdf',
+        $itemid,
+        '/' . $useridpath . '/',
+        $filename,
+    );
+
+    if (!$file || $file->is_directory()) {
+        return false;
+    }
+
+    send_stored_file($file, 0, 0, $forcedownload, $options);
+    return true;
 }
