@@ -8,6 +8,17 @@
 }}
 <div data-region="marking-content" class="p-3">
 
+    {{! Plagiarism section (shown by JS when plagiarism links exist) }}
+    <div data-region="plagiarism-section" class="d-none card mb-3">
+        <div class="card-header py-2">
+            <h6 class="mb-0">
+                <i class="fa fa-shield me-1"></i>
+                {{#str}} plagiarism, local_unifiedgrader {{/str}}
+            </h6>
+        </div>
+        <div class="card-body py-2" data-region="plagiarism-body"></div>
+    </div>
+
     {{! Grade section }}
     <div class="card mb-3">
         <div class="card-header py-2">

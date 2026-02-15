@@ -55,6 +55,8 @@ export default class extends BaseComponent {
             RUBRIC_TITLE: '[data-region="rubric-title"]',
             RUBRIC_TOTAL: '[data-region="rubric-total"]',
             RUBRIC_BODY: '[data-region="rubric-body"]',
+            PLAGIARISM_SECTION: '[data-region="plagiarism-section"]',
+            PLAGIARISM_BODY: '[data-region="plagiarism-body"]',
         };
         this._gradingDefinition = null;
         this._rubricSelections = {};
@@ -69,6 +71,7 @@ export default class extends BaseComponent {
      */
     getWatchers() {
         return [
+            {watch: 'submission:updated', handler: this._renderPlagiarism},
             {watch: 'grade:updated', handler: this._renderGrade},
             {watch: 'state.notes:updated', handler: this._renderNotes},
             {watch: 'state.commentLibrary:updated', handler: this._renderCommentLibrary},
@@ -764,5 +767,51 @@ export default class extends BaseComponent {
 
         const state = this.reactive.state;
         this.reactive.dispatch('deleteNote', state.activity.cmid, state.currentUser.id, noteid);
+    }
+
+    /**
+     * Render plagiarism links into the plagiarism section.
+     *
+     * @param {object} args Watcher args.
+     * @param {object} args.state Current state.
+     */
+    _renderPlagiarism({state}) {
+        const section = this.getElement(this.selectors.PLAGIARISM_SECTION);
+        const body = this.getElement(this.selectors.PLAGIARISM_BODY);
+        if (!section || !body) {
+            return;
+        }
+
+        const links = state.submission.plagiarismlinks || [];
+
+        if (links.length === 0) {
+            section.classList.add('d-none');
+            body.innerHTML = '';
+            return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+        for (const link of links) {
+            html += '<div class="list-group-item px-0 py-2 border-0">';
+            html += '<div class="small fw-bold text-truncate mb-1">' + this._escapeHtml(link.label) + '</div>';
+            html += '<div class="small">' + link.html + '</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+
+        body.innerHTML = html;
+        section.classList.remove('d-none');
+    }
+
+    /**
+     * Escape HTML special characters in a string.
+     *
+     * @param {string} text The text to escape.
+     * @return {string} Escaped text.
+     */
+    _escapeHtml(text) {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
     }
 }

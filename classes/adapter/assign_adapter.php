@@ -475,6 +475,78 @@ class assign_adapter extends base_adapter {
     }
 
     /**
+     * Get plagiarism report links for a user's assignment submission.
+     *
+     * Calls Moodle's generic plagiarism API for each submitted file and for
+     * online text content. Works with any plagiarism plugin (Copyleaks, Turnitin, etc.).
+     *
+     * @param int $userid The user ID.
+     * @return array Array of arrays with keys: 'label' (string), 'html' (string).
+     */
+    public function get_plagiarism_links(int $userid): array {
+        global $CFG;
+
+        if (empty($CFG->enableplagiarism)) {
+            return [];
+        }
+
+        require_once($CFG->libdir . '/plagiarismlib.php');
+
+        $submission = $this->assign->get_user_submission($userid, false);
+        if (!$submission) {
+            return [];
+        }
+
+        $results = [];
+
+        // Per-file plagiarism links.
+        $fs = get_file_storage();
+        $files = $fs->get_area_files(
+            $this->context->id,
+            'assignsubmission_file',
+            'submission_files',
+            $submission->id,
+            'sortorder, filename',
+            false,
+        );
+
+        foreach ($files as $file) {
+            $linkhtml = plagiarism_get_links([
+                'userid' => $userid,
+                'file' => $file,
+                'cmid' => $this->cm->id,
+                'course' => $this->course->id,
+            ]);
+            if (!empty(trim($linkhtml))) {
+                $results[] = [
+                    'label' => $file->get_filename(),
+                    'html' => $linkhtml,
+                ];
+            }
+        }
+
+        // Online text plagiarism link.
+        $onlinetext = $this->get_onlinetext($submission);
+        if (!empty($onlinetext)) {
+            $linkhtml = plagiarism_get_links([
+                'userid' => $userid,
+                'content' => $onlinetext,
+                'cmid' => $this->cm->id,
+                'course' => $this->course->id,
+                'assignment' => $submission->assignment,
+            ]);
+            if (!empty(trim($linkhtml))) {
+                $results[] = [
+                    'label' => get_string('onlinetext', 'local_unifiedgrader'),
+                    'html' => $linkhtml,
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
      * Resolve the display status from submission and grade records.
      *
      * @param \stdClass|null $submission

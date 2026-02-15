@@ -133,6 +133,22 @@ abstract class base_adapter {
     abstract public function is_grade_released(int $userid): bool;
 
     /**
+     * Get plagiarism report links for a user's submission.
+     *
+     * Returns an array of HTML strings from plagiarism plugins (e.g., Copyleaks, Turnitin).
+     * Each entry represents a file or online text content with its plagiarism link.
+     * Returns empty array if plagiarism is not enabled or no links are available.
+     *
+     * Subclasses should override this to call plagiarism_get_links() for each submission item.
+     *
+     * @param int $userid The user ID.
+     * @return array Array of arrays with keys: 'label' (string), 'html' (string).
+     */
+    public function get_plagiarism_links(int $userid): array {
+        return [];
+    }
+
+    /**
      * Get the activity type identifier.
      *
      * @return string e.g., 'assign', 'forum', 'quiz'.

@@ -67,7 +67,9 @@ class get_submission_data extends external_api {
         require_capability('local/unifiedgrader:grade', $context);
 
         $adapter = adapter_factory::create($params['cmid']);
-        return $adapter->get_submission_data($params['userid']);
+        $data = $adapter->get_submission_data($params['userid']);
+        $data['plagiarismlinks'] = $adapter->get_plagiarism_links($params['userid']);
+        return $data;
     }
 
     /**
@@ -94,6 +96,15 @@ class get_submission_data extends external_api {
             'timecreated' => new external_value(PARAM_INT, 'Time created'),
             'timemodified' => new external_value(PARAM_INT, 'Time modified'),
             'attemptnumber' => new external_value(PARAM_INT, 'Attempt number'),
+            'plagiarismlinks' => new external_multiple_structure(
+                new external_single_structure([
+                    'label' => new external_value(PARAM_TEXT, 'Label for the plagiarism link (filename or Online text)'),
+                    'html' => new external_value(PARAM_RAW, 'Rendered plagiarism HTML from the plugin'),
+                ]),
+                'Plagiarism report links from enabled plagiarism plugins',
+                VALUE_DEFAULT,
+                [],
+            ),
         ]);
     }
 }

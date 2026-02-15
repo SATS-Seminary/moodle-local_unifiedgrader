@@ -126,6 +126,10 @@ $string['manualquestions'] = 'Manual questions';
 $string['response'] = 'Response';
 $string['teachercomment'] = 'Teacher comment';
 
+// Plagiarism.
+$string['plagiarism'] = 'Plagiarism';
+$string['plagiarism_noresults'] = 'No plagiarism results available.';
+
 // Student feedback view.
 $string['view_feedback'] = 'View feedback';
 $string['view_annotated_feedback'] = 'View Annotated Feedback';

@@ -108,6 +108,7 @@ export const init = (containerId) => {
             timecreated: 0,
             timemodified: 0,
             attemptnumber: 0,
+            plagiarismlinks: [],
         },
         grade: {
             grade: null,
