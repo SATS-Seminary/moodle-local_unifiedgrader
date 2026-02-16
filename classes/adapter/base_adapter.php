@@ -218,4 +218,57 @@ abstract class base_adapter {
     public function get_context(): \context_module {
         return $this->context;
     }
+
+    /**
+     * Check whether grades are currently posted (visible to students).
+     *
+     * @return bool True if grades are posted (grade item is not hidden).
+     */
+    public function are_grades_posted(): bool {
+        $gradeitem = $this->fetch_grade_item();
+        return $gradeitem ? !$gradeitem->is_hidden() : true;
+    }
+
+    /**
+     * Get the raw hidden value for the grade item.
+     *
+     * Returns 0 (visible), 1 (always hidden), or a Unix timestamp (hidden until).
+     *
+     * @return int The hidden value.
+     */
+    public function get_grades_hidden_value(): int {
+        $gradeitem = $this->fetch_grade_item();
+        return $gradeitem ? (int) $gradeitem->get_hidden() : 0;
+    }
+
+    /**
+     * Set grade posting status for this activity.
+     *
+     * @param int $hidden 0 = post (visible), 1 = hide permanently, or Unix timestamp = hide until.
+     */
+    public function set_grades_posted(int $hidden): void {
+        $gradeitem = $this->fetch_grade_item();
+        if ($gradeitem) {
+            $gradeitem->set_hidden($hidden);
+        }
+    }
+
+    /**
+     * Fetch the grade_item for this activity.
+     *
+     * Subclasses may override this to use a different itemnumber
+     * (e.g., forum whole-forum grading uses itemnumber 1).
+     *
+     * @return \grade_item|null
+     */
+    protected function fetch_grade_item(): ?\grade_item {
+        $item = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => $this->cm->modname,
+            'iteminstance' => $this->cm->instance,
+            'itemnumber' => 0,
+            'courseid' => $this->course->id,
+        ]);
+        return $item ?: null;
+    }
 }

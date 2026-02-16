@@ -93,11 +93,7 @@ class hook_callbacks {
             return;
         }
 
-        // Student: show feedback banner (assignments only).
-        if ($modname !== 'assign') {
-            return;
-        }
-
+        // Student: show feedback banner for graded activities.
         $canviewfeedback = has_capability('local/unifiedgrader:viewfeedback', $context);
         if (!$canviewfeedback) {
             return;
@@ -113,9 +109,15 @@ class hook_callbacks {
         }
 
         $url = new \moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cm->id]);
+        $labelkey = $modname === 'assign' ? 'view_annotated_feedback' : 'view_forum_feedback';
+        $bannertext = get_string(
+            $modname === 'assign' ? 'view_annotated_feedback' : 'forum_feedback_banner',
+            'local_unifiedgrader',
+        );
         $PAGE->requires->js_call_amd('local_unifiedgrader/feedback_banner', 'init', [
             $url->out(false),
-            get_string('view_annotated_feedback', 'local_unifiedgrader'),
+            get_string($labelkey, 'local_unifiedgrader'),
+            $bannertext,
         ]);
     }
 }

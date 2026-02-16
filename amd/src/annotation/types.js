@@ -70,23 +70,33 @@ export const STAMPS = {
 export const CUSTOM_PROPS = ['annotationType', 'annotationText', 'stampType'];
 
 /**
- * Create a comment marker (small pin circle).
+ * SVG path for a speech-bubble comment icon (24×22 viewbox).
+ * Rounded rectangle body with a triangular tail at the bottom-left.
+ *
+ * @type {string}
+ */
+const COMMENT_BUBBLE_PATH =
+    'M3 0 C1.34 0 0 1.34 0 3 L0 13 C0 14.66 1.34 16 3 16'
+    + ' L6 16 L6 21 L11 16 L21 16 C22.66 16 24 14.66 24 13'
+    + ' L24 3 C24 1.34 22.66 0 21 0 Z';
+
+/**
+ * Create a comment marker (speech-bubble icon).
  *
  * @param {object} fabric The Fabric.js library namespace.
  * @param {number} x Centre x position.
  * @param {number} y Centre y position.
  * @param {string} color Fill colour.
  * @param {string} text Comment text.
- * @returns {object} Fabric.js Circle object.
+ * @returns {object} Fabric.js Path object.
  */
 export function createCommentMarker(fabric, x, y, color, text) {
-    const marker = new fabric.Circle({
+    const marker = new fabric.Path(COMMENT_BUBBLE_PATH, {
         left: x,
         top: y,
-        radius: 12,
         fill: color,
         stroke: '#ffffff',
-        strokeWidth: 2,
+        strokeWidth: 1.5,
         originX: 'center',
         originY: 'center',
         selectable: true,

@@ -1,0 +1,159 @@
+{{!
+    @template local_unifiedgrader/feedback_view_forum
+
+    Student read-only feedback view for forum activities.
+    Shows grade, feedback text, rubric/marking guide, and the student's forum posts.
+
+    Context variables required:
+    - cmid: Course module ID
+    - activityname: Activity name
+    - activityurl: URL to the forum
+    - gradedisplay: Formatted grade string (e.g. "85 / 100")
+    - feedback: HTML feedback text
+    - hasfeedback: Whether feedback text exists
+    - postcontent: Pre-rendered HTML of the student's forum posts
+    - hasposts: Whether the student has made any posts
+    - hasrubric: Whether rubric grading is used
+    - rubriccriteria: Array of rubric criteria with levels
+    - rubrictotal: Sum of selected rubric level scores
+    - hasguide: Whether marking guide is used
+    - guidecriteria: Array of guide criteria with scores and remarks
+    - guidetotal: Sum of achieved guide scores
+    - guidemaxtotal: Sum of max guide scores
+    - hasadvancedgrading: Whether rubric or guide is active
+    - gradingmethodname: Display name of the grading method
+    - showrightcolumn: Whether to show the right column
+}}
+<div class="local-unifiedgrader-feedback" data-region="feedback-viewer-forum">
+
+    {{! Header bar with back button, activity name, grade badge }}
+    <div class="d-flex align-items-center justify-content-between border-bottom py-2 px-3 mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{activityurl}}" class="btn btn-sm btn-outline-secondary"
+               title="{{#str}} backtocourse, local_unifiedgrader {{/str}}">
+                <i class="fa fa-arrow-left" aria-hidden="true"></i>
+            </a>
+            <h5 class="mb-0">{{activityname}}</h5>
+        </div>
+        {{#gradedisplay}}
+            <span class="badge bg-primary fs-6">
+                {{#str}} grade, local_unifiedgrader {{/str}}: {{gradedisplay}}
+            </span>
+        {{/gradedisplay}}
+    </div>
+
+    <div class="row g-3 px-3">
+        {{! Left column: Forum posts }}
+        <div class="{{#showrightcolumn}}col-lg-7{{/showrightcolumn}}{{^showrightcolumn}}col-12{{/showrightcolumn}}">
+            {{#hasposts}}
+                <div class="card">
+                    <div class="card-header py-2">
+                        <h6 class="mb-0">
+                            <i class="fa fa-comments-o me-1" aria-hidden="true"></i>
+                            {{#str}} forum_your_posts, local_unifiedgrader {{/str}}
+                        </h6>
+                    </div>
+                    <div class="card-body" style="max-height: calc(100vh - 220px); overflow-y: auto;">
+                        {{{postcontent}}}
+                    </div>
+                </div>
+            {{/hasposts}}
+            {{^hasposts}}
+                <div class="alert alert-info">
+                    {{#str}} forum_no_posts, local_unifiedgrader {{/str}}
+                </div>
+            {{/hasposts}}
+        </div>
+
+        {{! Right column: Feedback + Rubric/Guide }}
+        {{#showrightcolumn}}
+            <div class="col-lg-5">
+                {{#hasfeedback}}
+                    <div class="card mb-3">
+                        <div class="card-header py-2">
+                            <h6 class="mb-0">
+                                <i class="fa fa-comment-o me-1" aria-hidden="true"></i>
+                                {{#str}} feedback, local_unifiedgrader {{/str}}
+                            </h6>
+                        </div>
+                        <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                            {{{feedback}}}
+                        </div>
+                    </div>
+                {{/hasfeedback}}
+
+                {{! Rubric display (read-only) }}
+                {{#hasrubric}}
+                    <div class="card mb-3">
+                        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="fa fa-th me-1" aria-hidden="true"></i>
+                                {{gradingmethodname}}
+                            </h6>
+                            <span class="badge bg-primary">{{rubrictotal}} pts</span>
+                        </div>
+                        <div class="card-body p-0">
+                            {{#rubriccriteria}}
+                                <div class="border-bottom p-3">
+                                    <div class="fw-bold small mb-2">{{description}}</div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {{#levels}}
+                                            <div class="p-2 border rounded small flex-fill
+                                                {{#selected}} bg-primary bg-opacity-10 border-primary {{/selected}}
+                                                {{^selected}} bg-light text-muted {{/selected}}"
+                                                 style="min-width: 80px;">
+                                                <div class="fw-bold {{#selected}}text-primary{{/selected}}">
+                                                    {{score}} pts
+                                                </div>
+                                                <div style="font-size: 0.75rem;">{{definition}}</div>
+                                            </div>
+                                        {{/levels}}
+                                    </div>
+                                    {{#hasselection}}
+                                        <div class="small text-end mt-1 text-primary fw-bold">
+                                            {{selectedscore}} pts
+                                        </div>
+                                    {{/hasselection}}
+                                </div>
+                            {{/rubriccriteria}}
+                        </div>
+                    </div>
+                {{/hasrubric}}
+
+                {{! Marking guide display (read-only) }}
+                {{#hasguide}}
+                    <div class="card mb-3">
+                        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="fa fa-list-ol me-1" aria-hidden="true"></i>
+                                {{gradingmethodname}}
+                            </h6>
+                            <span class="badge bg-primary">{{guidetotal}} / {{guidemaxtotal}}</span>
+                        </div>
+                        <div class="card-body p-0">
+                            {{#guidecriteria}}
+                                <div class="border-bottom p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <div class="fw-bold small">{{shortname}}</div>
+                                        <span class="badge {{#hasscore}}bg-primary{{/hasscore}}{{^hasscore}}bg-secondary{{/hasscore}}">
+                                            {{#hasscore}}{{score}}{{/hasscore}}{{^hasscore}}&ndash;{{/hasscore}}
+                                            / {{maxscore}}
+                                        </span>
+                                    </div>
+                                    {{#description}}
+                                        <div class="small text-muted mb-1">{{{description}}}</div>
+                                    {{/description}}
+                                    {{#hasremark}}
+                                        <div class="small fst-italic border-start border-3 border-primary ps-2 mt-1">
+                                            {{{remark}}}
+                                        </div>
+                                    {{/hasremark}}
+                                </div>
+                            {{/guidecriteria}}
+                        </div>
+                    </div>
+                {{/hasguide}}
+            </div>
+        {{/showrightcolumn}}
+    </div>
+</div>

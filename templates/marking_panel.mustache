@@ -43,47 +43,68 @@
             {{! Advanced grading placeholder (rubric/marking guide) }}
             <div data-region="advanced-grading" class="d-none mb-3"></div>
 
-            {{! Feedback }}
-            <div class="mb-3">
-                <label for="feedback-editor-{{uniqid}}" class="form-label small fw-bold">
-                    {{#str}} feedback, local_unifiedgrader {{/str}}
-                </label>
-                <textarea id="feedback-editor-{{uniqid}}"
-                          data-action="feedback-input"
-                          class="form-control"
-                          rows="5"
-                          placeholder="{{#str}} feedback, local_unifiedgrader {{/str}}"></textarea>
+            {{! Saved feedback display (shown by JS when feedback exists and not editing) }}
+            <div data-region="feedback-display" class="d-none mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-bold text-success">
+                        <i class="fa fa-check-circle me-1"></i>
+                        {{#str}} feedback_saved, local_unifiedgrader {{/str}}
+                    </span>
+                    <div class="d-flex gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="edit-feedback">
+                            <i class="fa fa-pencil me-1"></i>{{#str}} edit_feedback, local_unifiedgrader {{/str}}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete-feedback">
+                            <i class="fa fa-trash me-1"></i>{{#str}} delete_feedback, local_unifiedgrader {{/str}}
+                        </button>
+                    </div>
+                </div>
+                <div data-region="feedback-display-content" class="border rounded p-3 bg-light small"></div>
             </div>
 
-            {{! Comment library }}
-            <div data-region="comment-library" class="mb-3">
-                <details class="border rounded">
-                    <summary class="px-3 py-2 bg-light small fw-bold" style="cursor: pointer;">
-                        {{#str}} commentlibrary, local_unifiedgrader {{/str}}
-                    </summary>
-                    <div class="p-2">
-                        <div data-region="comment-list" class="list-group list-group-flush mb-2"
-                             style="max-height: 200px; overflow-y: auto;">
-                            <div data-region="no-comments" class="text-muted small p-2 text-center">
-                                {{#str}} nocomments, local_unifiedgrader {{/str}}
+            {{! Feedback editor wrapper (shown/hidden by JS) }}
+            <div data-region="feedback-editor-wrapper">
+                <div class="mb-3">
+                    <label for="feedback-editor-{{uniqid}}" class="form-label small fw-bold">
+                        {{#str}} feedback, local_unifiedgrader {{/str}}
+                    </label>
+                    <textarea id="feedback-editor-{{uniqid}}"
+                              data-action="feedback-input"
+                              class="form-control"
+                              rows="5"
+                              placeholder="{{#str}} feedback, local_unifiedgrader {{/str}}"></textarea>
+                </div>
+
+                {{! Comment library }}
+                <div data-region="comment-library" class="mb-3">
+                    <details class="border rounded">
+                        <summary class="px-3 py-2 bg-light small fw-bold" style="cursor: pointer;">
+                            {{#str}} commentlibrary, local_unifiedgrader {{/str}}
+                        </summary>
+                        <div class="p-2">
+                            <div data-region="comment-list" class="list-group list-group-flush mb-2"
+                                 style="max-height: 200px; overflow-y: auto;">
+                                <div data-region="no-comments" class="text-muted small p-2 text-center">
+                                    {{#str}} nocomments, local_unifiedgrader {{/str}}
+                                </div>
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <input type="text"
+                                       data-action="new-comment-input"
+                                       class="form-control"
+                                       placeholder="{{#str}} newcomment, local_unifiedgrader {{/str}}">
+                                <button data-action="save-comment" class="btn btn-outline-primary" type="button">
+                                    +
+                                </button>
                             </div>
                         </div>
-                        <div class="input-group input-group-sm">
-                            <input type="text"
-                                   data-action="new-comment-input"
-                                   class="form-control"
-                                   placeholder="{{#str}} newcomment, local_unifiedgrader {{/str}}">
-                            <button data-action="save-comment" class="btn btn-outline-primary" type="button">
-                                +
-                            </button>
-                        </div>
-                    </div>
-                </details>
+                    </details>
+                </div>
             </div>
 
             {{! Save button }}
             <button data-action="save-grade" class="btn btn-primary w-100" type="button">
-                {{#str}} savegrade, local_unifiedgrader {{/str}}
+                {{#str}} savefeedback, local_unifiedgrader {{/str}}
             </button>
 
         </div>

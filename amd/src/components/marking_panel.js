@@ -58,7 +58,13 @@ export default class extends BaseComponent {
             RUBRIC_BODY: '[data-region="rubric-body"]',
             PLAGIARISM_SECTION: '[data-region="plagiarism-section"]',
             PLAGIARISM_BODY: '[data-region="plagiarism-body"]',
+            FEEDBACK_DISPLAY: '[data-region="feedback-display"]',
+            FEEDBACK_DISPLAY_CONTENT: '[data-region="feedback-display-content"]',
+            FEEDBACK_EDITOR_WRAPPER: '[data-region="feedback-editor-wrapper"]',
+            EDIT_FEEDBACK_BTN: '[data-action="edit-feedback"]',
+            DELETE_FEEDBACK_BTN: '[data-action="delete-feedback"]',
         };
+        this._editingFeedback = false;
         this._gradingDefinition = null;
         this._rubricSelections = {};
         this._guideScores = {};
@@ -122,6 +128,18 @@ export default class extends BaseComponent {
                     this._handleSaveComment();
                 }
             });
+        }
+
+        // Edit feedback button.
+        const editFeedbackBtn = this.getElement(this.selectors.EDIT_FEEDBACK_BTN);
+        if (editFeedbackBtn) {
+            editFeedbackBtn.addEventListener('click', () => this._handleEditFeedback());
+        }
+
+        // Delete feedback button.
+        const deleteFeedbackBtn = this.getElement(this.selectors.DELETE_FEEDBACK_BTN);
+        if (deleteFeedbackBtn) {
+            deleteFeedbackBtn.addEventListener('click', () => this._handleDeleteFeedback());
         }
 
         // Add note button.
@@ -208,6 +226,97 @@ export default class extends BaseComponent {
         } else if (state.grade) {
             this._updateFeedbackContent(state.grade.feedback || '');
         }
+
+        // Toggle feedback display/edit mode.
+        // Reset editing flag — _renderGrade fires on student switch and after save.
+        this._editingFeedback = false;
+        this._toggleFeedbackMode(state);
+    }
+
+    /**
+     * Toggle between feedback display (read-only banner) and editor mode.
+     *
+     * @param {object} state Current state.
+     */
+    _toggleFeedbackMode(state) {
+        const display = this.getElement(this.selectors.FEEDBACK_DISPLAY);
+        const editorWrapper = this.getElement(this.selectors.FEEDBACK_EDITOR_WRAPPER);
+        const displayContent = this.getElement(this.selectors.FEEDBACK_DISPLAY_CONTENT);
+
+        if (!display || !editorWrapper) {
+            return;
+        }
+
+        const feedbackHtml = state.grade?.feedbackdraft || state.grade?.feedback || '';
+        const hasFeedback = this._hasMeaningfulFeedback(feedbackHtml);
+
+        if (hasFeedback && !this._editingFeedback) {
+            // Display mode: show banner with saved feedback, hide editor.
+            display.classList.remove('d-none');
+            editorWrapper.classList.add('d-none');
+            if (displayContent) {
+                displayContent.innerHTML = feedbackHtml;
+            }
+        } else {
+            // Edit mode: hide banner, show editor.
+            display.classList.add('d-none');
+            editorWrapper.classList.remove('d-none');
+        }
+    }
+
+    /**
+     * Check whether feedback HTML contains meaningful content.
+     *
+     * @param {string} html The feedback HTML.
+     * @return {boolean} True if there is non-empty text content.
+     */
+    _hasMeaningfulFeedback(html) {
+        if (!html) {
+            return false;
+        }
+        // Strip HTML tags and check for non-whitespace content.
+        const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+        return text.length > 0;
+    }
+
+    /**
+     * Handle "Edit" button click on the feedback display banner.
+     */
+    _handleEditFeedback() {
+        this._editingFeedback = true;
+
+        const display = this.getElement(this.selectors.FEEDBACK_DISPLAY);
+        const editorWrapper = this.getElement(this.selectors.FEEDBACK_EDITOR_WRAPPER);
+
+        if (display) {
+            display.classList.add('d-none');
+        }
+        if (editorWrapper) {
+            editorWrapper.classList.remove('d-none');
+        }
+
+        // Focus the TinyMCE editor after a brief delay (needed after unhiding).
+        const textarea = this.getElement(this.selectors.FEEDBACK_INPUT);
+        if (textarea) {
+            const editor = getInstanceForElementId(textarea.id);
+            if (editor) {
+                setTimeout(() => editor.focus(), 100);
+            }
+        }
+    }
+
+    /**
+     * Handle "Delete" button click on the feedback display banner.
+     */
+    async _handleDeleteFeedback() {
+        const confirmMsg = await getString('confirm_delete_feedback', 'local_unifiedgrader');
+        if (!window.confirm(confirmMsg)) {
+            return;
+        }
+
+        // Clear the editor content and save with empty feedback.
+        this._updateFeedbackContent('');
+        this._handleSaveGrade();
     }
 
     /**
@@ -349,7 +458,7 @@ export default class extends BaseComponent {
                 saveBtn.textContent = await getString('saving', 'local_unifiedgrader');
             } else {
                 saveBtn.disabled = false;
-                saveBtn.textContent = await getString('savegrade', 'local_unifiedgrader');
+                saveBtn.textContent = await getString('savefeedback', 'local_unifiedgrader');
             }
         }
     }

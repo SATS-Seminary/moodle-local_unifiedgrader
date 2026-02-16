@@ -70,7 +70,7 @@ function local_unifiedgrader_extend_settings_navigation(
     // secondary navigation renders for students (Moodle prunes empty branches,
     // and without any children modulesettings disappears, taking the entire
     // secondary nav with it). Adding our node keeps modulesettings alive.
-    if (!$cangrade && $canviewfeedback && $modname === 'assign') {
+    if (!$cangrade && $canviewfeedback && in_array($modname, ['assign', 'forum'])) {
         global $USER;
         try {
             $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
@@ -78,8 +78,9 @@ function local_unifiedgrader_extend_settings_navigation(
                 $modulesettings = $settingsnav->find('modulesettings', navigation_node::TYPE_SETTING);
                 if ($modulesettings) {
                     $url = new moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cm->id]);
+                    $labelkey = $modname === 'assign' ? 'view_annotated_feedback' : 'view_forum_feedback';
                     $node = navigation_node::create(
-                        get_string('view_annotated_feedback', 'local_unifiedgrader'),
+                        get_string($labelkey, 'local_unifiedgrader'),
                         $url,
                         navigation_node::TYPE_CUSTOM,
                         null,

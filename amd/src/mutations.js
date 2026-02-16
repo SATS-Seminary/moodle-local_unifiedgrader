@@ -428,6 +428,37 @@ export default class {
     }
 
     /**
+     * Set grade visibility for the current activity.
+     *
+     * @param {object} stateManager The reactive state manager.
+     * @param {number} cmid Course module ID.
+     * @param {number} hidden 0 = post (visible), 1 = hide permanently, >1 = hide-until timestamp.
+     */
+    async setGradesPosted(stateManager, cmid, hidden) {
+        stateManager.setReadOnly(false);
+        stateManager.state.ui.posting = true;
+        stateManager.setReadOnly(true);
+
+        try {
+            const result = await Ajax.call([{
+                methodname: 'local_unifiedgrader_set_grades_posted',
+                args: {cmid, hidden},
+            }])[0];
+
+            stateManager.setReadOnly(false);
+            stateManager.state.ui.gradesPosted = result.posted;
+            stateManager.state.ui.gradesHidden = result.hidden;
+            stateManager.state.ui.posting = false;
+            stateManager.setReadOnly(true);
+        } catch (error) {
+            Notification.exception(error);
+            stateManager.setReadOnly(false);
+            stateManager.state.ui.posting = false;
+            stateManager.setReadOnly(true);
+        }
+    }
+
+    /**
      * Refresh the feedback files filemanager widget.
      *
      * Called after the draft area has been re-prepared (student switch or save).

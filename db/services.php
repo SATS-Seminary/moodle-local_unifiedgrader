@@ -151,4 +151,10 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_set_grades_posted' => [
+        'classname' => 'local_unifiedgrader\external\set_grades_posted',
+        'description' => 'Post or unpost grades for an activity (hide/unhide grade item).',
+        'type' => 'write',
+        'ajax' => true,
+    ],
 ];

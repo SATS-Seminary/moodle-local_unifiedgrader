@@ -27,6 +27,7 @@ import PreviewPanel from 'local_unifiedgrader/components/preview_panel';
 import MarkingPanel from 'local_unifiedgrader/components/marking_panel';
 import StudentNavigator from 'local_unifiedgrader/components/student_navigator';
 import SubmissionComments from 'local_unifiedgrader/components/submission_comments';
+import PostGradesToggle from 'local_unifiedgrader/components/post_grades_toggle';
 
 /** @type {Reactive|null} */
 let reactiveInstance = null;
@@ -58,6 +59,8 @@ export const init = (containerId) => {
     const hasfeedbackfileplugin = container.dataset.hasfeedbackfileplugin === '1';
     const feedbackfilesclientid = container.dataset.feedbackfilesclientid || '';
     const allowmanualgradeoverride = container.dataset.allowmanualgradeoverride === '1';
+    const gradesPosted = container.dataset.gradesposted === '1';
+    const gradesHidden = parseInt(container.dataset.gradeshidden, 10) || 0;
 
     let activityinfo = {};
     let participants = [];
@@ -146,6 +149,9 @@ export const init = (containerId) => {
         ui: {
             loading: false,
             saving: false,
+            posting: false,
+            gradesPosted: gradesPosted,
+            gradesHidden: gradesHidden,
             draftitemid: draftitemid,
             feedbackfilesdraftid: feedbackfilesdraftid,
             hasfeedbackfileplugin: hasfeedbackfileplugin,
@@ -189,6 +195,14 @@ export const init = (containerId) => {
     if (commentsEl) {
         new SubmissionComments({
             element: commentsEl,
+            reactive: reactiveInstance,
+        });
+    }
+
+    const postGradesEl = container.querySelector('[data-region="post-grades-toggle"]');
+    if (postGradesEl) {
+        new PostGradesToggle({
+            element: postGradesEl,
             reactive: reactiveInstance,
         });
     }

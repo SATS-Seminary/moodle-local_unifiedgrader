@@ -50,10 +50,15 @@ $string['setting_allow_manual_override_desc'] = 'When enabled, teachers can manu
 // Grading interface.
 $string['grade'] = 'Grade';
 $string['savegrade'] = 'Save grade';
+$string['savefeedback'] = 'Save feedback';
 $string['savinggrade'] = 'Saving grade...';
 $string['gradesaved'] = 'Grade saved';
 $string['error_saving'] = 'Error saving grade.';
 $string['feedback'] = 'Feedback';
+$string['feedback_saved'] = 'Feedback (saved)';
+$string['edit_feedback'] = 'Edit';
+$string['delete_feedback'] = 'Delete';
+$string['confirm_delete_feedback'] = 'Are you sure you want to delete this feedback? The grade will be preserved.';
 $string['maxgrade'] = '/ {$a}';
 
 // Submissions.
@@ -211,3 +216,21 @@ $string['docinfo_creator'] = 'Creator';
 $string['docinfo_created'] = 'Created';
 $string['docinfo_modified'] = 'Modified';
 $string['docinfo_calculating'] = 'Calculating...';
+
+// Forum feedback view.
+$string['view_forum_feedback'] = 'View Forum Feedback';
+$string['forum_your_posts'] = 'Your forum posts';
+$string['forum_no_posts'] = 'You have not made any posts in this forum.';
+$string['forum_feedback_banner'] = 'Your teacher has graded your forum participation.';
+
+// Post grades.
+$string['grades_posted'] = 'Grades posted';
+$string['grades_hidden'] = 'Grades hidden';
+$string['post_grades'] = 'Post grades';
+$string['unpost_grades'] = 'Unpost grades';
+$string['confirm_post_grades'] = 'Post all grades for this activity? Students will be able to see their grades and feedback.';
+$string['confirm_unpost_grades'] = 'Unpost all grades for this activity? Students will no longer be able to see their grades and feedback.';
+$string['schedule_post'] = 'Post on a date';
+$string['schedule_post_btn'] = 'Schedule';
+$string['grades_scheduled'] = 'Posting {$a}';
+$string['schedule_must_be_future'] = 'The scheduled date must be in the future.';

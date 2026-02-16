@@ -89,6 +89,10 @@ $canviewall = has_capability('local/unifiedgrader:viewall', $context);
 $canviewnotes = has_capability('local/unifiedgrader:viewnotes', $context);
 $canmanagenotes = has_capability('local/unifiedgrader:managenotes', $context);
 
+// Grade posting status.
+$gradesposted = $adapter->are_grades_posted();
+$gradeshidden = $adapter->get_grades_hidden_value();
+
 // Prepare template context.
 $templatedata = [
     'cmid' => $cmid,
@@ -120,6 +124,8 @@ $templatedata = [
     }, $availablegroups))),
     'currentgroup' => $currentgroup,
     'allowmanualgradeoverride' => !empty(get_config('local_unifiedgrader', 'allow_manual_grade_override')),
+    'gradesposted' => $gradesposted,
+    'gradeshidden' => $gradeshidden,
 ];
 
 // TinyMCE editor setup for the feedback textarea.

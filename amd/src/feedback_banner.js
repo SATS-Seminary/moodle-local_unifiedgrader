@@ -31,12 +31,15 @@
  *
  * @param {string} url The URL to the feedback viewer page.
  * @param {string} label The button label text.
+ * @param {string} [description] Optional banner body text.
  */
-export const init = (url, label) => {
+export const init = (url, label, description) => {
     // Don't create duplicates.
     if (document.getElementById('ug-feedback-banner')) {
         return;
     }
+
+    const bannerText = description || 'Your teacher has annotated your submission.';
 
     const banner = document.createElement('div');
     banner.id = 'ug-feedback-banner';
@@ -45,7 +48,7 @@ export const init = (url, label) => {
         '<div class="card-body d-flex align-items-center justify-content-between py-2 px-3">' +
             '<span class="d-flex align-items-center gap-2">' +
                 '<i class="fa fa-file-text-o text-primary" aria-hidden="true"></i> ' +
-                '<span>Your teacher has annotated your submission.</span>' +
+                '<span>' + bannerText + '</span>' +
             '</span>' +
             '<a href="' + url + '" class="btn btn-primary btn-sm text-nowrap">' +
                 '<i class="fa fa-eye me-1" aria-hidden="true"></i>' + label +

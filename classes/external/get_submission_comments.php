@@ -84,7 +84,17 @@ class get_submission_comments extends external_api {
             throw new \moodle_exception('nopermission', 'local_unifiedgrader');
         }
 
-        [$course, $cm] = get_course_and_cm_from_cmid($params['cmid'], 'assign');
+        [$course, $cm] = get_course_and_cm_from_cmid($params['cmid']);
+
+        // Submission comments are only supported for assignments.
+        if ($cm->modname !== 'assign') {
+            return [
+                'comments' => [],
+                'count' => 0,
+                'canpost' => false,
+            ];
+        }
+
         $assign = new \assign($context, $cm, $course);
         $submission = $assign->get_user_submission($params['userid'], false);
 

@@ -40,7 +40,6 @@ export const init = async() => {
     const cmid = parseInt(container.dataset.cmid, 10);
     const fileid = parseInt(container.dataset.fileid, 10);
     const pdfUrl = container.dataset.pdfurl;
-    const annotatedPdfMap = JSON.parse(container.dataset.annotatedpdfmap || '{}');
 
     // Find the PDF viewer component element.
     const viewerEl = container.querySelector('[data-region="pdf-viewer-component"]');
@@ -78,11 +77,9 @@ export const init = async() => {
     // Wait for the PDF to load.
     await pdfViewer.loadPdf(pdfUrl);
 
-    // Only load annotation overlays if no flattened PDF exists for this file.
-    // When a flattened PDF is loaded, annotations are already baked into the PDF.
-    if (!annotatedPdfMap[fileid]) {
-        await loadAnnotationsForFile(pdfViewer, cmid, fileid);
-    }
+    // Always load annotation overlays for the interactive viewer —
+    // comment markers display as icons with hover tooltips for the text.
+    await loadAnnotationsForFile(pdfViewer, cmid, fileid);
 
     // Handle file switching (multiple PDFs).
     const fileSelector = container.querySelector('[data-action="file-selector"]');
@@ -90,19 +87,14 @@ export const init = async() => {
         fileSelector.addEventListener('change', async(e) => {
             const newFileId = parseInt(e.target.value, 10);
             const selectedOption = e.target.selectedOptions[0];
-            const origUrl = selectedOption.dataset.url;
-
-            // Prefer annotated PDF URL if available for this file.
-            const url = annotatedPdfMap[newFileId] || origUrl;
+            const url = selectedOption.dataset.url;
 
             // Reset the PDF viewer URL to force reload.
             pdfViewer._currentUrl = null;
             await pdfViewer.loadPdf(url);
 
-            // Only load overlays for files without a flattened PDF.
-            if (!annotatedPdfMap[newFileId]) {
-                await loadAnnotationsForFile(pdfViewer, cmid, newFileId);
-            }
+            // Always load annotation overlays for hover tooltips.
+            await loadAnnotationsForFile(pdfViewer, cmid, newFileId);
         });
     }
 };

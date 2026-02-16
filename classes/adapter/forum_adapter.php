@@ -465,14 +465,58 @@ class forum_adapter extends base_adapter {
     }
 
     /**
-     * Forums do not support PDF annotations, so grades are never "released"
-     * in the annotation feedback sense.
+     * Check whether a forum grade has been released to the student.
+     *
+     * A forum grade is considered released when a forum_grades record exists
+     * with a non-null grade AND the gradebook item is not hidden.
      *
      * @param int $userid
-     * @return bool Always false.
+     * @return bool
      */
     public function is_grade_released(int $userid): bool {
-        return false;
+        global $DB;
+
+        $forumid = $this->forum->get_id();
+
+        // Check that a grade record exists with a non-null grade.
+        $graderecord = $DB->get_record('forum_grades', [
+            'forum' => $forumid,
+            'itemnumber' => 1,
+            'userid' => $userid,
+        ]);
+        if (!$graderecord || $graderecord->grade === null) {
+            return false;
+        }
+
+        // Check the gradebook item is not hidden.
+        $gradeitem = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => 'forum',
+            'iteminstance' => $forumid,
+            'itemnumber' => 1,
+            'courseid' => $this->course->id,
+        ]);
+        if ($gradeitem && $gradeitem->is_hidden()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Fetch the grade_item for whole-forum grading (itemnumber 1).
+     *
+     * @return \grade_item|null
+     */
+    protected function fetch_grade_item(): ?\grade_item {
+        $item = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => 'forum',
+            'iteminstance' => $this->forum->get_id(),
+            'itemnumber' => 1,
+            'courseid' => $this->course->id,
+        ]);
+        return $item ?: null;
     }
 
     /**
