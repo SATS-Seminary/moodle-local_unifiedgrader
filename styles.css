@@ -1,12 +1,10 @@
 /* Unified Grader - local_unifiedgrader styles. */
 
-/* Hide the activity header/description that Moodle injects above our interface. */
+/* Hide the activity header/description that Moodle injects above our grading interface.
+   grade.php uses pagelayout-embedded, so scope to that layout only. */
 .pagelayout-embedded .activity-header,
 .pagelayout-embedded .activity-description,
-.pagelayout-embedded .activity-information,
-.activity-header,
-.activity-description,
-.activity-information {
+.pagelayout-embedded .activity-information {
     display: none !important;
 }
 
