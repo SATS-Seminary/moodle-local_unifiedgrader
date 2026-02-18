@@ -325,6 +325,20 @@ abstract class base_adapter {
     }
 
     /**
+     * Get the effective due date for a specific user.
+     *
+     * Accounts for user overrides and extensions. Subclasses should
+     * override this to provide activity-specific logic.
+     *
+     * @param int $userid The user ID.
+     * @return int The effective due date timestamp (0 if no due date).
+     */
+    public function get_effective_duedate(int $userid): int {
+        $info = $this->get_activity_info();
+        return (int) ($info['duedate'] ?? 0);
+    }
+
+    /**
      * Check whether a participant entry matches the selected filter.
      *
      * Filter semantics:
@@ -332,11 +346,11 @@ abstract class base_adapter {
      * - notsubmitted: Not yet submitted (status is 'draft', 'new', or 'nosubmission').
      * - graded:       Has a grade value present (any status).
      * - needsgrading: Submitted but not yet graded (status 'submitted', no grade, or 'needsgrading').
-     * - late:         Submission timestamp exceeds the due date.
+     * - late:         Entry is flagged as late (computed with per-user effective due date).
      *
      * @param string $filter The active filter value.
-     * @param array $entry Participant entry with 'status', 'submittedat', 'gradevalue' keys.
-     * @param int $duedate The activity due/close date timestamp.
+     * @param array $entry Participant entry with 'status', 'submittedat', 'gradevalue', 'islate' keys.
+     * @param int $duedate The effective due/close date for this user (unused for late; kept for compat).
      * @return bool True if the entry matches the filter.
      */
     protected function matches_filter(string $filter, array $entry, int $duedate): bool {
@@ -351,7 +365,7 @@ abstract class base_adapter {
                 return in_array($entry['status'], ['submitted', 'needsgrading'])
                     && $entry['gradevalue'] === null;
             case 'late':
-                return $duedate > 0 && $entry['submittedat'] > 0 && $entry['submittedat'] > $duedate;
+                return !empty($entry['islate']);
             default:
                 return $entry['status'] === $filter;
         }

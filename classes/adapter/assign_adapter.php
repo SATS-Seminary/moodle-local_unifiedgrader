@@ -95,13 +95,32 @@ class assign_adapter extends base_adapter {
 
         // Batch-load user overrides to avoid N+1 queries.
         global $DB;
-        $overrideuserids = $DB->get_fieldset_select(
+        $overrides = $DB->get_records_select(
             'assign_overrides',
-            'userid',
             'assignid = :assignid AND userid IS NOT NULL',
             ['assignid' => $instance->id],
+            '',
+            'userid, duedate',
         );
-        $overrideset = array_flip($overrideuserids);
+        $overrideset = [];
+        foreach ($overrides as $ov) {
+            $overrideset[(int) $ov->userid] = $ov->duedate !== null ? (int) $ov->duedate : null;
+        }
+
+        // Batch-load extension due dates from user flags.
+        $extensions = $DB->get_records_select(
+            'assign_user_flags',
+            'assignment = :assignid AND extensionduedate > 0',
+            ['assignid' => $instance->id],
+            '',
+            'userid, extensionduedate',
+        );
+        $extensionset = [];
+        foreach ($extensions as $ext) {
+            $extensionset[(int) $ext->userid] = (int) $ext->extensionduedate;
+        }
+
+        $globalduedate = (int) $instance->duedate;
 
         $result = [];
         foreach ($participants as $participant) {
@@ -122,22 +141,30 @@ class assign_adapter extends base_adapter {
             $flags = $this->assign->get_user_flags($participant->id, false);
             $locked = ($flags && !empty($flags->locked));
 
+            // Effective due date: override duedate > extension duedate > global duedate.
+            $uid = (int) $participant->id;
+            $effectiveduedate = $overrideset[$uid] ?? $extensionset[$uid] ?? $globalduedate;
+            $submittedat = $submission ? (int) $submission->timemodified : 0;
+            $islate = $effectiveduedate > 0 && $submittedat > 0 && $submittedat > $effectiveduedate;
+
             $entry = [
-                'id' => (int) $participant->id,
+                'id' => $uid,
                 'fullname' => $fullname,
                 'email' => $instance->blindmarking ? '' : $participant->email,
                 'profileimageurl' => $profileimageurl,
                 'status' => $status,
-                'submittedat' => $submission ? (int) $submission->timemodified : 0,
+                'submittedat' => $submittedat,
                 'gradevalue' => ($grade && $grade->grade !== null && $grade->grade >= 0)
                     ? (float) $grade->grade : null,
                 'locked' => $locked,
-                'hasoverride' => isset($overrideset[$participant->id]),
+                'hasoverride' => isset($overrideset[$uid]),
+                'hasextension' => isset($extensionset[$uid]),
+                'islate' => $islate,
             ];
 
             // Apply status filter.
             if (!empty($filters['status']) && $filters['status'] !== 'all') {
-                if (!$this->matches_filter($filters['status'], $entry, (int) $instance->duedate)) {
+                if (!$this->matches_filter($filters['status'], $entry, $effectiveduedate)) {
                     continue;
                 }
             }
@@ -761,6 +788,41 @@ class assign_adapter extends base_adapter {
         }
 
         return $results;
+    }
+
+    /**
+     * Get the effective due date for a specific user.
+     *
+     * Priority: override duedate > extension duedate > global duedate.
+     *
+     * @param int $userid The user ID.
+     * @return int The effective due date timestamp (0 if no due date).
+     */
+    public function get_effective_duedate(int $userid): int {
+        global $DB;
+
+        $instance = $this->assign->get_instance();
+        $globalduedate = (int) $instance->duedate;
+
+        // Check for override duedate.
+        $override = $DB->get_field('assign_overrides', 'duedate', [
+            'assignid' => $instance->id,
+            'userid' => $userid,
+        ]);
+        if ($override !== false && $override !== null) {
+            return (int) $override;
+        }
+
+        // Check for extension.
+        $extension = $DB->get_field('assign_user_flags', 'extensionduedate', [
+            'assignment' => $instance->id,
+            'userid' => $userid,
+        ]);
+        if ($extension !== false && (int) $extension > 0) {
+            return (int) $extension;
+        }
+
+        return $globalduedate;
     }
 
     /**

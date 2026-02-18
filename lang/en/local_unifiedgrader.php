@@ -260,6 +260,7 @@ $string['action_lock'] = 'Prevent submission changes';
 $string['action_unlock'] = 'Allow submission changes';
 $string['action_edit_submission'] = 'Edit submission';
 $string['action_grant_extension'] = 'Grant extension';
+$string['action_edit_extension'] = 'Edit extension';
 $string['action_submit_for_grading'] = 'Submit for grading';
 $string['confirm_revert_to_draft'] = 'Are you sure you want to revert this submission to draft status?';
 $string['confirm_remove_submission'] = 'Are you sure you want to remove this submission? This cannot be undone.';

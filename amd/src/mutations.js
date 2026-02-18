@@ -680,20 +680,40 @@ export default class {
             }
             content.innerHTML = '';
 
+            // The YUI widget creates an .fp-iconview container inside .fp-content.
+            // All CSS rules (e.g. .fp-iconview .fp-thumbnail) require this wrapper.
+            const iconView = document.createElement('div');
+            iconView.className = 'fp-iconview';
+
             files.forEach(file => {
-                const span = document.createElement('span');
-                span.className = 'fp-file fp-hascontextmenu fp-file-saved';
-                span.tabIndex = 0;
+                // Match Moodle's native file manager DOM structure (fm_js_template_iconfilename).
+                const wrapper = document.createElement('div');
+                wrapper.className = 'fp-file fp-hascontextmenu';
+                wrapper.tabIndex = 0;
 
                 const a = document.createElement('a');
                 a.href = '#';
+                a.className = 'd-block aabtn';
+
+                // Position-relative container for thumbnail + ref icons (matches native template).
+                const posWrap = document.createElement('div');
+                posWrap.style.position = 'relative';
 
                 const thumb = document.createElement('div');
                 thumb.className = 'fp-thumbnail';
-                const img = document.createElement('img');
-                img.src = file.realthumbnail || file.thumbnail || file.icon || '';
-                img.alt = '';
-                thumb.appendChild(img);
+
+                const imgSrc = file.realthumbnail || file.thumbnail || file.icon || '';
+                if (imgSrc) {
+                    const img = document.createElement('img');
+                    img.src = imgSrc;
+                    img.alt = '';
+                    // Match YUI widget sizing (filepicker.js lines 486-487).
+                    const maxW = file.thumbnail_width || 90;
+                    const maxH = file.thumbnail_height || 90;
+                    img.style.maxWidth = maxW + 'px';
+                    img.style.maxHeight = maxH + 'px';
+                    thumb.appendChild(img);
+                }
 
                 // Green check badge to indicate the file is saved.
                 const badge = document.createElement('i');
@@ -701,19 +721,22 @@ export default class {
                 badge.setAttribute('aria-hidden', 'true');
                 thumb.appendChild(badge);
 
-                a.appendChild(thumb);
+                posWrap.appendChild(thumb);
+                a.appendChild(posWrap);
 
                 const fnField = document.createElement('div');
                 fnField.className = 'fp-filename-field';
-                const fnP = document.createElement('p');
-                fnP.className = 'fp-filename';
-                fnP.textContent = file.fullname || file.filename || '';
-                fnField.appendChild(fnP);
+                const fnDiv = document.createElement('div');
+                fnDiv.className = 'fp-filename text-truncate';
+                fnDiv.textContent = file.fullname || file.filename || '';
+                fnField.appendChild(fnDiv);
                 a.appendChild(fnField);
 
-                span.appendChild(a);
-                content.appendChild(span);
+                wrapper.appendChild(a);
+                iconView.appendChild(wrapper);
             });
+
+            content.appendChild(iconView);
         })
         .catch(() => {
             // Silently ignore — draft area listing failures are non-critical.

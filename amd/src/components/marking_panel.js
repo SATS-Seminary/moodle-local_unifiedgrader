@@ -959,8 +959,8 @@ export default class extends BaseComponent {
     /**
      * Render the late submission indicator.
      *
-     * Compares submission.timemodified with activity.duedate to determine
-     * if the submission was late, and displays the duration.
+     * Uses the per-user effective due date (accounts for overrides and
+     * extensions) to determine whether the submission was late.
      *
      * @param {object} args Watcher args.
      * @param {object} args.state Current state.
@@ -971,7 +971,8 @@ export default class extends BaseComponent {
             return;
         }
 
-        const duedate = state.activity.duedate || 0;
+        // Use the per-user effective due date, falling back to the global activity due date.
+        const duedate = state.submission.effectiveduedate || state.activity.duedate || 0;
         const submitted = state.submission.timemodified || 0;
 
         if (!duedate || !submitted || submitted <= duedate) {
@@ -979,7 +980,7 @@ export default class extends BaseComponent {
             return;
         }
 
-        // Calculate the late duration.
+        // Calculate the late duration against the effective due date.
         const diffSeconds = submitted - duedate;
         const days = Math.floor(diffSeconds / 86400);
         const hours = Math.floor((diffSeconds % 86400) / 3600);

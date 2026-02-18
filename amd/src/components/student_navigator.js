@@ -96,6 +96,7 @@ export default class extends BaseComponent {
             'action_unlock',
             'action_edit_submission',
             'action_grant_extension',
+            'action_edit_extension',
             'action_submit_for_grading',
             'confirm_revert_to_draft',
             'confirm_remove_submission',
@@ -286,8 +287,7 @@ export default class extends BaseComponent {
             statusWrapper.className = 'd-flex align-items-center gap-1';
 
             // Show a red dot for late submissions (before the badge).
-            const duedate = state.activity.duedate || 0;
-            if (duedate && p.submittedat > 0 && p.submittedat > duedate) {
+            if (p.islate) {
                 const lateDot = document.createElement('span');
                 lateDot.className = 'rounded-circle bg-danger d-inline-block';
                 lateDot.style.cssText = 'width: 6px; height: 6px; flex-shrink: 0;';
@@ -475,7 +475,9 @@ export default class extends BaseComponent {
             return;
         }
 
-        const actions = this._getActionsForStatus(student.status, !!student.locked, !!student.hasoverride);
+        const actions = this._getActionsForStatus(
+            student.status, !!student.locked, !!student.hasoverride, !!student.hasextension,
+        );
         if (actions.length === 0) {
             wrapper.innerHTML = '';
             const badge = document.createElement('span');
@@ -567,9 +569,10 @@ export default class extends BaseComponent {
      * @param {string} status Submission status.
      * @param {boolean} locked Whether the submission is locked.
      * @param {boolean} hasOverride Whether the student has an active override.
+     * @param {boolean} hasExtension Whether the student has an active extension.
      * @return {object[]} Array of action objects.
      */
-    _getActionsForStatus(status, locked, hasOverride) {
+    _getActionsForStatus(status, locked, hasOverride, hasExtension) {
         const s = this._strings;
         if (!s) {
             return [];
@@ -609,8 +612,9 @@ export default class extends BaseComponent {
                 icon: 'fa-pencil', type: 'redirect',
             },
             grant_extension: {
-                id: 'grant_extension', label: s.action_grant_extension,
-                icon: 'fa-calendar-plus-o', type: 'redirect',
+                id: 'grant_extension',
+                label: hasExtension ? s.action_edit_extension : s.action_grant_extension,
+                icon: 'fa-calendar-plus-o', type: 'modal',
             },
             submit_for_grading: {
                 id: 'submit', label: s.action_submit_for_grading,
@@ -698,21 +702,28 @@ export default class extends BaseComponent {
     }
 
     /**
-     * Handle a modal action (override add/edit).
+     * Handle a modal action (override add/edit, extension grant/edit).
      *
-     * @param {string} _actionId Action identifier (unused, reserved for future modal types).
+     * @param {string} actionId Action identifier.
      * @param {object} student Participant data.
      */
-    async _handleModalAction(_actionId, student) {
+    async _handleModalAction(actionId, student) {
         const state = this.reactive.state;
         const cmid = state.activity.cmid;
-        const overrideid = state.submission?.overrideid || 0;
+        let saved = false;
 
-        const {openOverrideModal} = await import('local_unifiedgrader/override_modal');
-        const saved = await openOverrideModal(cmid, student.id, overrideid);
+        if (actionId === 'grant_extension') {
+            const {openExtensionModal} = await import('local_unifiedgrader/extension_modal');
+            saved = await openExtensionModal(cmid, student.id, !!student.hasextension);
+        } else {
+            // Override modal (add/edit).
+            const overrideid = state.submission?.overrideid || 0;
+            const {openOverrideModal} = await import('local_unifiedgrader/override_modal');
+            saved = await openOverrideModal(cmid, student.id, overrideid);
+        }
 
         if (saved) {
-            // Refresh the student data and participant list to pick up the new override state.
+            // Refresh the student data and participant list to pick up changes.
             this.reactive.dispatch('loadStudent', cmid, student.id);
             this.reactive.dispatch('updateFilters', cmid, {});
         }
@@ -734,9 +745,6 @@ export default class extends BaseComponent {
         switch (actionId) {
             case 'edit_submission':
                 url = base + '?id=' + cmid + '&userid=' + userid + '&action=editsubmission';
-                break;
-            case 'grant_extension':
-                url = base + '?id=' + cmid + '&userid=' + userid + '&action=grantextension';
                 break;
             default:
                 return;

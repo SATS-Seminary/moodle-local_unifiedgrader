@@ -135,13 +135,19 @@ class quiz_adapter extends base_adapter {
         $needsgrading = $this->get_users_needing_grading();
 
         // Batch-load user overrides to avoid N+1 queries.
-        $overrideuserids = $DB->get_fieldset_select(
+        $overrides = $DB->get_records_select(
             'quiz_overrides',
-            'userid',
             'quiz = :quizid2 AND userid IS NOT NULL',
             ['quizid2' => $this->quiz->id],
+            '',
+            'userid, timeclose',
         );
-        $overrideset = array_flip($overrideuserids);
+        $overrideset = [];
+        foreach ($overrides as $ov) {
+            $overrideset[(int) $ov->userid] = $ov->timeclose !== null ? (int) $ov->timeclose : null;
+        }
+
+        $globaltimeclose = (int) ($this->quiz->timeclose ?? 0);
 
         $result = [];
         foreach ($enrolledusers as $user) {
@@ -155,20 +161,26 @@ class quiz_adapter extends base_adapter {
             $userpicture->size = 64;
             $profileimageurl = $userpicture->get_url($PAGE)->out(false);
 
+            // Effective close date: override timeclose > global timeclose.
+            $effectiveduedate = $overrideset[$userid] ?? $globaltimeclose;
+            $submittedat = $stats ? (int) ($stats->lastfinish ?? 0) : 0;
+            $islate = $effectiveduedate > 0 && $submittedat > 0 && $submittedat > $effectiveduedate;
+
             $entry = [
                 'id' => $userid,
                 'fullname' => fullname($user),
                 'email' => $user->email,
                 'profileimageurl' => $profileimageurl,
                 'status' => $status,
-                'submittedat' => $stats ? (int) ($stats->lastfinish ?? 0) : 0,
+                'submittedat' => $submittedat,
                 'gradevalue' => $usergrade ? (float) $usergrade->grade : null,
                 'hasoverride' => isset($overrideset[$userid]),
+                'islate' => $islate,
             ];
 
             // Apply status filter.
             if (!empty($filters['status']) && $filters['status'] !== 'all') {
-                if (!$this->matches_filter($filters['status'], $entry, (int) ($this->quiz->timeclose ?? 0))) {
+                if (!$this->matches_filter($filters['status'], $entry, $effectiveduedate)) {
                     continue;
                 }
             }
@@ -414,6 +426,30 @@ class quiz_adapter extends base_adapter {
      */
     public function is_grade_released(int $userid): bool {
         return false;
+    }
+
+    /**
+     * Get the effective due date (close time) for a specific user.
+     *
+     * Checks for quiz overrides with a timeclose value.
+     *
+     * @param int $userid The user ID.
+     * @return int The effective close date timestamp (0 if no close date).
+     */
+    public function get_effective_duedate(int $userid): int {
+        global $DB;
+
+        $globaltimeclose = (int) ($this->quiz->timeclose ?? 0);
+
+        $override = $DB->get_field('quiz_overrides', 'timeclose', [
+            'quiz' => $this->quiz->id,
+            'userid' => $userid,
+        ]);
+        if ($override !== false && $override !== null) {
+            return (int) $override;
+        }
+
+        return $globaltimeclose;
     }
 
     /**

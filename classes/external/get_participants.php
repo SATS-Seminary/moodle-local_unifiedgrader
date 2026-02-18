@@ -113,6 +113,12 @@ class get_participants extends external_api {
                 'hasoverride' => new external_value(
                     PARAM_BOOL, 'Whether user has an override', VALUE_DEFAULT, false
                 ),
+                'hasextension' => new external_value(
+                    PARAM_BOOL, 'Whether user has an extension', VALUE_DEFAULT, false
+                ),
+                'islate' => new external_value(
+                    PARAM_BOOL, 'Whether submission is late (accounts for overrides/extensions)', VALUE_DEFAULT, false
+                ),
             ]),
         );
     }

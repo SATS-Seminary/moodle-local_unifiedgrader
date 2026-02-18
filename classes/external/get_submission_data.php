@@ -75,6 +75,9 @@ class get_submission_data extends external_api {
         $data['hasoverride'] = $override !== null;
         $data['overrideid'] = $override ? (int) $override['id'] : 0;
 
+        // Effective due date for this user (accounts for overrides and extensions).
+        $data['effectiveduedate'] = $adapter->get_effective_duedate($params['userid']);
+
         return $data;
     }
 
@@ -115,6 +118,9 @@ class get_submission_data extends external_api {
             ),
             'hasoverride' => new external_value(PARAM_BOOL, 'Whether user has an override', VALUE_DEFAULT, false),
             'overrideid' => new external_value(PARAM_INT, 'Override ID (0 if none)', VALUE_DEFAULT, 0),
+            'effectiveduedate' => new external_value(
+                PARAM_INT, 'Effective due date for this user (accounts for overrides/extensions)', VALUE_DEFAULT, 0
+            ),
         ]);
     }
 }

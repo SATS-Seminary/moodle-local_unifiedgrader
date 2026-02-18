@@ -147,14 +147,19 @@ class forum_adapter extends base_adapter {
             $userpicture->size = 64;
             $profileimageurl = $userpicture->get_url($PAGE)->out(false);
 
+            $submittedat = $userposts ? (int) $userposts->lastpost : 0;
+            $forumduedate = (int) $this->forum->get_due_date();
+            $islate = $forumduedate > 0 && $submittedat > 0 && $submittedat > $forumduedate;
+
             $entry = [
                 'id' => $userid,
                 'fullname' => fullname($user),
                 'email' => $user->email,
                 'profileimageurl' => $profileimageurl,
                 'status' => $status,
-                'submittedat' => $userposts ? (int) $userposts->lastpost : 0,
+                'submittedat' => $submittedat,
                 'gradevalue' => $hasgrade ? (float) $usergrade->grade : null,
+                'islate' => $islate,
             ];
 
             // Apply status filter.
