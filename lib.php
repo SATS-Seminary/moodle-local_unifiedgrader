@@ -66,41 +66,9 @@ function local_unifiedgrader_extend_settings_navigation(
     $cangrade = has_capability('local/unifiedgrader:grade', $context);
     $canviewfeedback = has_capability('local/unifiedgrader:viewfeedback', $context);
 
-    // Student feedback link — add a node to 'modulesettings' so that the
-    // secondary navigation renders for students (Moodle prunes empty branches,
-    // and without any children modulesettings disappears, taking the entire
-    // secondary nav with it). Adding our node keeps modulesettings alive.
-    if (!$cangrade && $canviewfeedback && in_array($modname, ['assign', 'forum'])) {
-        global $USER;
-        try {
-            $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
-            if ($adapter->is_grade_released((int) $USER->id)) {
-                $modulesettings = $settingsnav->find('modulesettings', navigation_node::TYPE_SETTING);
-                if ($modulesettings) {
-                    $url = new moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cm->id]);
-                    $labelkey = $modname === 'assign' ? 'view_annotated_feedback' : 'view_forum_feedback';
-                    $node = navigation_node::create(
-                        get_string($labelkey, 'local_unifiedgrader'),
-                        $url,
-                        navigation_node::TYPE_CUSTOM,
-                        null,
-                        'local_unifiedgrader_feedback',
-                        new pix_icon('i/preview', ''),
-                    );
-                    $modulesettings->add_node($node);
-
-                    // Promote the tab out of the "More" overflow and style it.
-                    $PAGE->requires->js_call_amd('local_unifiedgrader/nav_promote', 'init', [
-                        'local_unifiedgrader_feedback',
-                    ]);
-                }
-            }
-        } catch (\Throwable $e) {
-            debugging(
-                'local_unifiedgrader: student feedback link failed: ' . $e->getMessage(),
-                DEBUG_DEVELOPER,
-            );
-        }
+    // Student feedback is handled by the PSR-14 hook (feedback_banner.js +
+    // assessment_criteria.js) — no secondary nav node needed.
+    if (!$cangrade) {
         return;
     }
 

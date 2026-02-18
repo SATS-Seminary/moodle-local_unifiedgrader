@@ -93,8 +93,8 @@ class hook_callbacks {
             return;
         }
 
-        // Student: show feedback banner for graded activities.
-        // Skip if already on a Unified Grader page — the banner is only for discovery.
+        // Student: override "View grades" button and show feedback banners.
+        // Skip if already on a Unified Grader page.
         $pagepath = $PAGE->url->get_path();
         if (strpos($pagepath, '/local/unifiedgrader/') !== false) {
             return;
@@ -107,23 +107,44 @@ class hook_callbacks {
 
         try {
             $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
-            if (!$adapter->is_grade_released((int) $USER->id)) {
-                return;
-            }
         } catch (\Throwable $e) {
             return;
         }
 
-        $url = new \moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cm->id]);
-        $labelkey = $modname === 'assign' ? 'view_annotated_feedback' : 'view_forum_feedback';
-        $bannertext = get_string(
-            $modname === 'assign' ? 'view_annotated_feedback' : 'forum_feedback_banner',
-            'local_unifiedgrader',
-        );
-        $PAGE->requires->js_call_amd('local_unifiedgrader/feedback_banner', 'init', [
-            $url->out(false),
-            get_string($labelkey, 'local_unifiedgrader'),
-            $bannertext,
-        ]);
+        $feedbackurl = new \moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cm->id]);
+        $isgraded = $adapter->is_grade_released((int) $USER->id);
+
+        if ($isgraded) {
+            // Post-grading: override "View grades" button → "View feedback" → redirect.
+            $PAGE->requires->js_call_amd('local_unifiedgrader/assessment_criteria', 'init', [
+                null,
+                $feedbackurl->out(false),
+                get_string('view_feedback', 'local_unifiedgrader'),
+                true,
+            ]);
+
+            // Also show the feedback banner for discovery.
+            $labelkey = $modname === 'assign' ? 'view_annotated_feedback' : 'view_forum_feedback';
+            $bannertext = get_string(
+                $modname === 'assign' ? 'view_annotated_feedback' : 'forum_feedback_banner',
+                'local_unifiedgrader',
+            );
+            $PAGE->requires->js_call_amd('local_unifiedgrader/feedback_banner', 'init', [
+                $feedbackurl->out(false),
+                get_string($labelkey, 'local_unifiedgrader'),
+                $bannertext,
+            ]);
+        } else {
+            // Pre-grading: override "View grades" button → "Assessment criteria" → modal.
+            $definition = $adapter->get_grading_definition();
+            if ($definition) {
+                $PAGE->requires->js_call_amd('local_unifiedgrader/assessment_criteria', 'init', [
+                    $definition,
+                    $feedbackurl->out(false),
+                    get_string('assessment_criteria', 'local_unifiedgrader'),
+                    false,
+                ]);
+            }
+        }
     }
 }

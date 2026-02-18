@@ -152,6 +152,7 @@ $string['plagiarism'] = 'Plagiarism';
 $string['plagiarism_noresults'] = 'No plagiarism results available.';
 
 // Student feedback view.
+$string['assessment_criteria'] = 'Assessment criteria';
 $string['view_feedback'] = 'View feedback';
 $string['view_annotated_feedback'] = 'View Annotated Feedback';
 $string['feedback_not_available'] = 'Your feedback is not yet available. Please check back after your submission has been graded and released.';
@@ -194,6 +195,7 @@ $string['pdf_search'] = 'Search in document';
 // Annotation tools.
 $string['annotate_tools'] = 'Annotation tools';
 $string['annotate_select'] = 'Select';
+$string['annotate_textselect'] = 'Select text';
 $string['annotate_comment'] = 'Comment';
 $string['annotate_highlight'] = 'Highlight';
 $string['annotate_pen'] = 'Pen';

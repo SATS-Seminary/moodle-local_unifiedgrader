@@ -638,13 +638,13 @@ export default class PdfViewer extends BaseComponent {
                     this._scheduleSave();
                 });
 
-                // Toggle text selection when the annotation tool changes.
-                // Text selection is enabled when the "select" tool is active.
+                // Toggle text selection based on annotation tool.
+                // Only the 'textselect' tool enables the PDF.js text layer for selection.
                 this._annotationLayer.onToolChange((tool) => {
-                    this.setTextSelectable(tool === 'select');
+                    this.setTextSelectable(tool === 'textselect');
                 });
-                // Enable text selection initially (default tool is select).
-                this.setTextSelectable(true);
+                // Start with text selection off (default tool is 'select' for annotations).
+                this.setTextSelectable(false);
 
                 // Create the toolbar handler and show it.
                 if (toolbarEl) {
@@ -735,9 +735,12 @@ export default class PdfViewer extends BaseComponent {
 
             // Update annotation layer for the new page.
             if (this._annotationLayer) {
+                // Rescale annotations on zoom (same page) but not on page switch
+                // (where switchPage replaces the canvas contents entirely).
                 this._annotationLayer.setPageSize(
                     Math.round(displayViewport.width),
-                    Math.round(displayViewport.height)
+                    Math.round(displayViewport.height),
+                    !isPageChange
                 );
                 if (isPageChange) {
                     await this._annotationLayer.switchPage(pageNum);

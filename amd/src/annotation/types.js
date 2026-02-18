@@ -28,6 +28,7 @@
  */
 export const TOOLS = {
     SELECT: 'select',
+    TEXT_SELECT: 'textselect',
     COMMENT: 'comment',
     HIGHLIGHT: 'highlight',
     PEN: 'pen',

@@ -144,6 +144,31 @@ export default class AnnotationLayer {
             return;
         }
 
+        // Text-select mode: make Fabric.js canvas fully transparent to events
+        // so the PDF.js text layer underneath can handle text selection.
+        if (tool === TOOLS.TEXT_SELECT) {
+            this._canvas.isDrawingMode = false;
+            this._canvas.discardActiveObject();
+            this._canvas.forEachObject((obj) => {
+                obj.selectable = false;
+                obj.evented = false;
+            });
+            // Let pointer events pass through the Fabric.js upper canvas.
+            const upper = this._canvas.upperCanvasEl;
+            if (upper) {
+                upper.style.pointerEvents = 'none';
+            }
+            this._canvas.requestRenderAll();
+            this._notifyToolChange(tool);
+            return;
+        }
+
+        // Re-enable pointer events on the Fabric upper canvas for all other tools.
+        const upper = this._canvas.upperCanvasEl;
+        if (upper) {
+            upper.style.pointerEvents = 'auto';
+        }
+
         // Toggle Fabric.js drawing mode for pen tool.
         if (tool === TOOLS.PEN) {
             this._canvas.isDrawingMode = true;
@@ -211,16 +236,35 @@ export default class AnnotationLayer {
     /**
      * Resize the Fabric canvas to match the rendered PDF page.
      *
+     * When rescale is true (e.g. after a zoom change), existing annotation
+     * objects are scaled proportionally so they stay aligned with the PDF.
+     *
      * @param {number} width Display width in pixels.
      * @param {number} height Display height in pixels.
+     * @param {boolean} rescale Scale existing objects to the new dimensions.
      */
-    setPageSize(width, height) {
+    setPageSize(width, height, rescale = false) {
+        const oldW = this._canvasWidth;
+        const oldH = this._canvasHeight;
         this._canvasWidth = width;
         this._canvasHeight = height;
         if (!this._canvas) {
             return;
         }
         this._canvas.setDimensions({width: width, height: height});
+
+        // Scale existing objects to the new dimensions (e.g. after zoom).
+        if (rescale && oldW > 0 && oldH > 0) {
+            const scaleX = width / oldW;
+            const scaleY = height / oldH;
+            if (Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001) {
+                const objects = this._canvas.getObjects();
+                if (objects.length > 0) {
+                    this._scaleObjects(objects, scaleX, scaleY);
+                }
+            }
+        }
+
         this._canvas.requestRenderAll();
     }
 
@@ -457,6 +501,9 @@ export default class AnnotationLayer {
         this._canvas.on('selection:created', () => this._notifySelectionChange());
         this._canvas.on('selection:updated', () => this._notifySelectionChange());
         this._canvas.on('selection:cleared', () => this._notifySelectionChange());
+
+        // Trigger save when objects are moved, resized, or rotated.
+        this._canvas.on('object:modified', () => this._notifyChange());
     }
 
     /**
@@ -944,6 +991,99 @@ export default class AnnotationLayer {
             }
         }
 
+        // Scale annotations to match current viewport if dimensions differ
+        // from when they were saved. This ensures annotations remain aligned
+        // across different screen sizes (teacher vs student, resize, etc.).
+        this._scaleToCurrentViewport(json, objects);
+    }
+
+    /**
+     * Scale loaded annotation objects to match the current canvas dimensions.
+     *
+     * Annotations are stored with absolute pixel coordinates relative to the
+     * viewport size at the time of creation. If the current canvas differs,
+     * all object positions, sizes, and strokes are scaled proportionally.
+     *
+     * @param {object} json The source Fabric JSON (with _viewportWidth/_viewportHeight).
+     * @param {Array} objects The Fabric objects on the canvas.
+     */
+    _scaleToCurrentViewport(json, objects) {
+        const savedW = json._viewportWidth;
+        const savedH = json._viewportHeight;
+
+        // No stored dimensions or no current dimensions — nothing to scale.
+        if (!savedW || !savedH || !this._canvasWidth || !this._canvasHeight) {
+            return;
+        }
+
+        const scaleX = this._canvasWidth / savedW;
+        const scaleY = this._canvasHeight / savedH;
+
+        // Skip if dimensions match (within floating-point tolerance).
+        if (Math.abs(scaleX - 1) < 0.001 && Math.abs(scaleY - 1) < 0.001) {
+            return;
+        }
+
+        this._scaleObjects(objects, scaleX, scaleY);
+    }
+
+    /**
+     * Scale an array of Fabric objects by the given factors.
+     *
+     * Positions are scaled independently (scaleX for left, scaleY for top)
+     * to handle non-uniform aspect ratio changes. Object dimensions (size,
+     * stroke, font) use a uniform scale (min of scaleX, scaleY) to avoid
+     * visual distortion.
+     *
+     * @param {Array} objects Fabric.js objects to scale.
+     * @param {number} scaleX Horizontal scale factor.
+     * @param {number} scaleY Vertical scale factor.
+     */
+    _scaleObjects(objects, scaleX, scaleY) {
+        const uniformScale = Math.min(scaleX, scaleY);
+
+        objects.forEach((obj) => {
+            // Scale position.
+            obj.left *= scaleX;
+            obj.top *= scaleY;
+
+            // Scale object size uniformly to avoid distortion.
+            obj.scaleX = (obj.scaleX || 1) * uniformScale;
+            obj.scaleY = (obj.scaleY || 1) * uniformScale;
+
+            // Scale stroke width proportionally.
+            if (obj.strokeWidth) {
+                obj.strokeWidth *= uniformScale;
+            }
+
+            // Scale radius for circles/ellipses.
+            if (obj.radius) {
+                obj.radius *= uniformScale;
+            }
+            if (obj.rx) {
+                obj.rx *= uniformScale;
+            }
+            if (obj.ry) {
+                obj.ry *= uniformScale;
+            }
+
+            // Scale line endpoints.
+            if (obj.x1 !== undefined) {
+                obj.x1 *= scaleX;
+                obj.y1 *= scaleY;
+                obj.x2 *= scaleX;
+                obj.y2 *= scaleY;
+            }
+
+            // Scale font size for text objects.
+            if (obj.fontSize) {
+                obj.fontSize *= uniformScale;
+            }
+
+            obj.setCoords();
+        });
+
+        this._canvas.requestRenderAll();
     }
 
     /** Save the current canvas state for the current page. */

@@ -667,6 +667,24 @@ class assign_adapter extends base_adapter {
     }
 
     /**
+     * Get the grading definition (rubric/marking guide) for this assignment.
+     *
+     * @return array|null
+     */
+    public function get_grading_definition(): ?array {
+        $gradingmanager = get_grading_manager($this->context, 'mod_assign', 'submissions');
+        $method = $gradingmanager->get_active_method();
+        if (!$method) {
+            return null;
+        }
+        $controller = $gradingmanager->get_controller($method);
+        if (!$controller) {
+            return null;
+        }
+        return $this->serialize_grading_definition($controller);
+    }
+
+    /**
      * Get plagiarism report links for a user's assignment submission.
      *
      * Calls Moodle's generic plagiarism API for each submitted file and for

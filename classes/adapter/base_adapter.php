@@ -152,6 +152,18 @@ abstract class base_adapter {
     }
 
     /**
+     * Get the grading definition (rubric/marking guide) for this activity.
+     *
+     * Returns the serialized grading definition with criteria and levels/scores.
+     * Subclasses should override this for activity types that use advanced grading.
+     *
+     * @return array|null The grading definition, or null if simple grading.
+     */
+    public function get_grading_definition(): ?array {
+        return null;
+    }
+
+    /**
      * Prepare the feedback draft area for a student.
      *
      * Clears the shared draft area and repopulates it with the student's

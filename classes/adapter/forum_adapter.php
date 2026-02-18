@@ -509,6 +509,24 @@ class forum_adapter extends base_adapter {
     }
 
     /**
+     * Get the grading definition (rubric/marking guide) for this forum.
+     *
+     * @return array|null
+     */
+    public function get_grading_definition(): ?array {
+        $gradingmanager = get_grading_manager($this->context, 'mod_forum', 'forum');
+        $method = $gradingmanager->get_active_method();
+        if (!$method) {
+            return null;
+        }
+        $controller = $gradingmanager->get_controller($method);
+        if (!$controller) {
+            return null;
+        }
+        return $this->serialize_grading_definition($controller);
+    }
+
+    /**
      * Fetch the grade_item for whole-forum grading (itemnumber 1).
      *
      * @return \grade_item|null
