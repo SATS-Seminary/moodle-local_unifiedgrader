@@ -150,6 +150,8 @@ $string['feedbackfiles'] = 'Feedback files';
 // Plagiarism.
 $string['plagiarism'] = 'Plagiarism';
 $string['plagiarism_noresults'] = 'No plagiarism results available.';
+$string['plagiarism_pending'] = 'Plagiarism scan in progress';
+$string['plagiarism_error'] = 'Plagiarism scan failed';
 
 // Student feedback view.
 $string['assessment_criteria'] = 'Assessment criteria';

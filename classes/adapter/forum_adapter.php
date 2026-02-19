@@ -110,13 +110,16 @@ class forum_adapter extends base_adapter {
         $groupid = $filters['group'] ?? 0;
         $forumid = $this->forum->get_id();
 
-        // Get enrolled users who can view discussions.
+        // Get enrolled users who can view discussions (active enrolments only).
         $enrolledusers = get_enrolled_users(
             $this->context,
             'mod/forum:viewdiscussion',
             $groupid,
             'u.*',
             'u.lastname, u.firstname',
+            0,
+            0,
+            true,
         );
 
         // Batch-load post counts and last post time per user.
@@ -470,6 +473,93 @@ class forum_adapter extends base_adapter {
     }
 
     /**
+     * Get plagiarism report links for a user's forum posts.
+     *
+     * Calls Moodle's generic plagiarism API for each post's text content
+     * and each post attachment. Works with any plagiarism plugin
+     * (Copyleaks, Turnitin, etc.).
+     *
+     * @param int $userid The user ID.
+     * @return array Array of arrays with keys: 'label' (string), 'html' (string).
+     */
+    public function get_plagiarism_links(int $userid): array {
+        global $CFG, $DB;
+
+        if (empty($CFG->enableplagiarism)) {
+            return [];
+        }
+
+        require_once($CFG->libdir . '/plagiarismlib.php');
+
+        $forumid = $this->forum->get_id();
+        $discussions = $DB->get_records('forum_discussions', ['forum' => $forumid], '', 'id');
+        if (empty($discussions)) {
+            return [];
+        }
+
+        $discussionids = array_keys($discussions);
+        [$insql, $params] = $DB->get_in_or_equal($discussionids, SQL_PARAMS_NAMED);
+        $params['userid'] = $userid;
+        $posts = $DB->get_records_select(
+            'forum_posts',
+            "discussion {$insql} AND userid = :userid AND deleted = 0",
+            $params,
+            'created ASC',
+        );
+
+        if (empty($posts)) {
+            return [];
+        }
+
+        $results = [];
+        $fs = get_file_storage();
+
+        foreach ($posts as $post) {
+            // Post text plagiarism.
+            $linkhtml = plagiarism_get_links([
+                'userid' => $userid,
+                'content' => $post->message,
+                'cmid' => $this->cm->id,
+                'course' => $this->course->id,
+                'forum' => $forumid,
+            ]);
+            if (!empty(trim($linkhtml))) {
+                $results[] = [
+                    'label' => format_string($post->subject),
+                    'html' => $linkhtml,
+                ];
+            }
+
+            // Per-attachment plagiarism.
+            $files = $fs->get_area_files(
+                $this->context->id,
+                'mod_forum',
+                'attachment',
+                $post->id,
+                'filename',
+                false,
+            );
+            foreach ($files as $file) {
+                $filehtml = plagiarism_get_links([
+                    'userid' => $userid,
+                    'file' => $file,
+                    'cmid' => $this->cm->id,
+                    'course' => $this->course->id,
+                    'forum' => $forumid,
+                ]);
+                if (!empty(trim($filehtml))) {
+                    $results[] = [
+                        'label' => $file->get_filename(),
+                        'html' => $filehtml,
+                    ];
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    /**
      * Check whether a forum grade has been released to the student.
      *
      * A forum grade is considered released when a forum_grades record exists
@@ -581,17 +671,31 @@ class forum_adapter extends base_adapter {
     /**
      * Render forum posts as HTML grouped by discussion.
      *
+     * Includes per-post plagiarism shield icons when a plagiarism plugin
+     * is enabled and returns results for the post content or attachments.
+     *
      * @param array $posts Post records.
      * @param array $discussions Discussion records keyed by id.
      * @return string HTML content.
      */
     private function render_posts_as_html(array $posts, array $discussions): string {
+        global $CFG;
+
+        $plagiarismenabled = !empty($CFG->enableplagiarism);
+        if ($plagiarismenabled) {
+            require_once($CFG->libdir . '/plagiarismlib.php');
+        }
+
         // Group posts by discussion.
         $grouped = [];
         foreach ($posts as $post) {
             $did = (int) $post->discussion;
             $grouped[$did][] = $post;
         }
+
+        $forumid = $this->forum->get_id();
+        $fs = $plagiarismenabled ? get_file_storage() : null;
+        $hasanyplagiarism = false;
 
         $html = '';
         foreach ($grouped as $discussionid => $discussionposts) {
@@ -612,10 +716,28 @@ class forum_adapter extends base_adapter {
                 $wordcount = count_words(html_to_text($formattedmessage, 0, false));
                 $wordcountlabel = get_string('forum_wordcount', 'local_unifiedgrader', $wordcount);
 
+                // Gather plagiarism data for this post.
+                $shieldhtml = '';
+                if ($plagiarismenabled) {
+                    $plagiarismhtml = $this->get_post_plagiarism_html($post, $forumid, $fs);
+                    if (!empty($plagiarismhtml)) {
+                        $hasanyplagiarism = true;
+                        $severity = $this->extract_plagiarism_severity($plagiarismhtml);
+                        $percentage = $this->extract_plagiarism_percentage($plagiarismhtml);
+                        $shieldhtml = $this->render_plagiarism_shield(
+                            $post->id, $severity, $percentage, $plagiarismhtml,
+                        );
+                    }
+                }
+
                 $html .= '<div class="card mb-2">';
-                $html .= '<div class="card-header py-1 small text-muted d-flex justify-content-between align-items-center">';
+                $html .= '<div class="card-header py-1 small text-muted'
+                    . ' d-flex justify-content-between align-items-center">';
                 $html .= '<span><strong>' . $subject . '</strong> &mdash; ' . $postdate . '</span>';
-                $html .= '<span class="ms-2 text-nowrap">' . $wordcountlabel . '</span>';
+                $html .= '<span class="ms-2 text-nowrap d-flex align-items-center gap-2">';
+                $html .= $wordcountlabel;
+                $html .= $shieldhtml;
+                $html .= '</span>';
                 $html .= '</div>';
                 $html .= '<div class="card-body py-2">' . $formattedmessage . '</div>';
                 $html .= '</div>';
@@ -624,7 +746,308 @@ class forum_adapter extends base_adapter {
             $html .= '</div>';
         }
 
+        // Append inline script for popout toggle if any shields were rendered.
+        if ($hasanyplagiarism) {
+            $html .= $this->render_plagiarism_inline_script();
+        }
+
         return $html;
+    }
+
+    /**
+     * Get combined plagiarism HTML for a single forum post (text + attachments).
+     *
+     * @param \stdClass $post The forum post record.
+     * @param int $forumid The forum ID.
+     * @param \file_storage $fs File storage instance.
+     * @return string Combined plagiarism HTML, or empty string.
+     */
+    private function get_post_plagiarism_html(\stdClass $post, int $forumid, \file_storage $fs): string {
+        $parts = [];
+
+        // Post text.
+        $linkhtml = plagiarism_get_links([
+            'userid' => (int) $post->userid,
+            'content' => $post->message,
+            'cmid' => $this->cm->id,
+            'course' => $this->course->id,
+            'forum' => $forumid,
+        ]);
+        if (!empty(trim($linkhtml))) {
+            $parts[] = '<div class="mb-1"><strong class="small">'
+                . get_string('onlinetext', 'local_unifiedgrader')
+                . '</strong></div>' . $linkhtml;
+        }
+
+        // Attachments.
+        $files = $fs->get_area_files(
+            $this->context->id,
+            'mod_forum',
+            'attachment',
+            $post->id,
+            'filename',
+            false,
+        );
+        foreach ($files as $file) {
+            $filehtml = plagiarism_get_links([
+                'userid' => (int) $post->userid,
+                'file' => $file,
+                'cmid' => $this->cm->id,
+                'course' => $this->course->id,
+                'forum' => $forumid,
+            ]);
+            if (!empty(trim($filehtml))) {
+                $parts[] = '<div class="mb-1"><strong class="small">'
+                    . s($file->get_filename())
+                    . '</strong></div>' . $filehtml;
+            }
+        }
+
+        return implode('<hr class="my-2">', $parts);
+    }
+
+    /**
+     * Extract a numeric percentage from plagiarism HTML.
+     *
+     * Plagiarism plugins return arbitrary HTML. This attempts to find a
+     * percentage pattern (e.g. "42%") common across Turnitin, Copyleaks,
+     * and most other plugins.
+     *
+     * @param string $html Plagiarism HTML from plagiarism_get_links().
+     * @return string|null Percentage string (e.g. "42") or null if not found.
+     */
+    private function extract_plagiarism_percentage(string $html): ?string {
+        $text = strip_tags($html);
+        if (preg_match('/(\d+)\s*%/', $text, $matches)) {
+            return $matches[1];
+        }
+        return null;
+    }
+
+    /**
+     * Extract severity level from plagiarism plugin HTML.
+     *
+     * Reads the CSS classes that the plagiarism plugin itself uses to
+     * colour its widget, so we respect the plugin's own configurable
+     * thresholds rather than inventing our own.
+     *
+     * Supports Copyleaks (plagiarism + AI dual indicators) and Turnitin.
+     * For Copyleaks, if either plagiarism or AI indicator is at a higher
+     * severity, the higher severity wins.
+     *
+     * @param string $html Raw HTML from plagiarism_get_links().
+     * @return string One of: 'success', 'warning', 'danger', 'pending', 'error', 'unknown'.
+     */
+    private function extract_plagiarism_severity(string $html): string {
+        // Severity hierarchy (higher index = worse).
+        $levels = ['success' => 0, 'warning' => 1, 'danger' => 2];
+        $worst = -1;
+
+        // --- Copyleaks ---
+        // Plagiarism indicator: cls-plag-score-level-{low,mid,high}.
+        // AI content indicator: cls-ai-score-level-{low,mid,high}.
+        $copyleaksmap = ['low' => 'success', 'mid' => 'warning', 'high' => 'danger'];
+
+        if (preg_match_all('/cls-(?:plag|ai)-score-level-(low|mid|high)/', $html, $matches)) {
+            foreach ($matches[1] as $level) {
+                $severity = $copyleaksmap[$level];
+                $worst = max($worst, $levels[$severity]);
+            }
+        }
+
+        // Copyleaks pending/error states.
+        if (preg_match('/\b(in-progress|scheduled)\b/', $html)) {
+            return $worst >= 0 ? array_search($worst, $levels) : 'pending';
+        }
+        if (preg_match('/\b(failed|error|retry)\b/', $html)) {
+            return $worst >= 0 ? array_search($worst, $levels) : 'error';
+        }
+
+        // --- Turnitin ---
+        // Score colour classes: score_colour_75 (red), score_colour_50 (orange),
+        // score_colour_25 (green/yellow). No class = very low (blue).
+        if (preg_match_all('/score_colour_(\d+)/', $html, $matches)) {
+            foreach ($matches[1] as $threshold) {
+                $threshold = (int) $threshold;
+                if ($threshold >= 75) {
+                    $worst = max($worst, $levels['danger']);
+                } else if ($threshold >= 50) {
+                    $worst = max($worst, $levels['warning']);
+                } else {
+                    $worst = max($worst, $levels['success']);
+                }
+            }
+        }
+
+        // Turnitin pending: look for queued/pending indicators.
+        if (preg_match('/class="[^"]*turnitin_status[^"]*"/', $html) && $worst < 0) {
+            return 'pending';
+        }
+
+        if ($worst >= 0) {
+            return array_search($worst, $levels);
+        }
+
+        // --- Generic fallback ---
+        // Look for common Bootstrap-style colour classes used by other plugins.
+        if (preg_match('/\b(?:text-danger|bg-danger|badge-danger|alert-danger)\b/', $html)) {
+            return 'danger';
+        }
+        if (preg_match('/\b(?:text-warning|bg-warning|badge-warning|alert-warning)\b/', $html)) {
+            return 'warning';
+        }
+        if (preg_match('/\b(?:text-success|bg-success|badge-success|alert-success)\b/', $html)) {
+            return 'success';
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Render the shield icon HTML with optional percentage and hidden popout.
+     *
+     * @param int $postid The post ID (used for unique element IDs).
+     * @param string $severity Severity level from extract_plagiarism_severity().
+     * @param string|null $percentage Extracted percentage, or null.
+     * @param string $plagiarismhtml Full plagiarism widget HTML for the popout.
+     * @return string HTML for the shield + popout.
+     */
+    private function render_plagiarism_shield(
+        int $postid,
+        string $severity,
+        ?string $percentage,
+        string $plagiarismhtml,
+    ): string {
+        $percentlabel = $percentage !== null ? ($percentage . '%') : '';
+        $shieldtitle = get_string('plagiarism', 'local_unifiedgrader');
+
+        // Map severity to Bootstrap text colour class.
+        $colourclass = match ($severity) {
+            'success' => 'text-success',
+            'warning' => 'text-warning',
+            'danger' => 'text-danger',
+            'pending' => 'text-muted',
+            'error' => 'text-muted',
+            default => 'text-secondary',
+        };
+
+        // For pending/error states, use a different icon indicator.
+        $iconclass = 'fa-shield';
+        if ($severity === 'pending') {
+            $iconclass = 'fa-shield';
+            $percentlabel = '';
+            $shieldtitle = get_string('plagiarism_pending', 'local_unifiedgrader');
+        } else if ($severity === 'error') {
+            $iconclass = 'fa-shield';
+            $percentlabel = '';
+            $shieldtitle = get_string('plagiarism_error', 'local_unifiedgrader');
+        }
+
+        $html = '<span class="position-relative d-inline-flex align-items-center"'
+            . ' data-region="plagiarism-shield-wrapper">';
+        $html .= '<button type="button"'
+            . ' class="btn btn-link btn-sm p-0 ms-1 plagiarism-shield-btn ' . $colourclass . '"'
+            . ' data-postid="' . $postid . '"'
+            . ' title="' . s($shieldtitle) . '"'
+            . ' aria-label="' . s($shieldtitle) . '">';
+        $html .= '<i class="fa ' . $iconclass . '" aria-hidden="true"></i>';
+        if ($severity === 'pending') {
+            $html .= ' <i class="fa fa-spinner fa-spin small" aria-hidden="true"></i>';
+        } else if ($severity === 'error') {
+            $html .= ' <i class="fa fa-exclamation-triangle small" aria-hidden="true"></i>';
+        } else if (!empty($percentlabel)) {
+            $html .= ' <span class="small fw-bold">' . $percentlabel . '</span>';
+        }
+        $html .= '</button>';
+        $html .= '<div class="local-unifiedgrader-plagiarism-popout d-none"'
+            . ' data-region="plagiarism-popout" data-postid="' . $postid . '">';
+        $html .= '<div class="d-flex justify-content-between align-items-center mb-2">';
+        $html .= '<strong class="small">' . s(get_string('plagiarism', 'local_unifiedgrader')) . '</strong>';
+        $html .= '<button type="button" class="btn btn-sm btn-link p-0 plagiarism-close-btn"'
+            . ' aria-label="Close"><i class="fa fa-times"></i></button>';
+        $html .= '</div>';
+        $html .= '<div class="plagiarism-popout-content small">' . $plagiarismhtml . '</div>';
+        $html .= '</div>';
+        $html .= '</span>';
+
+        return $html;
+    }
+
+    /**
+     * Render the inline JavaScript for plagiarism popout toggle.
+     *
+     * Uses event delegation and outside-click to close pattern,
+     * consistent with the annotation toolbar's docinfo popout.
+     *
+     * @return string HTML script block.
+     */
+    private function render_plagiarism_inline_script(): string {
+        return <<<'SCRIPT'
+<script>
+(function() {
+    var activePopout = null;
+    var outsideHandler = null;
+
+    function closeActive() {
+        if (activePopout) {
+            activePopout.classList.add('d-none');
+            activePopout = null;
+        }
+        if (outsideHandler) {
+            document.removeEventListener('click', outsideHandler, true);
+            outsideHandler = null;
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        // Handle close button.
+        var closeBtn = e.target.closest('.plagiarism-close-btn');
+        if (closeBtn) {
+            closeActive();
+            return;
+        }
+
+        // Handle shield button toggle.
+        var shieldBtn = e.target.closest('.plagiarism-shield-btn');
+        if (!shieldBtn) {
+            return;
+        }
+
+        var wrapper = shieldBtn.closest('[data-region="plagiarism-shield-wrapper"]');
+        if (!wrapper) {
+            return;
+        }
+        var popout = wrapper.querySelector('[data-region="plagiarism-popout"]');
+        if (!popout) {
+            return;
+        }
+
+        // If clicking the same shield, toggle off.
+        if (activePopout === popout) {
+            closeActive();
+            return;
+        }
+
+        // Close any other open popout first.
+        closeActive();
+
+        // Open this popout.
+        popout.classList.remove('d-none');
+        activePopout = popout;
+
+        // Defer outside-click handler so current click doesn't trigger it.
+        requestAnimationFrame(function() {
+            outsideHandler = function(evt) {
+                if (!wrapper.contains(evt.target)) {
+                    closeActive();
+                }
+            };
+            document.addEventListener('click', outsideHandler, true);
+        });
+    });
+})();
+</script>
+SCRIPT;
     }
 
     /**

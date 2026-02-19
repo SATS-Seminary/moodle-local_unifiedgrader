@@ -104,13 +104,16 @@ class quiz_adapter extends base_adapter {
 
         $groupid = $filters['group'] ?? 0;
 
-        // Get enrolled users who can attempt quizzes.
+        // Get enrolled users who can attempt quizzes (active enrolments only).
         $enrolledusers = get_enrolled_users(
             $this->context,
             'mod/quiz:attempt',
             $groupid,
             'u.*',
             'u.lastname, u.firstname',
+            0,
+            0,
+            true,
         );
 
         // Batch-load attempt stats per user.

@@ -1019,7 +1019,11 @@ export default class extends BaseComponent {
             return;
         }
 
-        const links = state.submission.plagiarismlinks || [];
+        // Forums show per-post plagiarism shields inline in the preview panel,
+        // so the marking panel card is redundant.
+        const links = state.activity.type === 'forum'
+            ? []
+            : (state.submission.plagiarismlinks || []);
 
         if (links.length === 0) {
             section.classList.add('d-none');

@@ -93,6 +93,11 @@ class assign_adapter extends base_adapter {
         $participants = $this->assign->list_participants($groupid, false);
         $instance = $this->assign->get_instance();
 
+        // Exclude suspended enrolments — list_participants() may include
+        // them depending on user preferences and capabilities.
+        $activeids = get_enrolled_users($this->context, '', $groupid, 'u.id', null, 0, 0, true);
+        $participants = array_intersect_key($participants, $activeids);
+
         // Batch-load user overrides to avoid N+1 queries.
         global $DB;
         $overrides = $DB->get_records_select(
