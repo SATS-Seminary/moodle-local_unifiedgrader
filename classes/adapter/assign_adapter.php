@@ -332,7 +332,18 @@ class assign_adapter extends base_adapter {
         return [
             'grade' => ($grade && $grade->grade !== null && $grade->grade >= 0)
                 ? (float) $grade->grade : null,
-            'feedback' => format_text($feedbacktext, $feedbackformat, ['context' => $this->context]),
+            'feedback' => format_text(
+                $grade ? file_rewrite_pluginfile_urls(
+                    $feedbacktext,
+                    'pluginfile.php',
+                    $this->context->id,
+                    'assignfeedback_comments',
+                    'feedback',
+                    (int) $grade->id,
+                ) : $feedbacktext,
+                $feedbackformat,
+                ['context' => $this->context],
+            ),
             'feedbackformat' => (int) $feedbackformat,
             'rubricdata' => $rubricdata ? json_encode($rubricdata) : '',
             'gradingdefinition' => $gradingdefinition ? json_encode($gradingdefinition) : '',
