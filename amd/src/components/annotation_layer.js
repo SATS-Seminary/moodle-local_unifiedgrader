@@ -17,11 +17,13 @@
  * Annotation layer - manages a Fabric.js canvas overlay on the PDF page.
  *
  * This is a plain class (not a Moodle reactive component) that handles:
- * - Fabric.js canvas lifecycle on top of the PDF canvas
+ * - Fabric.js canvas lifecycle on top of a single PDF page canvas
  * - Tool modes (select, comment, highlight, pen, stamp)
- * - Per-page annotation storage with backend persistence
  * - Undo / redo stack
  * - Comment popup for the comment tool
+ *
+ * In continuous-scroll mode, PdfViewer creates one AnnotationLayer instance
+ * per rendered page and manages the cross-page annotation state centrally.
  *
  * @module     local_unifiedgrader/components/annotation_layer
  * @copyright  2026 South African Theological Seminary
@@ -101,12 +103,6 @@ export default class AnnotationLayer {
         this._canvasWidth = 0;
         /** @type {number} */
         this._canvasHeight = 0;
-
-        // Per-page state: page number → Fabric JSON.
-        /** @type {Map<number, object>} */
-        this._pageAnnotations = new Map();
-        /** @type {number} */
-        this._currentPageNum = 1;
 
         // Undo / redo.
         /** @type {Array} */
@@ -334,42 +330,6 @@ export default class AnnotationLayer {
     }
 
     /**
-     * Switch to a new page: save current page state, load new page state.
-     *
-     * @param {number} pageNum The new page number (1-based).
-     */
-    async switchPage(pageNum) {
-        // Save current page (skip in read-only mode — nothing to save).
-        if (!this._readOnly) {
-            this._saveCurrentPageState();
-        }
-
-        this._currentPageNum = pageNum;
-        this._undoStack = [];
-        this._redoStack = [];
-        if (!this._canvas) {
-            return;
-        }
-
-        // Load the new page's annotations.
-        const saved = this._pageAnnotations.get(pageNum);
-        this._canvas.clear();
-        if (saved && saved.objects && saved.objects.length > 0) {
-            await this._loadFromJSONWithCustomProps(saved);
-            if (this._readOnly) {
-                this._markAllObjectsReadOnly();
-            } else {
-                // Re-apply selectability based on current tool.
-                this.setTool(this._currentTool);
-            }
-        }
-        this._canvas.requestRenderAll();
-        if (!this._readOnly) {
-            this._notifyChange();
-        }
-    }
-
-    /**
      * Undo the last annotation operation.
      */
     undo() {
@@ -453,39 +413,19 @@ export default class AnnotationLayer {
     }
 
     /**
-     * Get all annotation data for all pages (for saving).
+     * Load annotation data onto the canvas. Clears existing content first.
+     * Called by PdfViewer to populate this page's annotations from the central map.
      *
-     * @returns {Map<number, object>} Map of page number to Fabric JSON.
+     * @param {object} fabricJson Fabric.js canvas JSON (with objects array).
+     * @returns {Promise<void>}
      */
-    getAllAnnotations() {
-        this._saveCurrentPageState();
-        return new Map(this._pageAnnotations);
-    }
-
-    /**
-     * Load annotations for a specific page from external data.
-     *
-     * @param {number} pageNum Page number.
-     * @param {object} fabricJson Fabric.js canvas JSON.
-     */
-    setPageAnnotations(pageNum, fabricJson) {
-        this._pageAnnotations.set(pageNum, fabricJson);
-    }
-
-    /**
-     * Reload the current page's annotations onto the canvas without saving
-     * current state first. Used after setPageAnnotations() populates the map
-     * from the backend — calling switchPage() would save the empty canvas
-     * and overwrite the just-loaded data.
-     */
-    async reloadCurrentPage() {
+    async loadAnnotations(fabricJson) {
         if (!this._canvas) {
             return;
         }
-        const saved = this._pageAnnotations.get(this._currentPageNum);
         this._canvas.clear();
-        if (saved && saved.objects && saved.objects.length > 0) {
-            await this._loadFromJSONWithCustomProps(saved);
+        if (fabricJson && fabricJson.objects && fabricJson.objects.length > 0) {
+            await this._loadFromJSONWithCustomProps(fabricJson);
             if (this._readOnly) {
                 this._markAllObjectsReadOnly();
             } else {
@@ -493,6 +433,43 @@ export default class AnnotationLayer {
             }
         }
         this._canvas.requestRenderAll();
+    }
+
+    /**
+     * Get the current canvas state as Fabric JSON.
+     * Used by PdfViewer to save state to the central annotation map.
+     *
+     * @returns {?object} Fabric JSON with _viewportWidth/_viewportHeight, or null if empty.
+     */
+    getCurrentPageState() {
+        if (!this._canvas) {
+            return null;
+        }
+        const json = this._canvas.toObject(CUSTOM_PROPS);
+        if (json.objects && json.objects.length > 0) {
+            json._viewportWidth = this._canvasWidth;
+            json._viewportHeight = this._canvasHeight;
+            return json;
+        }
+        return null;
+    }
+
+    /**
+     * Get the current canvas display width.
+     *
+     * @returns {number}
+     */
+    getCanvasWidth() {
+        return this._canvasWidth;
+    }
+
+    /**
+     * Get the current canvas display height.
+     *
+     * @returns {number}
+     */
+    getCanvasHeight() {
+        return this._canvasHeight;
     }
 
     /**
@@ -533,12 +510,13 @@ export default class AnnotationLayer {
 
     /**
      * Clean up and destroy the Fabric canvas.
+     * Note: PdfViewer should call getCurrentPageState() before destroy()
+     * to capture any unsaved annotation state.
      */
     destroy() {
         this._closeCommentPopup();
         this._closeCommentPicker();
         this._hideCommentTooltip();
-        this._saveCurrentPageState();
         if (this._canvas) {
             this._canvas.dispose();
             this._canvas = null;
@@ -1476,41 +1454,6 @@ export default class AnnotationLayer {
         });
 
         this._canvas.requestRenderAll();
-    }
-
-    /** Save the current canvas state for the current page. */
-    _saveCurrentPageState() {
-        if (!this._canvas) {
-            return;
-        }
-        const json = this._canvas.toObject(CUSTOM_PROPS);
-        if (json.objects && json.objects.length > 0) {
-            // Store viewport dimensions alongside annotations for PDF flattening.
-            json._viewportWidth = this._canvasWidth;
-            json._viewportHeight = this._canvasHeight;
-            this._pageAnnotations.set(this._currentPageNum, json);
-        } else {
-            this._pageAnnotations.delete(this._currentPageNum);
-        }
-    }
-
-    /**
-     * Get stored viewport dimensions for all annotated pages.
-     *
-     * @returns {Map<number, {width: number, height: number}>}
-     */
-    getPageDimensions() {
-        this._saveCurrentPageState();
-        const dims = new Map();
-        for (const [pageNum, json] of this._pageAnnotations) {
-            if (json._viewportWidth && json._viewportHeight) {
-                dims.set(pageNum, {
-                    width: json._viewportWidth,
-                    height: json._viewportHeight,
-                });
-            }
-        }
-        return dims;
     }
 
     /** Mark all objects on the canvas as non-selectable but hoverable (for tooltips). */

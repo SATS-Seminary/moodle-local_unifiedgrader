@@ -39,6 +39,8 @@ export default class extends BaseComponent {
             GRADE_INPUT: '[data-action="grade-input"]',
             MAX_GRADE: '[data-region="max-grade"]',
             SIMPLE_GRADE: '[data-region="simple-grade"]',
+            SCALE_GRADE: '[data-region="scale-grade"]',
+            SCALE_INPUT: '[data-action="scale-input"]',
             ADVANCED_GRADING: '[data-region="advanced-grading"]',
             FEEDBACK_INPUT: '[data-action="feedback-input"]',
             SAVE_GRADE_BTN: '[data-action="save-grade"]',
@@ -76,6 +78,10 @@ export default class extends BaseComponent {
         this._clibPopout = null;
         this._autoSaveTimer = null;
         this._suppressAutoSave = false;
+        this._reportButtonLabel = 'Report academic impropriety';
+        getString('report_impropriety', 'local_unifiedgrader').then(str => {
+            this._reportButtonLabel = str;
+        }).catch(() => {});
     }
 
     /**
@@ -276,18 +282,29 @@ export default class extends BaseComponent {
         // grade value so manual overrides are not lost.
         this._renderAdvancedGrading(state);
 
-        const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
-        if (gradeInput && state.grade) {
-            gradeInput.value = state.grade.grade !== null ? state.grade.grade : '';
+        const usescale = state.activity?.usescale || false;
 
-            // When advanced grading is active and manual override is not allowed,
-            // make the grade input readonly so teachers must use the rubric/guide.
-            const hasAdvancedGrading = this._gradingDefinition !== null;
-            const allowOverride = state.ui?.allowmanualgradeoverride !== false;
-            gradeInput.readOnly = hasAdvancedGrading && !allowOverride;
+        if (usescale) {
+            // Scale: set the dropdown value.
+            const scaleInput = this.getElement(this.selectors.SCALE_INPUT);
+            if (scaleInput && state.grade) {
+                scaleInput.value = state.grade.grade !== null ? String(Math.round(state.grade.grade)) : '';
+            }
+        } else {
+            // Points: set the numeric input value.
+            const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
+            if (gradeInput && state.grade) {
+                gradeInput.value = state.grade.grade !== null ? state.grade.grade : '';
+
+                // When advanced grading is active and manual override is not allowed,
+                // make the grade input readonly so teachers must use the rubric/guide.
+                const hasAdvancedGrading = this._gradingDefinition !== null;
+                const allowOverride = state.ui?.allowmanualgradeoverride !== false;
+                gradeInput.readOnly = hasAdvancedGrading && !allowOverride;
+            }
         }
 
-        // Update the percentage display.
+        // Update the percentage display (not applicable for scales).
         this._updatePercentage();
 
         // Use draft-ready content (with rewritten file URLs) when available.
@@ -490,15 +507,51 @@ export default class extends BaseComponent {
      * @param {object} state Current state.
      */
     _updateMaxGrade(state) {
-        const maxGradeEl = this.getElement(this.selectors.MAX_GRADE);
-        if (maxGradeEl) {
-            const maxgrade = state.ui.maxgrade || state.activity?.maxgrade || 100;
-            maxGradeEl.textContent = '/ ' + maxgrade;
-        }
+        const simpleGrade = this.getElement(this.selectors.SIMPLE_GRADE);
+        const scaleGrade = this.getElement(this.selectors.SCALE_GRADE);
+        const usescale = state.activity?.usescale || false;
 
-        const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
-        if (gradeInput) {
-            gradeInput.max = state.ui.maxgrade || state.activity?.maxgrade || 100;
+        if (usescale && scaleGrade) {
+            // Scale-based grading: show dropdown, hide numeric input.
+            if (simpleGrade) {
+                simpleGrade.classList.add('d-none');
+            }
+            scaleGrade.classList.remove('d-none');
+
+            // Populate the scale dropdown if not already done.
+            const scaleInput = this.getElement(this.selectors.SCALE_INPUT);
+            if (scaleInput && scaleInput.options.length <= 1) {
+                scaleInput.innerHTML = '';
+                const emptyOpt = document.createElement('option');
+                emptyOpt.value = '';
+                emptyOpt.textContent = '---';
+                scaleInput.appendChild(emptyOpt);
+                const items = state.activity.scaleitems || [];
+                for (const item of items) {
+                    const opt = document.createElement('option');
+                    opt.value = item.value;
+                    opt.textContent = item.label;
+                    scaleInput.appendChild(opt);
+                }
+                scaleInput.addEventListener('change', () => this._debouncedAutoSave());
+            }
+        } else {
+            // Point-based grading: show numeric input, hide dropdown.
+            if (scaleGrade) {
+                scaleGrade.classList.add('d-none');
+            }
+            if (simpleGrade) {
+                simpleGrade.classList.remove('d-none');
+            }
+            const maxGradeEl = this.getElement(this.selectors.MAX_GRADE);
+            if (maxGradeEl) {
+                const maxgrade = state.ui.maxgrade || state.activity?.maxgrade || 100;
+                maxGradeEl.textContent = '/ ' + maxgrade;
+            }
+            const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
+            if (gradeInput) {
+                gradeInput.max = state.ui.maxgrade || state.activity?.maxgrade || 100;
+            }
         }
     }
 
@@ -508,6 +561,12 @@ export default class extends BaseComponent {
     _updatePercentage() {
         const percentEl = this.getElement(this.selectors.GRADE_PERCENTAGE);
         if (!percentEl) {
+            return;
+        }
+
+        // Percentages don't apply to scale-based grading.
+        if (this.reactive.state.activity?.usescale) {
+            percentEl.textContent = '';
             return;
         }
 
@@ -988,9 +1047,16 @@ export default class extends BaseComponent {
             this._autoSaveTimer = null;
         }
         const state = this.reactive.state;
-        const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
 
-        const grade = gradeInput ? gradeInput.value : '';
+        // Read grade from the appropriate input (scale dropdown or numeric input).
+        let grade = '';
+        if (state.activity?.usescale) {
+            const scaleInput = this.getElement(this.selectors.SCALE_INPUT);
+            grade = scaleInput ? scaleInput.value : '';
+        } else {
+            const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
+            grade = gradeInput ? gradeInput.value : '';
+        }
         const feedback = this._getEditorContent();
         const advancedGradingData = this._collectAdvancedGradingData();
 
@@ -1154,8 +1220,47 @@ export default class extends BaseComponent {
         }
         html += '</div>';
 
+        // Academic impropriety report button.
+        if (state.ui.enableReportForm && state.ui.reportFormUrl) {
+            const reportUrl = this._buildReportUrl(state);
+            html += '<div class="mt-2 pt-2 border-top">';
+            html += '<a href="' + this._escapeHtml(reportUrl) + '" target="_blank" rel="noopener"'
+                + ' class="btn btn-sm btn-outline-danger w-100">';
+            html += '<i class="fa fa-flag me-1"></i>';
+            html += this._escapeHtml(this._reportButtonLabel);
+            html += '</a>';
+            html += '</div>';
+        }
+
         body.innerHTML = html;
         section.classList.remove('d-none');
+    }
+
+    /**
+     * Build the academic impropriety report URL with placeholders replaced.
+     *
+     * @param {object} state Current reactive state.
+     * @returns {string} The fully resolved URL.
+     */
+    _buildReportUrl(state) {
+        const participants = [...state.participants.values()];
+        const student = participants.find(p => p.id === state.submission.userid);
+        const studentName = student ? student.fullname : '';
+        const graderUrl = M.cfg.wwwroot + '/local/unifiedgrader/grade.php?cmid='
+            + state.activity.cmid + '&userid=' + state.submission.userid;
+
+        let url = state.ui.reportFormUrl;
+        // Decode URL-encoded braces so placeholder patterns match (browsers/MS Forms encode { } as %7B %7D).
+        url = url.replace(/%7B/gi, '{').replace(/%7D/gi, '}');
+        url = url.replace(/\{studentname\}/gi, encodeURIComponent(studentName));
+        url = url.replace(/\{coursecode\}/gi, encodeURIComponent(state.activity.coursecode || ''));
+        url = url.replace(/\{coursename\}/gi, encodeURIComponent(state.ui.coursefullname || ''));
+        url = url.replace(/\{activityname\}/gi, encodeURIComponent(state.activity.name || ''));
+        url = url.replace(/\{activitytype\}/gi, encodeURIComponent(state.activity.type || ''));
+        url = url.replace(/\{studentid\}/gi, encodeURIComponent(String(state.submission.userid || '')));
+        url = url.replace(/\{gradername\}/gi, encodeURIComponent(state.ui.graderFullname || ''));
+        url = url.replace(/\{graderurl\}/gi, encodeURIComponent(graderUrl));
+        return url;
     }
 
     /**

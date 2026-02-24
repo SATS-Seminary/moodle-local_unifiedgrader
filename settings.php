@@ -52,6 +52,13 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_configcheckbox(
+        'local_unifiedgrader/enable_quiz_post_grades',
+        get_string('setting_enable_quiz_post_grades', 'local_unifiedgrader'),
+        get_string('setting_enable_quiz_post_grades_desc', 'local_unifiedgrader'),
+        0
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
         'local_unifiedgrader/allow_manual_grade_override',
         get_string('setting_allow_manual_override', 'local_unifiedgrader'),
         get_string('setting_allow_manual_override_desc', 'local_unifiedgrader'),
@@ -65,6 +72,23 @@ if ($hassiteconfig) {
         '',
         PARAM_RAW,
         40
+    ));
+
+    // Academic impropriety report form.
+    $settings->add(new admin_setting_configcheckbox(
+        'local_unifiedgrader/enable_report_form',
+        get_string('setting_enable_report_form', 'local_unifiedgrader'),
+        get_string('setting_enable_report_form_desc', 'local_unifiedgrader'),
+        0
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_unifiedgrader/report_form_url',
+        get_string('setting_report_form_url', 'local_unifiedgrader'),
+        get_string('setting_report_form_url_desc', 'local_unifiedgrader'),
+        '',
+        PARAM_RAW,
+        60
     ));
 
     $ADMIN->add('localplugins', $settings);

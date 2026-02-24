@@ -100,35 +100,34 @@ export const init = async() => {
 };
 
 /**
- * Load student annotations for a file and apply them to the PDF viewer's annotation layer.
+ * Load student annotations for a file and apply them to the PDF viewer.
+ *
+ * Uses PdfViewer-level annotation API (setPageAnnotations + refreshRenderedAnnotations)
+ * which works with the continuous-scroll multi-page architecture.
  *
  * @param {PdfViewer} pdfViewer The PDF viewer instance.
  * @param {number} cmid Course module ID.
  * @param {number} fileid File ID.
  */
 async function loadAnnotationsForFile(pdfViewer, cmid, fileid) {
-    const annotationLayer = pdfViewer.getAnnotationLayer();
-    if (!annotationLayer) {
-        return;
-    }
-
     try {
         const annotations = await loadStudentAnnotations(cmid, fileid);
 
         annotations.forEach((annot) => {
             try {
                 const json = JSON.parse(annot.annotationdata);
-                annotationLayer.setPageAnnotations(annot.pagenum, json);
+                pdfViewer.setPageAnnotations(annot.pagenum, json);
             } catch (e) {
                 window.console.warn('[feedback_viewer] Invalid annotation JSON for page', annot.pagenum, e);
             }
         });
 
-        // Reload the current page to display the annotations.
+        // Refresh annotation overlays on all currently rendered pages.
         if (annotations.length > 0) {
-            await annotationLayer.reloadCurrentPage();
+            await pdfViewer.refreshRenderedAnnotations();
         }
     } catch (err) {
         window.console.error('[feedback_viewer] Failed to load annotations:', err);
     }
 }
+

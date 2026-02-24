@@ -382,16 +382,18 @@ class provider implements
             return;
         }
 
-        [$insql, $inparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
+        [$insql1, $inparams1] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid1');
+        [$insql2, $inparams2] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid2');
 
         $DB->delete_records_select('local_unifiedgrader_notes',
-            "cmid = :cmid AND (userid {$insql} OR authorid {$insql})",
-            array_merge(['cmid' => $context->instanceid], $inparams),
+            "cmid = :cmid AND (userid {$insql1} OR authorid {$insql2})",
+            array_merge(['cmid' => $context->instanceid], $inparams1, $inparams2),
         );
 
+        [$insql3, $inparams3] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid3');
         $DB->delete_records_select('local_unifiedgrader_annot',
-            "cmid = :cmid AND userid {$insql}",
-            array_merge(['cmid' => $context->instanceid], $inparams),
+            "cmid = :cmid2 AND userid {$insql3}",
+            array_merge(['cmid2' => $context->instanceid], $inparams3),
         );
 
         // Delete user-level data.

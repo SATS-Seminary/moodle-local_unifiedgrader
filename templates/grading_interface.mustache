@@ -60,7 +60,11 @@
      data-gradesposted="{{#gradesposted}}1{{/gradesposted}}{{^gradesposted}}0{{/gradesposted}}"
      data-gradeshidden="{{gradeshidden}}"
      data-coursecode="{{coursecode}}"
-     data-canloginas="{{#canloginas}}1{{/canloginas}}{{^canloginas}}0{{/canloginas}}">
+     data-canloginas="{{#canloginas}}1{{/canloginas}}{{^canloginas}}0{{/canloginas}}"
+     data-coursefullname="{{coursefullname}}"
+     data-enablereportform="{{#enablereportform}}1{{/enablereportform}}{{^enablereportform}}0{{/enablereportform}}"
+     data-reportformurl="{{reportformurl}}"
+     data-graderfullname="{{graderfullname}}">
 
     {{! Header bar }}
     <div class="d-flex align-items-stretch border-bottom bg-white" style="height: 80px;">
@@ -131,6 +135,7 @@
             <div data-region="save-status" class="text-muted small"></div>
         </div>
 
+        {{#showpostgrades}}
         <div data-region="post-grades-toggle" class="d-flex align-items-center px-2 border-start">
             <div class="dropdown">
                 <button type="button"
@@ -154,6 +159,7 @@
                             {{#str}} unpost_grades, local_unifiedgrader {{/str}}
                         </button>
                     </li>
+                    {{#showschedulepost}}
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <div class="px-3 py-2" data-region="schedule-section">
@@ -171,9 +177,11 @@
                             </button>
                         </div>
                     </li>
+                    {{/showschedulepost}}
                 </ul>
             </div>
         </div>
+        {{/showpostgrades}}
 
         <div class="d-flex align-items-center px-2 border-start">
             <div class="btn-group btn-group-sm" role="group" data-region="layout-toggle">

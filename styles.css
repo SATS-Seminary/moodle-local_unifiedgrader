@@ -91,6 +91,19 @@
     z-index: 100;
 }
 
+/* PDF viewer — continuous scroll page slots. */
+.local-unifiedgrader-container .pdf-page-slot,
+.local-unifiedgrader-feedback .pdf-page-slot {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+}
+
+.local-unifiedgrader-container .pdf-page-slot + .pdf-page-slot,
+.local-unifiedgrader-feedback .pdf-page-slot + .pdf-page-slot {
+    margin-top: 4px;
+}
+
 /* PDF viewer. */
 .local-unifiedgrader-container [data-region="pdf-viewer"] {
     background-color: var(--bs-gray-200, #e9ecef);
@@ -264,6 +277,15 @@
 .local-unifiedgrader-feedback-page .secondary-navigation,
 .local-unifiedgrader-feedback-page #page-footer {
     display: none !important;
+}
+
+/* Responsive media in marking panel (teacher grading view). */
+.local-unifiedgrader-container [data-region="marking-panel"] video,
+.local-unifiedgrader-container [data-region="marking-panel"] audio,
+.local-unifiedgrader-container [data-region="marking-panel"] img,
+.local-unifiedgrader-container [data-region="marking-panel"] iframe {
+    max-width: 100%;
+    height: auto;
 }
 
 /* Student feedback view — responsive media in feedback panel. */

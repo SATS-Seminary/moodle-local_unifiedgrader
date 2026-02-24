@@ -73,6 +73,12 @@ class set_grades_posted extends external_api {
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
 
+        // Block quiz grade posting unless the admin setting is enabled.
+        $cm = get_coursemodule_from_id('', $params['cmid'], 0, false, MUST_EXIST);
+        if ($cm->modname === 'quiz' && empty(get_config('local_unifiedgrader', 'enable_quiz_post_grades'))) {
+            throw new \moodle_exception('quiz_post_grades_disabled', 'local_unifiedgrader');
+        }
+
         // Validate: hidden must be 0, 1, or a future timestamp.
         $hidden = $params['hidden'];
         if ($hidden < 0) {

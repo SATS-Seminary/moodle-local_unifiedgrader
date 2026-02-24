@@ -80,13 +80,28 @@ class forum_adapter extends base_adapter {
         $gradingmanager = get_grading_manager($this->context, 'mod_forum', 'forum');
         $gradingmethod = $gradingmanager->get_active_method();
 
+        // Detect scale-based grading (negative grade = scale ID).
+        $rawgrade = (int) $this->forum->get_grade_for_forum();
+        $usescale = $rawgrade < 0;
+        $scaleitems = [];
+        $maxgrade = (float) $this->forum->get_grade_for_forum();
+        if ($usescale) {
+            $menu = make_grades_menu($rawgrade);
+            foreach ($menu as $value => $label) {
+                $scaleitems[] = ['value' => (int) $value, 'label' => (string) $label];
+            }
+            $maxgrade = (float) count($scaleitems);
+        }
+
         return [
             'id' => (int) $this->cm->id,
             'name' => format_string($this->forum->get_name()),
             'type' => 'forum',
             'duedate' => (int) $this->forum->get_due_date(),
             'cutoffdate' => (int) $this->forum->get_cutoff_date(),
-            'maxgrade' => (float) $this->forum->get_grade_for_forum(),
+            'maxgrade' => $maxgrade,
+            'usescale' => $usescale,
+            'scaleitems' => $scaleitems,
             'intro' => format_text(
                 $this->forum->get_intro(),
                 $this->forum->get_intro_format(),
@@ -244,7 +259,7 @@ class forum_adapter extends base_adapter {
         }
 
         // Render posts as HTML content grouped by discussion.
-        $content = $this->render_posts_as_html($posts, $discussions);
+        $content = $this->render_posts_as_html($posts, $discussions, $userid);
 
         // Get the earliest and latest post times.
         $timecreated = PHP_INT_MAX;
@@ -302,7 +317,14 @@ class forum_adapter extends base_adapter {
                 'userid' => $userid,
             ]);
             if ($gradegrade && !empty($gradegrade->feedback)) {
-                $feedbacktext = $gradegrade->feedback;
+                $feedbacktext = file_rewrite_pluginfile_urls(
+                    $gradegrade->feedback,
+                    'pluginfile.php',
+                    $this->context->id,
+                    'local_unifiedgrader',
+                    'forumfeedback',
+                    (int) $gradegrade->id,
+                );
                 $feedbackformat = (int) ($gradegrade->feedbackformat ?? FORMAT_HTML);
             }
         }
@@ -381,10 +403,121 @@ class forum_adapter extends base_adapter {
             $this->save_grade_directly($userid, $grade);
         }
 
+        // Process feedback files from the draft area before saving feedback text.
+        $feedbacktosave = $feedback;
+        if ($draftitemid > 0) {
+            $gradeitem = $this->fetch_grade_item();
+            if ($gradeitem) {
+                $gradegrade = \grade_grade::fetch([
+                    'itemid' => $gradeitem->id,
+                    'userid' => $userid,
+                ]);
+                if ($gradegrade) {
+                    $feedbacktosave = file_save_draft_area_files(
+                        $draftitemid,
+                        $this->context->id,
+                        'local_unifiedgrader',
+                        'forumfeedback',
+                        (int) $gradegrade->id,
+                        $this->get_editor_options(),
+                        $feedback,
+                    );
+                }
+            }
+        }
+
         // Persist feedback in the gradebook (forums have no feedback table).
-        $this->save_feedback_to_gradebook($userid, $feedback, $feedbackformat);
+        $this->save_feedback_to_gradebook($userid, $feedbacktosave, $feedbackformat);
 
         return true;
+    }
+
+    /**
+     * Prepare the feedback draft area for a student.
+     *
+     * Clears the shared draft area, copies the student's existing feedback
+     * files into it, and returns the feedback HTML with draft URLs.
+     *
+     * @param int $userid The student user ID.
+     * @param int $draftitemid The shared draft area item ID.
+     * @return array With key 'feedbackhtml'.
+     */
+    public function prepare_feedback_draft(int $userid, int $draftitemid): array {
+        global $USER;
+
+        $feedbacktext = '';
+        $gradegradeid = 0;
+
+        $gradeitem = $this->fetch_grade_item();
+        if ($gradeitem) {
+            $gradegrade = \grade_grade::fetch([
+                'itemid' => $gradeitem->id,
+                'userid' => $userid,
+            ]);
+            if ($gradegrade) {
+                $gradegradeid = (int) $gradegrade->id;
+                $feedbacktext = $gradegrade->feedback ?? '';
+            }
+        }
+
+        // Clear existing draft files from the previous student.
+        $fs = get_file_storage();
+        $usercontext = \context_user::instance($USER->id);
+        $fs->delete_area_files($usercontext->id, 'user', 'draft', $draftitemid);
+
+        // Copy this student's feedback files from permanent storage into the draft area.
+        // NOTE: file_prepare_draft_area() only copies files when draftitemid is empty (0).
+        // Since we reuse the same draftitemid across student switches, we must copy manually.
+        if ($gradegradeid) {
+            $files = $fs->get_area_files(
+                $this->context->id,
+                'local_unifiedgrader',
+                'forumfeedback',
+                $gradegradeid,
+            );
+            $filerecord = [
+                'contextid' => $usercontext->id,
+                'component' => 'user',
+                'filearea' => 'draft',
+                'itemid' => $draftitemid,
+            ];
+            foreach ($files as $file) {
+                if ($file->is_directory() && $file->get_filepath() === '/') {
+                    continue;
+                }
+                $fs->create_file_from_storedfile($filerecord, $file);
+            }
+        }
+
+        // Rewrite @@PLUGINFILE@@ URLs to draftfile.php URLs for the editor.
+        if (!empty($feedbacktext)) {
+            $feedbacktext = file_rewrite_pluginfile_urls(
+                $feedbacktext,
+                'draftfile.php',
+                $usercontext->id,
+                'user',
+                'draft',
+                $draftitemid,
+                $this->get_editor_options(),
+            );
+        }
+
+        return ['feedbackhtml' => $feedbacktext];
+    }
+
+    /**
+     * Get editor options for the feedback editor.
+     *
+     * @return array Editor options compatible with file_save_draft_area_files.
+     */
+    private function get_editor_options(): array {
+        global $CFG;
+        return [
+            'maxfiles' => -1,
+            'maxbytes' => $CFG->maxbytes,
+            'context' => $this->context,
+            'subdirs' => true,
+        ];
     }
 
     /**
@@ -701,12 +834,20 @@ class forum_adapter extends base_adapter {
      * @param array $discussions Discussion records keyed by id.
      * @return string HTML content.
      */
-    private function render_posts_as_html(array $posts, array $discussions): string {
+    private function render_posts_as_html(array $posts, array $discussions, int $userid = 0): string {
         global $CFG;
 
         $plagiarismenabled = !empty($CFG->enableplagiarism);
         if ($plagiarismenabled) {
             require_once($CFG->libdir . '/plagiarismlib.php');
+        }
+
+        // Pre-build the academic impropriety report URL (same for all posts of this user).
+        $reporturl = '';
+        $reportenabled = get_config('local_unifiedgrader', 'enable_report_form');
+        $reporturltemplate = get_config('local_unifiedgrader', 'report_form_url');
+        if (!empty($reportenabled) && !empty($reporturltemplate) && $userid) {
+            $reporturl = $this->build_report_url($reporturltemplate, $userid);
         }
 
         // Group posts by discussion.
@@ -748,7 +889,7 @@ class forum_adapter extends base_adapter {
                         $severity = $this->extract_plagiarism_severity($plagiarismhtml);
                         $percentage = $this->extract_plagiarism_percentage($plagiarismhtml);
                         $shieldhtml = $this->render_plagiarism_shield(
-                            $post->id, $severity, $percentage, $plagiarismhtml,
+                            $post->id, $severity, $percentage, $plagiarismhtml, $reporturl,
                         );
                     }
                 }
@@ -940,6 +1081,7 @@ class forum_adapter extends base_adapter {
         string $severity,
         ?string $percentage,
         string $plagiarismhtml,
+        string $reporturl = '',
     ): string {
         $percentlabel = $percentage !== null ? ($percentage . '%') : '';
         $shieldtitle = get_string('plagiarism', 'local_unifiedgrader');
@@ -990,10 +1132,49 @@ class forum_adapter extends base_adapter {
             . ' aria-label="Close"><i class="fa fa-times"></i></button>';
         $html .= '</div>';
         $html .= '<div class="plagiarism-popout-content small">' . $plagiarismhtml . '</div>';
+        if (!empty($reporturl)) {
+            $reportlabel = get_string('report_impropriety', 'local_unifiedgrader');
+            $html .= '<div class="mt-2 pt-2 border-top">';
+            $html .= '<a href="' . s($reporturl) . '" target="_blank" rel="noopener"'
+                . ' class="btn btn-sm btn-outline-danger w-100">';
+            $html .= '<i class="fa fa-flag me-1"></i>' . s($reportlabel);
+            $html .= '</a>';
+            $html .= '</div>';
+        }
         $html .= '</div>';
         $html .= '</span>';
 
         return $html;
+    }
+
+    /**
+     * Build the academic impropriety report URL with placeholders replaced.
+     *
+     * @param string $urltemplate URL template with placeholders.
+     * @param int $userid The student user ID.
+     * @return string The resolved URL.
+     */
+    private function build_report_url(string $urltemplate, int $userid): string {
+        global $USER, $DB, $CFG;
+
+        $student = $DB->get_record('user', ['id' => $userid], 'id, firstname, lastname');
+        $studentname = $student ? fullname($student) : '';
+        $coursecode = \local_unifiedgrader\course_code_helper::extract_code($this->course->shortname);
+        $graderurl = $CFG->wwwroot . '/local/unifiedgrader/grade.php?cmid='
+            . $this->cm->id . '&userid=' . $userid;
+
+        $replacements = [
+            '{studentname}' => rawurlencode($studentname),
+            '{coursecode}' => rawurlencode($coursecode),
+            '{coursename}' => rawurlencode(format_string($this->course->fullname)),
+            '{activityname}' => rawurlencode(format_string($this->forum->get_name())),
+            '{activitytype}' => rawurlencode('forum'),
+            '{studentid}' => rawurlencode((string) $userid),
+            '{gradername}' => rawurlencode(fullname($USER)),
+            '{graderurl}' => rawurlencode($graderurl),
+        ];
+
+        return str_ireplace(array_keys($replacements), array_values($replacements), $urltemplate);
     }
 
     /**
@@ -1126,10 +1307,6 @@ SCRIPT;
      * @param int $feedbackformat
      */
     private function save_feedback_to_gradebook(int $userid, string $feedback, int $feedbackformat): void {
-        if (empty($feedback)) {
-            return;
-        }
-
         $gradeitem = \grade_item::fetch([
             'itemtype' => 'mod',
             'itemmodule' => 'forum',

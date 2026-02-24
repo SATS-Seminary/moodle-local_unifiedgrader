@@ -44,6 +44,8 @@ $string['setting_enable_forum'] = 'Enable for Forums';
 $string['setting_enable_forum_desc'] = 'Allow the Unified Grader to be used for forum activities.';
 $string['setting_enable_quiz'] = 'Enable for Quizzes';
 $string['setting_enable_quiz_desc'] = 'Allow the Unified Grader to be used for quiz activities.';
+$string['setting_enable_quiz_post_grades'] = 'Enable post grades for quizzes';
+$string['setting_enable_quiz_post_grades_desc'] = 'Quiz grade visibility is normally managed by the quiz\'s review options. When enabled, the Unified Grader\'s "Post grades" toggle will update the quiz review options programmatically to show or hide marks. When disabled (default), the post grades toggle is hidden for quizzes.';
 $string['setting_allow_manual_override'] = 'Allow manual grade override';
 $string['setting_allow_manual_override_desc'] = 'When enabled, teachers can manually type a grade even when a rubric or marking guide is configured. When disabled, the grade is calculated exclusively from the rubric or marking guide criteria.';
 
@@ -259,6 +261,8 @@ $string['schedule_post'] = 'Post on a date';
 $string['schedule_post_btn'] = 'Schedule';
 $string['grades_scheduled'] = 'Posting {$a}';
 $string['schedule_must_be_future'] = 'The scheduled date must be in the future.';
+$string['quiz_post_grades_disabled'] = 'Post grades is not available for quizzes. Grade visibility is controlled by the quiz review options.';
+$string['quiz_post_grades_no_schedule'] = 'Scheduling is not available for quizzes. Use Post or Unpost instead.';
 
 // Submission status actions.
 $string['action_revert_to_draft'] = 'Revert to draft';
@@ -301,6 +305,13 @@ $string['profile_no_email'] = 'No email available';
 // Settings: course code regex.
 $string['setting_coursecode_regex'] = 'Course code regex';
 $string['setting_coursecode_regex_desc'] = 'The Comment Library organises saved comments by course code, so teachers can reuse feedback across different offerings of the same course (e.g. semester to semester). This setting controls how course codes are extracted from Moodle course short names. Enter a PHP regex pattern that matches the code portion of your short names (e.g. <code>/[A-Z]{3}\\d{4}/</code> would extract <strong>THE2201</strong> from a short name like <em>THE2201-2026-S1</em>). Leave empty to use the full short name as the course code.';
+
+// Settings: academic impropriety report form.
+$string['setting_enable_report_form'] = 'Enable academic impropriety report form';
+$string['setting_enable_report_form_desc'] = 'When enabled, a "Report academic impropriety" button appears in plagiarism sections, linking to an external reporting form.';
+$string['setting_report_form_url'] = 'Report form URL template';
+$string['setting_report_form_url_desc'] = 'URL for the academic impropriety report form. Supported placeholders: <code>{coursecode}</code>, <code>{coursename}</code>, <code>{studentname}</code>, <code>{activityname}</code>, <code>{activitytype}</code>, <code>{studentid}</code>, <code>{gradername}</code>, <code>{graderurl}</code>. These are replaced at runtime with URL-encoded values. For Microsoft Forms, use the "Get Pre-filled URL" feature to find parameter names.';
+$string['report_impropriety'] = 'Report academic impropriety';
 
 // Comment library v2.
 $string['clib_title'] = 'Comment Library';

@@ -95,6 +95,15 @@ $canloginas = has_capability('moodle/user:loginas', $coursecontext);
 $gradesposted = $adapter->are_grades_posted();
 $gradeshidden = $adapter->get_grades_hidden_value();
 
+// Quizzes: post grades toggle is hidden by default (quiz review options control visibility).
+// When enabled via setting, the schedule option is still hidden (review options are state-based, not date-based).
+$showpostgrades = true;
+$showschedulepost = true;
+if ($cm->modname === 'quiz') {
+    $showpostgrades = !empty(get_config('local_unifiedgrader', 'enable_quiz_post_grades'));
+    $showschedulepost = false;
+}
+
 // Prepare template context.
 $templatedata = [
     'cmid' => $cmid,
@@ -129,7 +138,13 @@ $templatedata = [
     'allowmanualgradeoverride' => !empty(get_config('local_unifiedgrader', 'allow_manual_grade_override')),
     'gradesposted' => $gradesposted,
     'gradeshidden' => $gradeshidden,
+    'showpostgrades' => $showpostgrades,
+    'showschedulepost' => $showschedulepost,
     'coursecode' => \local_unifiedgrader\course_code_helper::extract_code($course->shortname),
+    'coursefullname' => format_string($course->fullname),
+    'enablereportform' => !empty(get_config('local_unifiedgrader', 'enable_report_form')),
+    'reportformurl' => get_config('local_unifiedgrader', 'report_form_url') ?: '',
+    'graderfullname' => fullname($USER),
 ];
 
 // TinyMCE editor setup for the feedback textarea.

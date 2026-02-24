@@ -49,6 +49,14 @@
                 </div>
             </div>
 
+            {{! Scale grading: dropdown selector (hidden by default, shown by JS when activity uses a scale) }}
+            <div data-region="scale-grade" class="d-none">
+                <select data-action="scale-input"
+                        class="form-select"
+                        aria-label="{{#str}} grade, local_unifiedgrader {{/str}}">
+                </select>
+            </div>
+
             {{! Advanced grading placeholder (rubric/marking guide) }}
             <div data-region="advanced-grading" class="d-none mb-3"></div>
 

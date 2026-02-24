@@ -61,13 +61,28 @@ class assign_adapter extends base_adapter {
         $gradingmanager = get_grading_manager($this->context, 'mod_assign', 'submissions');
         $gradingmethod = $gradingmanager->get_active_method();
 
+        // Detect scale-based grading (negative grade = scale ID).
+        $rawgrade = (int) $instance->grade;
+        $usescale = $rawgrade < 0;
+        $scaleitems = [];
+        $maxgrade = (float) $instance->grade;
+        if ($usescale) {
+            $menu = make_grades_menu($rawgrade);
+            foreach ($menu as $value => $label) {
+                $scaleitems[] = ['value' => (int) $value, 'label' => (string) $label];
+            }
+            $maxgrade = (float) count($scaleitems);
+        }
+
         return [
             'id' => (int) $this->cm->id,
             'name' => format_string($instance->name),
             'type' => 'assign',
             'duedate' => (int) $instance->duedate,
             'cutoffdate' => (int) $instance->cutoffdate,
-            'maxgrade' => (float) $instance->grade,
+            'maxgrade' => $maxgrade,
+            'usescale' => $usescale,
+            'scaleitems' => $scaleitems,
             'intro' => format_text(
                 $instance->intro,
                 $instance->introformat,

@@ -85,13 +85,28 @@ class quiz_adapter extends base_adapter {
             }
         }
 
+        // Detect scale-based grading (negative grade = scale ID).
+        $rawgrade = (int) $this->quiz->grade;
+        $usescale = $rawgrade < 0;
+        $scaleitems = [];
+        $maxgrade = (float) $this->quiz->grade;
+        if ($usescale) {
+            $menu = make_grades_menu($rawgrade);
+            foreach ($menu as $value => $label) {
+                $scaleitems[] = ['value' => (int) $value, 'label' => (string) $label];
+            }
+            $maxgrade = (float) count($scaleitems);
+        }
+
         return [
             'id' => (int) $this->cm->id,
             'name' => format_string($this->quiz->name),
             'type' => 'quiz',
             'duedate' => $duedate,
             'cutoffdate' => (int) ($this->quiz->timeclose ?? 0),
-            'maxgrade' => (float) $this->quiz->grade,
+            'maxgrade' => $maxgrade,
+            'usescale' => $usescale,
+            'scaleitems' => $scaleitems,
             'intro' => format_text(
                 $this->quiz->intro ?? '',
                 $this->quiz->introformat ?? FORMAT_HTML,
@@ -316,7 +331,14 @@ class quiz_adapter extends base_adapter {
                 'userid' => $userid,
             ]);
             if ($gradegrade && !empty($gradegrade->feedback)) {
-                $feedbacktext = $gradegrade->feedback;
+                $feedbacktext = file_rewrite_pluginfile_urls(
+                    $gradegrade->feedback,
+                    'pluginfile.php',
+                    $this->context->id,
+                    'local_unifiedgrader',
+                    'quizfeedback',
+                    (int) $gradegrade->id,
+                );
                 $feedbackformat = (int) ($gradegrade->feedbackformat ?? FORMAT_HTML);
             }
         }
@@ -382,10 +404,131 @@ class quiz_adapter extends base_adapter {
             $this->save_manual_question_grades($attempt, $advancedgradingdata['questions']);
         }
 
+        // Process feedback files from the draft area before saving feedback text.
+        $feedbacktosave = $feedback;
+        if ($draftitemid > 0) {
+            $gradeitem = \grade_item::fetch([
+                'itemtype' => 'mod',
+                'itemmodule' => 'quiz',
+                'iteminstance' => $this->quiz->id,
+                'itemnumber' => 0,
+                'courseid' => $this->course->id,
+            ]);
+            if ($gradeitem) {
+                $gradegrade = \grade_grade::fetch([
+                    'itemid' => $gradeitem->id,
+                    'userid' => $userid,
+                ]);
+                if ($gradegrade) {
+                    $feedbacktosave = file_save_draft_area_files(
+                        $draftitemid,
+                        $this->context->id,
+                        'local_unifiedgrader',
+                        'quizfeedback',
+                        (int) $gradegrade->id,
+                        $this->get_editor_options(),
+                        $feedback,
+                    );
+                }
+            }
+        }
+
         // Save feedback to gradebook.
-        $this->save_feedback_to_gradebook($userid, $feedback, $feedbackformat);
+        $this->save_feedback_to_gradebook($userid, $feedbacktosave, $feedbackformat);
 
         return true;
+    }
+
+    /**
+     * Prepare the feedback draft area for a student.
+     *
+     * Clears the shared draft area, copies the student's existing feedback
+     * files into it, and returns the feedback HTML with draft URLs.
+     *
+     * @param int $userid The student user ID.
+     * @param int $draftitemid The shared draft area item ID.
+     * @return array With key 'feedbackhtml'.
+     */
+    public function prepare_feedback_draft(int $userid, int $draftitemid): array {
+        global $USER;
+
+        $feedbacktext = '';
+        $gradegradeid = 0;
+
+        $gradeitem = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => 'quiz',
+            'iteminstance' => $this->quiz->id,
+            'itemnumber' => 0,
+            'courseid' => $this->course->id,
+        ]);
+        if ($gradeitem) {
+            $gradegrade = \grade_grade::fetch([
+                'itemid' => $gradeitem->id,
+                'userid' => $userid,
+            ]);
+            if ($gradegrade) {
+                $gradegradeid = (int) $gradegrade->id;
+                $feedbacktext = $gradegrade->feedback ?? '';
+            }
+        }
+
+        // Clear existing draft files from the previous student.
+        $fs = get_file_storage();
+        $usercontext = \context_user::instance($USER->id);
+        $fs->delete_area_files($usercontext->id, 'user', 'draft', $draftitemid);
+
+        // Copy this student's feedback files from permanent storage into the draft area.
+        if ($gradegradeid) {
+            $files = $fs->get_area_files(
+                $this->context->id,
+                'local_unifiedgrader',
+                'quizfeedback',
+                $gradegradeid,
+            );
+            $filerecord = [
+                'contextid' => $usercontext->id,
+                'component' => 'user',
+                'filearea' => 'draft',
+                'itemid' => $draftitemid,
+            ];
+            foreach ($files as $file) {
+                if ($file->is_directory() && $file->get_filepath() === '/') {
+                    continue;
+                }
+                $fs->create_file_from_storedfile($filerecord, $file);
+            }
+        }
+
+        // Rewrite @@PLUGINFILE@@ URLs to draftfile.php URLs for the editor.
+        if (!empty($feedbacktext)) {
+            $feedbacktext = file_rewrite_pluginfile_urls(
+                $feedbacktext,
+                'draftfile.php',
+                $usercontext->id,
+                'user',
+                'draft',
+                $draftitemid,
+                $this->get_editor_options(),
+            );
+        }
+
+        return ['feedbackhtml' => $feedbacktext];
+    }
+
+    /**
+     * Get editor options for the feedback editor.
+     *
+     * @return array Editor options compatible with file_save_draft_area_files.
+     */
+    private function get_editor_options(): array {
+        global $CFG;
+        return [
+            'maxfiles' => -1,
+            'maxbytes' => $CFG->maxbytes,
+            'context' => $this->context,
+            'subdirs' => true,
+        ];
     }
 
     /**
@@ -460,6 +603,50 @@ class quiz_adapter extends base_adapter {
      */
     public function is_grade_released(int $userid): bool {
         return false;
+    }
+
+    /**
+     * Post or unpost quiz grades by updating review options.
+     *
+     * Unlike assignments and forums, quiz grade visibility is controlled by
+     * the quiz's review options (reviewmarks/reviewmaxmarks bitmasks), not
+     * the gradebook's hidden flag. This override updates those bitmasks so
+     * the change persists through grade recalculations.
+     *
+     * Scheduling (hidden > 1) is not supported because review options are
+     * state-based (open/closed), not date-based.
+     *
+     * @param int $hidden 0 = post (visible), 1 = hide. Timestamps not supported.
+     * @throws \moodle_exception If a timestamp is passed (scheduling not supported).
+     */
+    public function set_grades_posted(int $hidden): void {
+        global $DB;
+
+        if ($hidden > 1) {
+            throw new \moodle_exception('quiz_post_grades_no_schedule', 'local_unifiedgrader');
+        }
+
+        $quiz = $DB->get_record('quiz', ['id' => $this->cm->instance], '*', MUST_EXIST);
+
+        // Review option bit constants from \mod_quiz\question\display_options.
+        $laterwhileopen = 0x00100;
+        $afterclose     = 0x00010;
+        $mask = $laterwhileopen | $afterclose;
+
+        if ($hidden === 0) {
+            // Post: enable marks + max marks for LATER_WHILE_OPEN and AFTER_CLOSE.
+            $quiz->reviewmarks    = $quiz->reviewmarks | $mask;
+            $quiz->reviewmaxmarks = $quiz->reviewmaxmarks | $mask;
+        } else {
+            // Unpost: clear marks + max marks for LATER_WHILE_OPEN and AFTER_CLOSE.
+            $quiz->reviewmarks    = $quiz->reviewmarks & ~$mask;
+            $quiz->reviewmaxmarks = $quiz->reviewmaxmarks & ~$mask;
+        }
+
+        $DB->update_record('quiz', $quiz);
+
+        // Re-sync grade item hidden status with the updated review options.
+        quiz_grade_item_update($quiz);
     }
 
     /**
@@ -1018,10 +1205,6 @@ class quiz_adapter extends base_adapter {
      * @param int $feedbackformat
      */
     private function save_feedback_to_gradebook(int $userid, string $feedback, int $feedbackformat): void {
-        if (empty($feedback)) {
-            return;
-        }
-
         $gradeitem = \grade_item::fetch([
             'itemtype' => 'mod',
             'itemmodule' => 'quiz',

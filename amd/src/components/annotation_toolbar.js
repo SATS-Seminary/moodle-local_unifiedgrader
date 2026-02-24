@@ -464,6 +464,21 @@ export default class AnnotationToolbar {
     }
 
     /**
+     * Switch the annotation layer this toolbar controls.
+     * Re-registers change/selection callbacks and updates button states.
+     *
+     * @param {object} layer An AnnotationLayer instance.
+     */
+    setLayer(layer) {
+        this._layer = layer;
+        // Re-register callbacks on the new layer.
+        this._layer.onChange(() => this._updateActionStates());
+        this._layer.onSelectionChange(() => this._updateDeleteState());
+        this._updateActionStates();
+        this._updateDeleteState();
+    }
+
+    /**
      * Show the toolbar.
      */
     show() {

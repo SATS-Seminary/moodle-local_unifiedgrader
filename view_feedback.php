@@ -238,11 +238,9 @@ if ($cm->modname === 'forum') {
         }
     }
 
-    // Feedback text (from gradebook for forums).
+    // Feedback text (from gradebook for forums). Already formatted by get_grade_data()
+    // with pluginfile.php URLs rewritten and format_text() applied.
     $feedback = $gradedata['feedback'] ?? '';
-    if (!empty($feedback)) {
-        $feedback = format_text($feedback, $gradedata['feedbackformat'] ?? FORMAT_HTML, ['context' => $context]);
-    }
 
     $showrightcolumn = !empty($feedback) || $hasrubric || $hasguide;
 

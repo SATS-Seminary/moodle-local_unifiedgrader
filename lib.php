@@ -143,7 +143,8 @@ function local_unifiedgrader_pluginfile(
         return false;
     }
 
-    if ($filearea !== 'annotatedpdf') {
+    $validfileareas = ['annotatedpdf', 'forumfeedback', 'quizfeedback'];
+    if (!in_array($filearea, $validfileareas)) {
         return false;
     }
 
@@ -156,7 +157,36 @@ function local_unifiedgrader_pluginfile(
         return false;
     }
 
-    // URL args: itemid (=fileid) / userid / filename.
+    // Forum/quiz feedback files: itemid = grade_grades.id, filepath = '/'.
+    if ($filearea === 'forumfeedback' || $filearea === 'quizfeedback') {
+        global $DB;
+
+        $itemid = (int) array_shift($args);
+        $filename = array_shift($args);
+
+        // Students: verify this grade_grade belongs to them and grade is released.
+        if ($isstudent) {
+            $gradegrade = $DB->get_record('grade_grades', ['id' => $itemid]);
+            if (!$gradegrade || (int) $gradegrade->userid !== (int) $USER->id) {
+                return false;
+            }
+            $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
+            if (!$adapter->is_grade_released((int) $USER->id)) {
+                return false;
+            }
+        }
+
+        $fs = get_file_storage();
+        $file = $fs->get_file($context->id, 'local_unifiedgrader', $filearea, $itemid, '/', $filename);
+        if (!$file || $file->is_directory()) {
+            return false;
+        }
+
+        send_stored_file($file, 0, 0, $forcedownload, $options);
+        return true;
+    }
+
+    // Annotated PDF files: URL args = itemid (=fileid) / userid / filename.
     $itemid = (int) array_shift($args);
     $useridpath = (int) array_shift($args);
     $filename = array_shift($args);
