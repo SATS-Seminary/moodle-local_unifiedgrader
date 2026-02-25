@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * External function: get grade data.
+ * External function: delete penalty.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary
@@ -30,12 +30,12 @@ use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use local_unifiedgrader\adapter\adapter_factory;
+use local_unifiedgrader\penalty_manager;
 
 /**
- * Returns current grade and feedback for a student.
+ * Deletes a grade penalty.
  */
-class get_grade_data extends external_api {
+class delete_penalty extends external_api {
 
     /**
      * Parameter definition.
@@ -43,11 +43,8 @@ class get_grade_data extends external_api {
      */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'cmid' => new external_value(PARAM_INT, 'Course module ID'),
-            'userid' => new external_value(PARAM_INT, 'User ID'),
-            'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
-            ),
+            'cmid' => new external_value(PARAM_INT, 'Course module ID (for capability check)'),
+            'penaltyid' => new external_value(PARAM_INT, 'Penalty ID to delete'),
         ]);
     }
 
@@ -55,27 +52,22 @@ class get_grade_data extends external_api {
      * Execute the function.
      *
      * @param int $cmid
-     * @param int $userid
-     * @param int $attemptnumber
+     * @param int $penaltyid
      * @return array
      */
-    public static function execute(int $cmid, int $userid, int $attemptnumber = -1): array {
+    public static function execute(int $cmid, int $penaltyid): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
-            'userid' => $userid,
-            'attemptnumber' => $attemptnumber,
+            'penaltyid' => $penaltyid,
         ]);
 
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
 
-        $adapter = adapter_factory::create($params['cmid']);
+        penalty_manager::delete_penalty($params['penaltyid']);
 
-        if ($params['attemptnumber'] >= 0) {
-            return $adapter->get_grade_data_for_attempt($params['userid'], $params['attemptnumber']);
-        }
-        return $adapter->get_grade_data($params['userid']);
+        return ['success' => true];
     }
 
     /**
@@ -84,13 +76,7 @@ class get_grade_data extends external_api {
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'grade' => new external_value(PARAM_FLOAT, 'Current grade', VALUE_OPTIONAL),
-            'feedback' => new external_value(PARAM_RAW, 'Feedback HTML'),
-            'feedbackformat' => new external_value(PARAM_INT, 'Feedback format'),
-            'rubricdata' => new external_value(PARAM_RAW, 'Rubric fill data (JSON)', VALUE_OPTIONAL),
-            'gradingdefinition' => new external_value(PARAM_RAW, 'Grading definition (JSON)', VALUE_OPTIONAL),
-            'timegraded' => new external_value(PARAM_INT, 'Time graded'),
-            'grader' => new external_value(PARAM_INT, 'Grader user ID'),
+            'success' => new external_value(PARAM_BOOL, 'Whether the penalty was deleted'),
         ]);
     }
 }

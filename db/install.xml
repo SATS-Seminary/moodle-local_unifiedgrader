@@ -127,5 +127,24 @@
         <INDEX NAME="ix_tagid" UNIQUE="false" FIELDS="tagid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_unifiedgrader_penalty" COMMENT="Grade penalties per student per activity.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="FK to course_modules.id"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Student being penalized"/>
+        <FIELD NAME="authorid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Teacher who applied the penalty"/>
+        <FIELD NAME="category" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="wordcount or other"/>
+        <FIELD NAME="label" TYPE="char" LENGTH="15" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Custom label for other penalties"/>
+        <FIELD NAME="percentage" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Penalty as integer percent of max grade"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="ix_cmid_userid" UNIQUE="false" FIELDS="cmid, userid"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

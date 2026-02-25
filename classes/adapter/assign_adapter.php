@@ -92,6 +92,7 @@ class assign_adapter extends base_adapter {
             'teamsubmission' => (bool) $instance->teamsubmission,
             'blindmarking' => (bool) $instance->blindmarking,
             'canmanageoverrides' => has_capability('mod/assign:manageoverrides', $this->context),
+            'maxattempts' => (int) $instance->maxattempts,
         ];
     }
 
@@ -223,13 +224,58 @@ class assign_adapter extends base_adapter {
     }
 
     /**
-     * Get full submission data for a user.
+     * Get full submission data for a user (latest attempt).
      *
      * @param int $userid
      * @return array
      */
     public function get_submission_data(int $userid): array {
         $submission = $this->assign->get_user_submission($userid, false);
+        return $this->build_submission_data($userid, $submission ?: null);
+    }
+
+    /**
+     * Get submission data for a specific attempt.
+     *
+     * @param int $userid The user ID.
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
+     * @return array
+     */
+    public function get_submission_data_for_attempt(int $userid, int $attemptnumber = -1): array {
+        $submission = $this->assign->get_user_submission($userid, false, $attemptnumber);
+        return $this->build_submission_data($userid, $submission ?: null);
+    }
+
+    /**
+     * Get the list of submission attempts for a user.
+     *
+     * @param int $userid The user ID.
+     * @return array List of arrays with keys: id, attemptnumber, status, timemodified, graded.
+     */
+    public function get_attempts(int $userid): array {
+        $submissions = $this->assign->get_all_submissions($userid);
+        $result = [];
+        foreach ($submissions as $sub) {
+            $grade = $this->assign->get_user_grade($userid, false, (int) $sub->attemptnumber);
+            $result[] = [
+                'id' => (int) $sub->attemptnumber,
+                'attemptnumber' => (int) $sub->attemptnumber,
+                'status' => $sub->status,
+                'timemodified' => (int) $sub->timemodified,
+                'graded' => ($grade && $grade->grade !== null && $grade->grade >= 0),
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Build submission data array from a submission record.
+     *
+     * @param int $userid
+     * @param \stdClass|null $submission
+     * @return array
+     */
+    private function build_submission_data(int $userid, ?\stdClass $submission): array {
         $flags = $this->assign->get_user_flags($userid, false);
         $locked = ($flags && !empty($flags->locked));
 
@@ -264,10 +310,6 @@ class assign_adapter extends base_adapter {
         }
 
         // Check whether any non-file submission plugins have actual student content.
-        // This tells the frontend whether to offer a "Submission" content pill
-        // alongside the file selector (e.g. YouTube + file upload).
-        // Uses is_empty() rather than view() to avoid false positives from plugins
-        // that render wrapper HTML even when the student hasn't submitted anything.
         $hascontent = false;
         foreach ($this->assign->get_submission_plugins() as $plugin) {
             if ($plugin->is_enabled() && $plugin->is_visible()
@@ -283,7 +325,7 @@ class assign_adapter extends base_adapter {
             'status' => $submission->status,
             'content' => $this->get_submission_content($submission),
             'hascontent' => $hascontent,
-            'files' => $this->get_submission_files($userid),
+            'files' => $this->build_submission_files($submission),
             'onlinetext' => $onlinetext,
             'timecreated' => (int) $submission->timecreated,
             'timemodified' => (int) $submission->timemodified,
@@ -294,14 +336,36 @@ class assign_adapter extends base_adapter {
     }
 
     /**
-     * Get current grade and feedback for a user.
+     * Get current grade and feedback for a user (latest attempt).
      *
      * @param int $userid
      * @return array
      */
     public function get_grade_data(int $userid): array {
         $grade = $this->assign->get_user_grade($userid, false);
+        return $this->build_grade_data($userid, $grade ?: null);
+    }
 
+    /**
+     * Get grade data for a specific attempt.
+     *
+     * @param int $userid The user ID.
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
+     * @return array
+     */
+    public function get_grade_data_for_attempt(int $userid, int $attemptnumber = -1): array {
+        $grade = $this->assign->get_user_grade($userid, false, $attemptnumber);
+        return $this->build_grade_data($userid, $grade ?: null);
+    }
+
+    /**
+     * Build grade data array from a grade record.
+     *
+     * @param int $userid
+     * @param \stdClass|null $grade
+     * @return array
+     */
+    private function build_grade_data(int $userid, ?\stdClass $grade): array {
         // Get feedback comments if the feedback plugin is enabled.
         $feedbacktext = '';
         $feedbackformat = FORMAT_HTML;
@@ -372,12 +436,18 @@ class assign_adapter extends base_adapter {
         array $advancedgradingdata = [],
         int $draftitemid = 0,
         int $feedbackfilesdraftid = 0,
+        int $attemptnumber = -1,
     ): bool {
         global $USER, $DB;
 
         // Moodle's assign::save_grade() requires attemptnumber to identify
         // which submission attempt the grade applies to.
-        $submission = $this->assign->get_user_submission($userid, false) ?: null;
+        // When attemptnumber is -1 (default), use the latest submission's attempt.
+        if ($attemptnumber >= 0) {
+            $submission = $this->assign->get_user_submission($userid, false, $attemptnumber) ?: null;
+        } else {
+            $submission = $this->assign->get_user_submission($userid, false) ?: null;
+        }
         $attemptnumber = $submission ? (int) $submission->attemptnumber : 0;
 
         // Check if advanced grading (rubric/marking guide) is active.
@@ -540,13 +610,23 @@ class assign_adapter extends base_adapter {
     }
 
     /**
-     * Get submitted files for document preview.
+     * Get submitted files for document preview (latest attempt).
      *
      * @param int $userid
      * @return array
      */
     public function get_submission_files(int $userid): array {
         $submission = $this->assign->get_user_submission($userid, false);
+        return $this->build_submission_files($submission ?: null);
+    }
+
+    /**
+     * Build the file list for a given submission record.
+     *
+     * @param \stdClass|null $submission
+     * @return array
+     */
+    private function build_submission_files(?\stdClass $submission): array {
         if (!$submission) {
             return [];
         }

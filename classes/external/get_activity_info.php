@@ -90,6 +90,9 @@ class get_activity_info extends external_api {
             'canmanageextensions' => new external_value(
                 PARAM_BOOL, 'Whether teacher can manage duedate extensions', VALUE_DEFAULT, false
             ),
+            'maxattempts' => new external_value(
+                PARAM_INT, 'Maximum attempts (-1=unlimited, 1=single)', VALUE_DEFAULT, 1
+            ),
         ]);
     }
 }

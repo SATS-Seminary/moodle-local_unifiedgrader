@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * External function: get grade data.
+ * External function: get penalties.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary
@@ -28,14 +28,15 @@ defined('MOODLE_INTERNAL') || die();
 
 use core_external\external_api;
 use core_external\external_function_parameters;
+use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use local_unifiedgrader\adapter\adapter_factory;
+use local_unifiedgrader\penalty_manager;
 
 /**
- * Returns current grade and feedback for a student.
+ * Returns grade penalties for a student in an activity.
  */
-class get_grade_data extends external_api {
+class get_penalties extends external_api {
 
     /**
      * Parameter definition.
@@ -44,10 +45,7 @@ class get_grade_data extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
-            'userid' => new external_value(PARAM_INT, 'User ID'),
-            'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
-            ),
+            'userid' => new external_value(PARAM_INT, 'Student user ID'),
         ]);
     }
 
@@ -56,41 +54,38 @@ class get_grade_data extends external_api {
      *
      * @param int $cmid
      * @param int $userid
-     * @param int $attemptnumber
      * @return array
      */
-    public static function execute(int $cmid, int $userid, int $attemptnumber = -1): array {
+    public static function execute(int $cmid, int $userid): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'userid' => $userid,
-            'attemptnumber' => $attemptnumber,
         ]);
 
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
 
-        $adapter = adapter_factory::create($params['cmid']);
-
-        if ($params['attemptnumber'] >= 0) {
-            return $adapter->get_grade_data_for_attempt($params['userid'], $params['attemptnumber']);
-        }
-        return $adapter->get_grade_data($params['userid']);
+        return penalty_manager::get_penalties($params['cmid'], $params['userid']);
     }
 
     /**
      * Return definition.
-     * @return external_single_structure
+     * @return external_multiple_structure
      */
-    public static function execute_returns(): external_single_structure {
-        return new external_single_structure([
-            'grade' => new external_value(PARAM_FLOAT, 'Current grade', VALUE_OPTIONAL),
-            'feedback' => new external_value(PARAM_RAW, 'Feedback HTML'),
-            'feedbackformat' => new external_value(PARAM_INT, 'Feedback format'),
-            'rubricdata' => new external_value(PARAM_RAW, 'Rubric fill data (JSON)', VALUE_OPTIONAL),
-            'gradingdefinition' => new external_value(PARAM_RAW, 'Grading definition (JSON)', VALUE_OPTIONAL),
-            'timegraded' => new external_value(PARAM_INT, 'Time graded'),
-            'grader' => new external_value(PARAM_INT, 'Grader user ID'),
-        ]);
+    public static function execute_returns(): external_multiple_structure {
+        return new external_multiple_structure(
+            new external_single_structure([
+                'id' => new external_value(PARAM_INT, 'Penalty ID'),
+                'cmid' => new external_value(PARAM_INT, 'Course module ID'),
+                'userid' => new external_value(PARAM_INT, 'Student user ID'),
+                'authorid' => new external_value(PARAM_INT, 'Author user ID'),
+                'category' => new external_value(PARAM_ALPHANUMEXT, 'Penalty category'),
+                'label' => new external_value(PARAM_TEXT, 'Custom label'),
+                'percentage' => new external_value(PARAM_INT, 'Penalty percentage'),
+                'timecreated' => new external_value(PARAM_INT, 'Time created'),
+                'timemodified' => new external_value(PARAM_INT, 'Time modified'),
+            ]),
+        );
     }
 }

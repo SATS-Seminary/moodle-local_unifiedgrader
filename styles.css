@@ -775,3 +775,54 @@
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
     overflow-y: auto;
 }
+
+/* Penalty popout — fixed positioning like comment library popout. */
+.local-unifiedgrader-penalty-popout {
+    position: fixed;
+    width: 340px;
+    max-width: calc(100vw - 1rem);
+    max-height: 400px;
+    z-index: 300;
+    background: #fff;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.14);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.local-unifiedgrader-penalty-popout .penalty-section {
+    margin-bottom: 0.75rem;
+}
+
+.local-unifiedgrader-penalty-popout .penalty-section:last-child {
+    margin-bottom: 0;
+}
+
+.local-unifiedgrader-penalty-popout .penalty-preset-btn {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.local-unifiedgrader-penalty-popout .penalty-preset-btn.active {
+    background-color: var(--bs-danger, #dc3545);
+    color: #fff;
+    border-color: var(--bs-danger, #dc3545);
+}
+
+.local-unifiedgrader-penalty-popout .penalty-active-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Penalty badges in marking panel and student view. */
+.local-unifiedgrader-penalty-badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+}

@@ -83,6 +83,14 @@ class provider implements
             'preferences' => 'privacy:metadata:preferences:data',
         ], 'privacy:metadata:preferences');
 
+        $collection->add_database_table('local_unifiedgrader_penalty', [
+            'userid' => 'privacy:metadata:penalty:userid',
+            'authorid' => 'privacy:metadata:penalty:authorid',
+            'category' => 'privacy:metadata:penalty:category',
+            'label' => 'privacy:metadata:penalty:label',
+            'percentage' => 'privacy:metadata:penalty:percentage',
+        ], 'privacy:metadata:penalty');
+
         return $collection;
     }
 
@@ -114,6 +122,19 @@ class provider implements
                   JOIN {course_modules} cm ON cm.id = a.cmid
                   JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
                  WHERE a.userid = :userid1 OR a.authorid = :userid2";
+
+        $contextlist->add_from_sql($sql, [
+            'contextlevel' => CONTEXT_MODULE,
+            'userid1' => $userid,
+            'userid2' => $userid,
+        ]);
+
+        // Penalties where user is the subject or the author.
+        $sql = "SELECT DISTINCT ctx.id
+                  FROM {local_unifiedgrader_penalty} p
+                  JOIN {course_modules} cm ON cm.id = p.cmid
+                  JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
+                 WHERE p.userid = :userid1 OR p.authorid = :userid2";
 
         $contextlist->add_from_sql($sql, [
             'contextlevel' => CONTEXT_MODULE,
@@ -158,6 +179,19 @@ class provider implements
         $sql = "SELECT DISTINCT a.authorid
                   FROM {local_unifiedgrader_annot} a
                   JOIN {course_modules} cm ON cm.id = a.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('authorid', $sql, ['cmid' => $context->instanceid]);
+
+        // Penalties: subjects and authors.
+        $sql = "SELECT DISTINCT p.userid
+                  FROM {local_unifiedgrader_penalty} p
+                  JOIN {course_modules} cm ON cm.id = p.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('userid', $sql, ['cmid' => $context->instanceid]);
+
+        $sql = "SELECT DISTINCT p.authorid
+                  FROM {local_unifiedgrader_penalty} p
+                  JOIN {course_modules} cm ON cm.id = p.cmid
                  WHERE cm.id = :cmid";
         $userlist->add_from_sql('authorid', $sql, ['cmid' => $context->instanceid]);
     }
@@ -243,6 +277,28 @@ class provider implements
                     (object) ['annotations' => array_values($exportdata)],
                 );
             }
+
+            // Export penalties applied to this user.
+            $penalties = $DB->get_records('local_unifiedgrader_penalty', [
+                'cmid' => $cm->id,
+                'userid' => $userid,
+            ]);
+
+            if ($penalties) {
+                $exportdata = array_map(function($penalty) {
+                    return [
+                        'category' => $penalty->category,
+                        'label' => $penalty->label,
+                        'percentage' => (int) $penalty->percentage,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($penalty->timecreated),
+                    ];
+                }, $penalties);
+
+                writer::with_context($context)->export_data(
+                    [get_string('penalties', 'local_unifiedgrader')],
+                    (object) ['penalties' => array_values($exportdata)],
+                );
+            }
         }
 
         // Export comment library (user-level, not context-specific).
@@ -319,6 +375,7 @@ class provider implements
 
         $DB->delete_records('local_unifiedgrader_notes', ['cmid' => $context->instanceid]);
         $DB->delete_records('local_unifiedgrader_annot', ['cmid' => $context->instanceid]);
+        $DB->delete_records('local_unifiedgrader_penalty', ['cmid' => $context->instanceid]);
     }
 
     /**
@@ -347,6 +404,14 @@ class provider implements
             $DB->delete_records('local_unifiedgrader_annot', [
                 'cmid' => $context->instanceid,
                 'userid' => $userid,
+            ]);
+            $DB->delete_records('local_unifiedgrader_penalty', [
+                'cmid' => $context->instanceid,
+                'userid' => $userid,
+            ]);
+            $DB->delete_records('local_unifiedgrader_penalty', [
+                'cmid' => $context->instanceid,
+                'authorid' => $userid,
             ]);
         }
 
@@ -394,6 +459,13 @@ class provider implements
         $DB->delete_records_select('local_unifiedgrader_annot',
             "cmid = :cmid2 AND userid {$insql3}",
             array_merge(['cmid2' => $context->instanceid], $inparams3),
+        );
+
+        [$insql4, $inparams4] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid4');
+        [$insql5, $inparams5] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid5');
+        $DB->delete_records_select('local_unifiedgrader_penalty',
+            "cmid = :cmid3 AND (userid {$insql4} OR authorid {$insql5})",
+            array_merge(['cmid3' => $context->instanceid], $inparams4, $inparams5),
         );
 
         // Delete user-level data.

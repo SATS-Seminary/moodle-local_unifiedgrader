@@ -27,6 +27,7 @@ import Notification from 'core/notification';
 import {get_string as getString} from 'core/str';
 import {getInstanceForElementId} from 'editor_tiny/editor';
 import CommentLibraryPopout from 'local_unifiedgrader/components/comment_library_popout';
+import PenaltyPopout from 'local_unifiedgrader/components/penalty_popout';
 
 export default class extends BaseComponent {
 
@@ -68,8 +69,13 @@ export default class extends BaseComponent {
             GRADE_PERCENTAGE: '[data-region="grade-percentage"]',
             OVERALL_FEEDBACK_SECTION: '[data-region="overall-feedback-section"]',
             FEEDBACK_COLLAPSE: '[data-region="feedback-collapse"]',
+            TOGGLE_PENALTIES: '[data-action="toggle-penalties"]',
+            PENALTY_BADGES: '[data-region="penalty-badges"]',
+            ATTEMPT_SELECTOR: '[data-region="attempt-selector"]',
+            ATTEMPT_SELECT: '[data-action="attempt-select"]',
         };
         this._editingFeedback = false;
+        this._penaltyPopout = null;
         this._gradingDefinition = null;
         this._rubricSelections = {};
         this._guideScores = {};
@@ -91,10 +97,12 @@ export default class extends BaseComponent {
      */
     getWatchers() {
         return [
+            {watch: 'submission:updated', handler: this._renderAttemptSelector},
             {watch: 'submission:updated', handler: this._renderLateIndicator},
             {watch: 'submission:updated', handler: this._renderPlagiarism},
             {watch: 'grade:updated', handler: this._renderGrade},
             {watch: 'state.notes:updated', handler: this._renderNotes},
+            {watch: 'state.penalties:updated', handler: this._renderPenalties},
             {watch: 'ui:updated', handler: this._updateUI},
         ];
     }
@@ -118,6 +126,23 @@ export default class extends BaseComponent {
             this._renderGrade({state});
         }
 
+        // Attempt selector change handler.
+        const attemptSelect = this.getElement(this.selectors.ATTEMPT_SELECT);
+        if (attemptSelect) {
+            attemptSelect.addEventListener('change', (e) => {
+                const attemptnumber = parseInt(e.target.value, 10);
+                const currentState = this.reactive.state;
+                if (attemptnumber !== currentState.submission.attemptnumber) {
+                    this.reactive.dispatch(
+                        'loadAttempt',
+                        currentState.activity.cmid,
+                        currentState.currentUser.id,
+                        attemptnumber,
+                    );
+                }
+            });
+        }
+
         // Initialise comment library popout.
         const coursecode = state.activity?.coursecode || '';
         this._clibPopout = new CommentLibraryPopout(coursecode, () => this._lastFocusedField);
@@ -130,6 +155,30 @@ export default class extends BaseComponent {
                 this._clibPopout.toggle(btn);
             });
         });
+
+        // Initialise penalty popout.
+        this._penaltyPopout = new PenaltyPopout(
+            (category, label, percentage) => {
+                const cmid = state.activity.cmid;
+                const userid = state.currentUser.id;
+                this.reactive.dispatch('savePenalty', cmid, userid, category, label, percentage);
+            },
+            (penaltyId) => {
+                const cmid = state.activity.cmid;
+                const userid = state.currentUser.id;
+                this.reactive.dispatch('deletePenalty', cmid, userid, penaltyId);
+            },
+        );
+
+        const penaltyBtn = this.getElement(this.selectors.TOGGLE_PENALTIES);
+        if (penaltyBtn) {
+            penaltyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const penalties = this._getPenaltiesArray();
+                this._penaltyPopout.toggle(penaltyBtn, penalties);
+            });
+        }
 
         // Track the last-focused remark textarea or score input inside the rubric/guide.
         const rubricBody = this.getElement(this.selectors.RUBRIC_BODY);
@@ -292,9 +341,20 @@ export default class extends BaseComponent {
             }
         } else {
             // Points: set the numeric input value.
+            // The grade from Moodle is the adjusted (post-penalty) value.
+            // Reverse-calculate the raw (pre-penalty) grade for display.
             const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
             if (gradeInput && state.grade) {
-                gradeInput.value = state.grade.grade !== null ? state.grade.grade : '';
+                let displayGrade = state.grade.grade;
+                if (displayGrade !== null) {
+                    const totalDeduction = this._getTotalPenaltyDeduction(state);
+                    if (totalDeduction > 0) {
+                        displayGrade = parseFloat(displayGrade) + totalDeduction;
+                        // Round to avoid floating point artifacts.
+                        displayGrade = Math.round(displayGrade * 100) / 100;
+                    }
+                }
+                gradeInput.value = displayGrade !== null ? displayGrade : '';
 
                 // When advanced grading is active and manual override is not allowed,
                 // make the grade input readonly so teachers must use the rubric/guide.
@@ -571,16 +631,103 @@ export default class extends BaseComponent {
         }
 
         const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
-        const grade = gradeInput ? parseFloat(gradeInput.value) : NaN;
+        const rawGrade = gradeInput ? parseFloat(gradeInput.value) : NaN;
         const maxgrade = parseFloat(gradeInput?.max) || 100;
 
-        if (isNaN(grade) || grade < 0) {
+        if (isNaN(rawGrade) || rawGrade < 0) {
             percentEl.textContent = '';
             return;
         }
 
-        const pct = Math.round((grade / maxgrade) * 100);
+        // Apply penalty deduction for percentage display.
+        const totalDeduction = this._getTotalPenaltyDeduction(this.reactive.state);
+        const effectiveGrade = Math.max(0, rawGrade - totalDeduction);
+        const pct = Math.round((effectiveGrade / maxgrade) * 100);
         percentEl.textContent = '(' + pct + '%)';
+    }
+
+    /**
+     * Get penalties as a plain array from the reactive state (StateMap → Array).
+     *
+     * @return {Array} Array of penalty objects.
+     */
+    _getPenaltiesArray() {
+        const penaltiesState = this.reactive.state.penalties;
+        if (!penaltiesState) {
+            return [];
+        }
+        // StateMap: convert to array via values().
+        if (typeof penaltiesState.values === 'function') {
+            return [...penaltiesState.values()];
+        }
+        // Fallback: already an array.
+        if (Array.isArray(penaltiesState)) {
+            return penaltiesState;
+        }
+        return [];
+    }
+
+    /**
+     * Calculate total penalty deduction in marks.
+     *
+     * @param {object} state Current reactive state.
+     * @return {number} Total marks to deduct.
+     */
+    _getTotalPenaltyDeduction(state) {
+        const penalties = this._getPenaltiesArray();
+        if (!penalties.length) {
+            return 0;
+        }
+        const maxgrade = parseFloat(state.ui?.maxgrade || state.activity?.maxgrade) || 100;
+        let totalPct = 0;
+        penalties.forEach((p) => {
+            totalPct += parseInt(p.percentage, 10) || 0;
+        });
+        return (totalPct / 100) * maxgrade;
+    }
+
+    /**
+     * Render penalty badges below the grade input and update the popout.
+     *
+     * @param {object} args Watcher args.
+     * @param {object} args.state Current state.
+     */
+    _renderPenalties() {
+        const badgesEl = this.getElement(this.selectors.PENALTY_BADGES);
+        if (!badgesEl) {
+            return;
+        }
+
+        const penalties = this._getPenaltiesArray();
+        badgesEl.innerHTML = '';
+
+        penalties.forEach((p) => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-warning text-dark local-unifiedgrader-penalty-badge';
+            const displayLabel = p.category === 'wordcount' ? 'Word count' : (p.label || 'Other');
+            badge.textContent = '-' + p.percentage + '% ' + displayLabel;
+            badgesEl.appendChild(badge);
+        });
+
+        // Update the popout if it's open.
+        if (this._penaltyPopout) {
+            this._penaltyPopout.updatePenalties(penalties);
+        }
+
+        // Recalculate percentage display with updated penalties.
+        this._updatePercentage();
+
+        // Update the penalties button to indicate active penalties.
+        const penaltyBtn = this.getElement(this.selectors.TOGGLE_PENALTIES);
+        if (penaltyBtn) {
+            if (penalties.length > 0) {
+                penaltyBtn.classList.remove('btn-outline-secondary');
+                penaltyBtn.classList.add('btn-warning', 'text-dark');
+            } else {
+                penaltyBtn.classList.remove('btn-warning', 'text-dark');
+                penaltyBtn.classList.add('btn-outline-secondary');
+            }
+        }
     }
 
     /**
@@ -1134,6 +1281,58 @@ export default class extends BaseComponent {
 
         const state = this.reactive.state;
         this.reactive.dispatch('deleteNote', state.activity.cmid, state.currentUser.id, noteid);
+    }
+
+    /**
+     * Render the attempt selector dropdown.
+     *
+     * Shows the dropdown only when the assignment supports multiple attempts
+     * and the student has more than one attempt.
+     *
+     * @param {object} args Watcher args.
+     * @param {object} args.state Current state.
+     */
+    _renderAttemptSelector({state}) {
+        const wrapper = this.getElement(this.selectors.ATTEMPT_SELECTOR);
+        const select = this.getElement(this.selectors.ATTEMPT_SELECT);
+        if (!wrapper || !select) {
+            return;
+        }
+
+        const maxattempts = state.activity?.maxattempts ?? 1;
+
+        // Get attempts list — may be a StateMap (has .values()) or an array.
+        let attemptList = [];
+        const attempts = state.submission?.attempts;
+        if (attempts) {
+            if (typeof attempts.values === 'function') {
+                attemptList = [...attempts.values()];
+            } else if (Array.isArray(attempts)) {
+                attemptList = attempts;
+            }
+        }
+
+        // Hide if single-attempt assignment or only one attempt exists.
+        if (maxattempts === 1 || attemptList.length <= 1) {
+            wrapper.classList.add('d-none');
+            return;
+        }
+
+        wrapper.classList.remove('d-none');
+
+        // Populate the dropdown options.
+        const currentAttempt = state.submission.attemptnumber;
+        select.innerHTML = '';
+
+        attemptList.forEach((attempt) => {
+            const option = document.createElement('option');
+            option.value = attempt.attemptnumber;
+            const num = attempt.attemptnumber + 1;
+            const statusLabel = attempt.graded ? 'graded' : attempt.status;
+            option.textContent = `Attempt ${num} (${statusLabel})`;
+            option.selected = attempt.attemptnumber === currentAttempt;
+            select.appendChild(option);
+        });
     }
 
     /**

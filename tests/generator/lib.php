@@ -45,6 +45,9 @@ class local_unifiedgrader_generator extends component_generator_base {
     /** @var int Counter for library tags. */
     protected int $tagcount = 0;
 
+    /** @var int Counter for penalties. */
+    protected int $penaltycount = 0;
+
     /**
      * Reset generator counters.
      */
@@ -53,6 +56,7 @@ class local_unifiedgrader_generator extends component_generator_base {
         $this->annotcount = 0;
         $this->clibcount = 0;
         $this->tagcount = 0;
+        $this->penaltycount = 0;
         parent::reset();
     }
 
@@ -203,6 +207,30 @@ class local_unifiedgrader_generator extends component_generator_base {
         ], $data);
 
         $record->id = $DB->insert_record('local_unifiedgrader_comments', $record);
+        return $record;
+    }
+
+    /**
+     * Create a grade penalty record.
+     *
+     * @param array $data Required: cmid, userid, authorid. Optional: category, label, percentage.
+     * @return \stdClass The created record.
+     */
+    public function create_penalty(array $data): \stdClass {
+        global $DB;
+
+        $this->penaltycount++;
+        $now = time();
+
+        $record = (object) array_merge([
+            'category' => 'wordcount',
+            'label' => '',
+            'percentage' => 10,
+            'timecreated' => $now,
+            'timemodified' => $now,
+        ], $data);
+
+        $record->id = $DB->insert_record('local_unifiedgrader_penalty', $record);
         return $record;
     }
 

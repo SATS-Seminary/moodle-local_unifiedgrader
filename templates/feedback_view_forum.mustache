@@ -22,9 +22,10 @@
     - hasmultiplefiles: Whether there are multiple PDF files
     - pdffilesjson: JSON-encoded array of PDF files
     - hasannotatedpdf: Whether an annotated PDF exists for the selected file
-    - annotatedpdfurl: URL of the annotated PDF (for download)
-    - downloadfilename: Suggested filename for the annotated PDF download
+    - annotatedpdfurl: URL of the annotated PDF (for inline viewer)
+    - downloadfilename: Suggested filename for the feedback PDF download
     - annotatedpdfmapjson: JSON map of fileid to annotated PDF URL
+    - feedbackdownloadurl: URL to download the combined feedback summary + annotated PDF
     - userid: Current student user ID
     - hasrubric: Whether rubric grading is used
     - rubriccriteria: Array of rubric criteria with levels
@@ -50,19 +51,26 @@
                 <i class="fa fa-arrow-left" aria-hidden="true"></i>
             </a>
             <h5 class="mb-0">{{activityname}}</h5>
-            {{#hasannotatedpdf}}
-                <a href="{{annotatedpdfurl}}" class="btn btn-sm btn-outline-primary ms-2" download="{{downloadfilename}}"
-                   data-region="download-annotated-pdf">
+            {{#gradedisplay}}
+                <a href="{{feedbackdownloadurl}}" class="btn btn-sm btn-outline-primary ms-2" download="{{downloadfilename}}"
+                   data-region="download-feedback-pdf">
                     <i class="fa fa-download me-1" aria-hidden="true"></i>
-                    {{#str}} download_annotated_pdf, local_unifiedgrader {{/str}}
+                    {{#str}} download_feedback_pdf, local_unifiedgrader {{/str}}
                 </a>
-            {{/hasannotatedpdf}}
+            {{/gradedisplay}}
         </div>
         {{#gradedisplay}}
             <span class="badge bg-primary fs-6">
                 {{#str}} grade, local_unifiedgrader {{/str}}: {{gradedisplay}}
             </span>
         {{/gradedisplay}}
+        {{#haspenalties}}
+            {{#penalties}}
+                <span class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
+                    {{text}}
+                </span>
+            {{/penalties}}
+        {{/haspenalties}}
     </div>
 
     <div class="row g-3 px-3">

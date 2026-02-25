@@ -92,6 +92,18 @@ export default class {
             // Notes is a StateMap (array with id fields) — must replace entirely.
             // Watcher uses state.notes:updated to catch this.
             stateManager.state.notes = notes;
+
+            // Load penalties in parallel (non-blocking if it fails).
+            try {
+                const penalties = await Ajax.call([{
+                    methodname: 'local_unifiedgrader_get_penalties',
+                    args: {cmid, userid},
+                }])[0];
+                stateManager.state.penalties = penalties;
+            } catch (_) {
+                stateManager.state.penalties = [];
+            }
+
             // Update submission comment count and reset loaded flag.
             stateManager.state.submissionComments.count = submissionData.commentcount || 0;
             stateManager.state.submissionComments.loaded = false;
@@ -99,6 +111,73 @@ export default class {
             stateManager.setReadOnly(true);
 
             // Refresh the filemanager widget after draft area has been re-prepared.
+            this._refreshFileManager(stateManager);
+        } catch (error) {
+            Notification.exception(error);
+            stateManager.setReadOnly(false);
+            stateManager.state.ui.loading = false;
+            stateManager.setReadOnly(true);
+        }
+    }
+
+    /**
+     * Load a specific submission attempt for the current student.
+     *
+     * Reloads submission data and grade data for the given attempt number.
+     * Notes and penalties are per-user (not per-attempt) so they are not reloaded.
+     *
+     * @param {object} stateManager The reactive state manager.
+     * @param {number} cmid Course module ID.
+     * @param {number} userid User ID.
+     * @param {number} attemptnumber Attempt number to load (0-based).
+     */
+    async loadAttempt(stateManager, cmid, userid, attemptnumber) {
+        stateManager.setReadOnly(false);
+        stateManager.state.ui.loading = true;
+        stateManager.setReadOnly(true);
+
+        try {
+            const draftitemid = stateManager.state.ui.draftitemid;
+            const feedbackfilesdraftid = stateManager.state.ui.feedbackfilesdraftid;
+            const calls = [
+                Ajax.call([{
+                    methodname: 'local_unifiedgrader_get_submission_data',
+                    args: {cmid, userid, attemptnumber},
+                }])[0],
+                Ajax.call([{
+                    methodname: 'local_unifiedgrader_get_grade_data',
+                    args: {cmid, userid, attemptnumber},
+                }])[0],
+            ];
+
+            // Re-prepare the feedback draft area for this attempt's grade.
+            if (draftitemid) {
+                calls.push(Ajax.call([{
+                    methodname: 'local_unifiedgrader_prepare_feedback_draft',
+                    args: {cmid, userid, draftitemid},
+                }])[0]);
+            }
+
+            if (feedbackfilesdraftid) {
+                calls.push(Ajax.call([{
+                    methodname: 'local_unifiedgrader_prepare_feedback_files_draft',
+                    args: {cmid, userid, draftitemid: feedbackfilesdraftid},
+                }])[0]);
+            }
+
+            const results = await Promise.all(calls);
+            const [submissionData, gradeData] = results;
+            const feedbackDraft = (draftitemid ? results[2] : null) || {feedbackhtml: ''};
+
+            stateManager.setReadOnly(false);
+            Object.assign(stateManager.state.submission, submissionData);
+            Object.assign(stateManager.state.grade, gradeData);
+            stateManager.state.grade.feedbackdraft = feedbackDraft.feedbackhtml;
+            stateManager.state.submissionComments.count = submissionData.commentcount || 0;
+            stateManager.state.submissionComments.loaded = false;
+            stateManager.state.ui.loading = false;
+            stateManager.setReadOnly(true);
+
             this._refreshFileManager(stateManager);
         } catch (error) {
             Notification.exception(error);
@@ -138,14 +217,16 @@ export default class {
                     draftitemid: draftitemid || 0,
                     advancedgradingdata: advancedgradingdata || '',
                     feedbackfilesdraftid: feedbackfilesdraftid || 0,
+                    attemptnumber: stateManager.state.submission.attemptnumber ?? -1,
                 },
             }])[0];
 
             // Refresh grade data, participant list, and draft areas after save.
+            const currentAttempt = stateManager.state.submission.attemptnumber ?? -1;
             const refreshCalls = [
                 Ajax.call([{
                     methodname: 'local_unifiedgrader_get_grade_data',
-                    args: {cmid, userid},
+                    args: {cmid, userid, attemptnumber: currentAttempt},
                 }])[0],
                 Ajax.call([{
                     methodname: 'local_unifiedgrader_get_participants',
@@ -282,6 +363,60 @@ export default class {
 
             stateManager.setReadOnly(false);
             stateManager.state.notes = notes;
+            stateManager.setReadOnly(true);
+        } catch (error) {
+            Notification.exception(error);
+        }
+    }
+
+    /**
+     * Save a grade penalty and refresh the penalty list.
+     *
+     * @param {object} stateManager The reactive state manager.
+     * @param {number} cmid Course module ID.
+     * @param {number} userid Student user ID.
+     * @param {string} category Penalty category ('wordcount' or 'other').
+     * @param {string} label Custom label for 'other' penalties.
+     * @param {number} percentage Penalty percentage (1-100).
+     */
+    async savePenalty(stateManager, cmid, userid, category, label, percentage) {
+        try {
+            const result = await Ajax.call([{
+                methodname: 'local_unifiedgrader_save_penalty',
+                args: {cmid, userid, category, label: label || '', percentage},
+            }])[0];
+
+            stateManager.setReadOnly(false);
+            stateManager.state.penalties = result.penalties;
+            stateManager.setReadOnly(true);
+        } catch (error) {
+            Notification.exception(error);
+        }
+    }
+
+    /**
+     * Delete a grade penalty and refresh the penalty list.
+     *
+     * @param {object} stateManager The reactive state manager.
+     * @param {number} cmid Course module ID.
+     * @param {number} userid Student user ID.
+     * @param {number} penaltyid Penalty ID to delete.
+     */
+    async deletePenalty(stateManager, cmid, userid, penaltyid) {
+        try {
+            await Ajax.call([{
+                methodname: 'local_unifiedgrader_delete_penalty',
+                args: {cmid, penaltyid},
+            }])[0];
+
+            // Refresh penalty list.
+            const penalties = await Ajax.call([{
+                methodname: 'local_unifiedgrader_get_penalties',
+                args: {cmid, userid},
+            }])[0];
+
+            stateManager.setReadOnly(false);
+            stateManager.state.penalties = penalties;
             stateManager.setReadOnly(true);
         } catch (error) {
             Notification.exception(error);

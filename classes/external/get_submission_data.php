@@ -46,6 +46,9 @@ class get_submission_data extends external_api {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'userid' => new external_value(PARAM_INT, 'User ID'),
+            'attemptnumber' => new external_value(
+                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
+            ),
         ]);
     }
 
@@ -54,12 +57,14 @@ class get_submission_data extends external_api {
      *
      * @param int $cmid
      * @param int $userid
+     * @param int $attemptnumber
      * @return array
      */
-    public static function execute(int $cmid, int $userid): array {
+    public static function execute(int $cmid, int $userid, int $attemptnumber = -1): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'userid' => $userid,
+            'attemptnumber' => $attemptnumber,
         ]);
 
         $context = \context_module::instance($params['cmid']);
@@ -67,7 +72,14 @@ class get_submission_data extends external_api {
         require_capability('local/unifiedgrader:grade', $context);
 
         $adapter = adapter_factory::create($params['cmid']);
-        $data = $adapter->get_submission_data($params['userid']);
+
+        // Use attempt-aware method when a specific attempt is requested.
+        if ($params['attemptnumber'] >= 0) {
+            $data = $adapter->get_submission_data_for_attempt($params['userid'], $params['attemptnumber']);
+        } else {
+            $data = $adapter->get_submission_data($params['userid']);
+        }
+
         $data['plagiarismlinks'] = $adapter->get_plagiarism_links($params['userid']);
 
         // Add override info.
@@ -77,6 +89,9 @@ class get_submission_data extends external_api {
 
         // Effective due date for this user (accounts for overrides and extensions).
         $data['effectiveduedate'] = $adapter->get_effective_duedate($params['userid']);
+
+        // Include the list of all attempts for this user.
+        $data['attempts'] = $adapter->get_attempts($params['userid']);
 
         return $data;
     }
@@ -123,6 +138,18 @@ class get_submission_data extends external_api {
             'overrideid' => new external_value(PARAM_INT, 'Override ID (0 if none)', VALUE_DEFAULT, 0),
             'effectiveduedate' => new external_value(
                 PARAM_INT, 'Effective due date for this user (accounts for overrides/extensions)', VALUE_DEFAULT, 0
+            ),
+            'attempts' => new external_multiple_structure(
+                new external_single_structure([
+                    'id' => new external_value(PARAM_INT, 'Attempt ID (same as attemptnumber)'),
+                    'attemptnumber' => new external_value(PARAM_INT, 'Attempt number (0-based)'),
+                    'status' => new external_value(PARAM_TEXT, 'Submission status'),
+                    'timemodified' => new external_value(PARAM_INT, 'Time modified'),
+                    'graded' => new external_value(PARAM_BOOL, 'Whether this attempt has been graded'),
+                ]),
+                'List of submission attempts',
+                VALUE_DEFAULT,
+                [],
             ),
         ]);
     }

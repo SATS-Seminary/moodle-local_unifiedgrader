@@ -106,6 +106,7 @@ abstract class base_adapter {
         array $advancedgradingdata = [],
         int $draftitemid = 0,
         int $feedbackfilesdraftid = 0,
+        int $attemptnumber = -1,
     ): bool;
 
     /**
@@ -134,6 +135,45 @@ abstract class base_adapter {
      * @return bool True if the grade is released and visible to the student.
      */
     abstract public function is_grade_released(int $userid): bool;
+
+    /**
+     * Get the list of submission attempts for a user.
+     *
+     * Returns an empty array for activity types that don't support attempts.
+     * Override in concrete adapters (e.g., assign) that support multiple attempts.
+     *
+     * @param int $userid The user ID.
+     * @return array List of arrays with keys: id, attemptnumber, status, timemodified, graded.
+     */
+    public function get_attempts(int $userid): array {
+        return [];
+    }
+
+    /**
+     * Get submission data for a specific attempt.
+     *
+     * Default delegates to get_submission_data() (ignoring attemptnumber).
+     *
+     * @param int $userid The user ID.
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
+     * @return array
+     */
+    public function get_submission_data_for_attempt(int $userid, int $attemptnumber = -1): array {
+        return $this->get_submission_data($userid);
+    }
+
+    /**
+     * Get grade data for a specific attempt.
+     *
+     * Default delegates to get_grade_data() (ignoring attemptnumber).
+     *
+     * @param int $userid The user ID.
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
+     * @return array
+     */
+    public function get_grade_data_for_attempt(int $userid, int $attemptnumber = -1): array {
+        return $this->get_grade_data($userid);
+    }
 
     /**
      * Get plagiarism report links for a user's submission.

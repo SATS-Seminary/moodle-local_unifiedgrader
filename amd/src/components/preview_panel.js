@@ -110,7 +110,7 @@ export default class extends BaseComponent {
         // Reset file selector in the right panel.
         this._renderFileSelector([]);
 
-        if (!submission || submission.status === 'nosubmission') {
+        if (!submission || submission.status === 'nosubmission' || !submission.status) {
             noSubEl.classList.remove('d-none');
             noSubEl.classList.add('d-flex');
             return;
@@ -140,6 +140,14 @@ export default class extends BaseComponent {
         // This ensures submission plugin CSS, JS, and AMD modules load correctly
         // (e.g. ytsubmission's YouTube player and timestamped feedback interface).
         if (hasContent) {
+            this._showSubmissionContent();
+            return;
+        }
+
+        // Fallback: submission exists but has no previewable files and no
+        // non-file content. Show submission content iframe anyway — submission
+        // plugins (e.g. audio recording) may render their own player there.
+        if (files.length === 0 && submission.status === 'submitted') {
             this._showSubmissionContent();
             return;
         }
@@ -346,7 +354,7 @@ export default class extends BaseComponent {
         if (file.convertible) {
             return true;
         }
-        const mimetype = file.mimetype;
+        const mimetype = file.mimetype || '';
         if ([
             'application/pdf',
             'image/jpeg',

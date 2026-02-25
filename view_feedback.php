@@ -28,6 +28,7 @@
 require_once(__DIR__ . '/../../config.php');
 
 use local_unifiedgrader\adapter\adapter_factory;
+use local_unifiedgrader\feedback_data_helper;
 
 $cmid = required_param('cmid', PARAM_INT);
 $fileid = optional_param('fileid', 0, PARAM_INT);
@@ -140,109 +141,23 @@ if ($cm->modname === 'forum') {
     $PAGE->activityheader->disable();
     $PAGE->add_body_class('local-unifiedgrader-feedback-page');
 
-    // Format grade display.
-    $gradedisplay = '';
-    if ($gradedata['grade'] !== null) {
-        $gradevalue = round($gradedata['grade'], 2);
-        $maxgrade = round($activityinfo['maxgrade'], 2);
-        $pct = $maxgrade > 0 ? round(($gradevalue / $maxgrade) * 100) : 0;
-        $gradedisplay = $gradevalue . ' / ' . $maxgrade . ' (' . $pct . '%)';
-    }
-
-    // Parse rubric/guide data for template.
-    $gradingdefinition = null;
-    $rubricdata = null;
-    $hasrubric = false;
-    $hasguide = false;
-    $rubriccriteria = [];
-    $guidecriteria = [];
-    $rubrictotal = 0;
-    $guidetotal = 0;
-    $guidemaxtotal = 0;
-
-    if (!empty($gradedata['gradingdefinition'])) {
-        $gradingdefinition = json_decode($gradedata['gradingdefinition'], true);
-    }
-    if (!empty($gradedata['rubricdata'])) {
-        $rubricdata = json_decode($gradedata['rubricdata'], true);
-    }
-
-    if ($gradingdefinition && !empty($gradingdefinition['criteria'])) {
-        if ($gradingdefinition['method'] === 'rubric') {
-            $hasrubric = true;
-            // Build fill map from rubricdata (criterionid => {levelid, remark}).
-            $fillmap = [];
-            if ($rubricdata && !empty($rubricdata['criteria'])) {
-                foreach ($rubricdata['criteria'] as $critid => $critdata) {
-                    $fillmap[(int) $critid] = [
-                        'levelid' => !empty($critdata['levelid']) ? (int) $critdata['levelid'] : 0,
-                        'remark' => $critdata['remark'] ?? '',
-                    ];
-                }
-            }
-            foreach ($gradingdefinition['criteria'] as $criterion) {
-                $levels = [];
-                $selectedscore = null;
-                $fill = $fillmap[$criterion['id']] ?? ['levelid' => 0, 'remark' => ''];
-                foreach ($criterion['levels'] as $level) {
-                    $isselected = $fill['levelid'] && $fill['levelid'] === $level['id'];
-                    $levels[] = [
-                        'score' => $level['score'],
-                        'definition' => $level['definition'],
-                        'selected' => $isselected,
-                    ];
-                    if ($isselected) {
-                        $selectedscore = $level['score'];
-                    }
-                }
-                $rubriccriteria[] = [
-                    'description' => $criterion['description'],
-                    'levels' => $levels,
-                    'selectedscore' => $selectedscore,
-                    'hasselection' => $selectedscore !== null,
-                    'remark' => $fill['remark'],
-                    'hasremark' => !empty($fill['remark']),
-                ];
-                if ($selectedscore !== null) {
-                    $rubrictotal += $selectedscore;
-                }
-            }
-        } else if ($gradingdefinition['method'] === 'guide') {
-            $hasguide = true;
-            $fillmap = [];
-            if ($rubricdata && !empty($rubricdata['criteria'])) {
-                foreach ($rubricdata['criteria'] as $critid => $critdata) {
-                    $fillmap[(int) $critid] = [
-                        'score' => $critdata['score'] ?? '',
-                        'remark' => $critdata['remark'] ?? '',
-                    ];
-                }
-            }
-            foreach ($gradingdefinition['criteria'] as $criterion) {
-                $fill = $fillmap[$criterion['id']] ?? ['score' => '', 'remark' => ''];
-                $score = $fill['score'] !== '' ? (float) $fill['score'] : null;
-                $guidecriteria[] = [
-                    'shortname' => $criterion['shortname'],
-                    'description' => $criterion['description'] ?? '',
-                    'maxscore' => $criterion['maxscore'],
-                    'score' => $score,
-                    'hasscore' => $score !== null,
-                    'remark' => $fill['remark'],
-                    'hasremark' => !empty($fill['remark']),
-                ];
-                if ($score !== null) {
-                    $guidetotal += $score;
-                }
-                $guidemaxtotal += (float) $criterion['maxscore'];
-            }
-        }
-    }
+    // Parse grade, penalties, and rubric/guide data via shared helper.
+    $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
+    $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
+    $gradinginfo = feedback_data_helper::parse_grading_data($gradedata);
+    $gradedisplay = $gradeinfo['gradedisplay'];
 
     // Feedback text (from gradebook for forums). Already formatted by get_grade_data()
     // with pluginfile.php URLs rewritten and format_text() applied.
     $feedback = $gradedata['feedback'] ?? '';
 
-    $showrightcolumn = !empty($feedback) || $hasrubric || $hasguide;
+    $showrightcolumn = !empty($feedback) || $gradinginfo['hasadvancedgrading'];
+
+    // Build feedback PDF download URL.
+    $feedbackdownloadurl = (new moodle_url('/local/unifiedgrader/download_feedback.php', [
+        'cmid' => $cmid,
+        'fileid' => $selectedfile ? $selectedfile['fileid'] : 0,
+    ]))->out(false);
 
     // Prepare template context.
     $templatedata = [
@@ -263,21 +178,22 @@ if ($cm->modname === 'forum') {
         'pdffilesjson' => json_encode($pdffiles),
         'hasannotatedpdf' => $hasannotatedpdf,
         'annotatedpdfurl' => $hasannotatedpdf ? $annotatedpdfmap[$selectedfile['fileid']] : '',
-        'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '.pdf'),
+        'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
         'annotatedpdfmapjson' => json_encode($annotatedpdfmap),
+        'feedbackdownloadurl' => $feedbackdownloadurl,
         'userid' => $userid,
-        'hasrubric' => $hasrubric,
-        'rubriccriteria' => $rubriccriteria,
-        'rubrictotal' => $rubrictotal,
-        'hasguide' => $hasguide,
-        'guidecriteria' => $guidecriteria,
-        'guidetotal' => round($guidetotal, 2),
-        'guidemaxtotal' => round($guidemaxtotal, 2),
-        'hasadvancedgrading' => $hasrubric || $hasguide,
-        'gradingmethodname' => $hasrubric
-            ? get_string('rubric', 'local_unifiedgrader')
-            : ($hasguide ? get_string('markingguide', 'local_unifiedgrader') : ''),
+        'hasrubric' => $gradinginfo['hasrubric'],
+        'rubriccriteria' => $gradinginfo['rubriccriteria'],
+        'rubrictotal' => $gradinginfo['rubrictotal'],
+        'hasguide' => $gradinginfo['hasguide'],
+        'guidecriteria' => $gradinginfo['guidecriteria'],
+        'guidetotal' => $gradinginfo['guidetotal'],
+        'guidemaxtotal' => $gradinginfo['guidemaxtotal'],
+        'hasadvancedgrading' => $gradinginfo['hasadvancedgrading'],
+        'gradingmethodname' => $gradinginfo['gradingmethodname'],
         'showrightcolumn' => $showrightcolumn,
+        'haspenalties' => $penaltyinfo['haspenalties'],
+        'penalties' => $penaltyinfo['penalties'],
     ];
 
     echo $OUTPUT->header();
@@ -370,104 +286,11 @@ $PAGE->set_pagelayout('standard');
 $PAGE->activityheader->disable();
 $PAGE->add_body_class('local-unifiedgrader-feedback-page');
 
-// Format grade display.
-$gradedisplay = '';
-if ($gradedata['grade'] !== null) {
-    $gradevalue = round($gradedata['grade'], 2);
-    $maxgrade = round($activityinfo['maxgrade'], 2);
-    $pct = $maxgrade > 0 ? round(($gradevalue / $maxgrade) * 100) : 0;
-    $gradedisplay = $gradevalue . ' / ' . $maxgrade . ' (' . $pct . '%)';
-}
-
-// Parse rubric/guide data for template.
-$gradingdefinition = null;
-$rubricdata = null;
-$hasrubric = false;
-$hasguide = false;
-$rubriccriteria = [];
-$guidecriteria = [];
-$rubrictotal = 0;
-$guidetotal = 0;
-$guidemaxtotal = 0;
-
-if (!empty($gradedata['gradingdefinition'])) {
-    $gradingdefinition = json_decode($gradedata['gradingdefinition'], true);
-}
-if (!empty($gradedata['rubricdata'])) {
-    $rubricdata = json_decode($gradedata['rubricdata'], true);
-}
-
-if ($gradingdefinition && !empty($gradingdefinition['criteria'])) {
-    if ($gradingdefinition['method'] === 'rubric') {
-        $hasrubric = true;
-        $fillmap = [];
-        if ($rubricdata && !empty($rubricdata['criteria'])) {
-            foreach ($rubricdata['criteria'] as $critid => $critdata) {
-                if (!empty($critdata['levelid'])) {
-                    $fillmap[(int) $critid] = (int) $critdata['levelid'];
-                }
-            }
-        }
-        foreach ($gradingdefinition['criteria'] as $criterion) {
-            $levels = [];
-            $selectedscore = null;
-            foreach ($criterion['levels'] as $level) {
-                $isselected = isset($fillmap[$criterion['id']])
-                    && $fillmap[$criterion['id']] === $level['id'];
-                $levels[] = [
-                    'score' => $level['score'],
-                    'definition' => $level['definition'],
-                    'selected' => $isselected,
-                ];
-                if ($isselected) {
-                    $selectedscore = $level['score'];
-                }
-            }
-            $rubriccriteria[] = [
-                'description' => $criterion['description'],
-                'levels' => $levels,
-                'selectedscore' => $selectedscore,
-                'hasselection' => $selectedscore !== null,
-            ];
-            if ($selectedscore !== null) {
-                $rubrictotal += $selectedscore;
-            }
-        }
-    } else if ($gradingdefinition['method'] === 'guide') {
-        $hasguide = true;
-        $fillmap = [];
-        if ($rubricdata && !empty($rubricdata['criteria'])) {
-            foreach ($rubricdata['criteria'] as $critid => $critdata) {
-                $fillmap[(int) $critid] = [
-                    'score' => $critdata['score'] ?? '',
-                    'remark' => $critdata['remark'] ?? '',
-                ];
-            }
-        }
-        foreach ($gradingdefinition['criteria'] as $criterion) {
-            $fill = $fillmap[$criterion['id']] ?? ['score' => '', 'remark' => ''];
-            $score = $fill['score'] !== '' ? (float) $fill['score'] : null;
-            $guidecriteria[] = [
-                'shortname' => $criterion['shortname'],
-                'description' => $criterion['description'] ?? '',
-                'maxscore' => $criterion['maxscore'],
-                'score' => $score,
-                'hasscore' => $score !== null,
-                'remark' => $fill['remark'],
-                'hasremark' => !empty($fill['remark']),
-            ];
-            if ($score !== null) {
-                $guidetotal += $score;
-            }
-            $guidemaxtotal += (float) $criterion['maxscore'];
-        }
-    }
-}
-
-$hasadvancedgrading = $hasrubric || $hasguide;
-$gradingmethodname = $hasrubric
-    ? get_string('rubric', 'local_unifiedgrader')
-    : ($hasguide ? get_string('markingguide', 'local_unifiedgrader') : '');
+// Parse grade, penalties, and rubric/guide data via shared helper.
+$penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
+$gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
+$gradinginfo = feedback_data_helper::parse_grading_data($gradedata);
+$gradedisplay = $gradeinfo['gradedisplay'];
 
 // Create assign object (needed for feedback file rewriting and submission comments).
 $assign = new \assign($context, $cm, $course);
@@ -547,7 +370,13 @@ if ($submission) {
     }
 }
 
-$showrightcolumn = !empty($feedback) || $hasadvancedgrading;
+$showrightcolumn = !empty($feedback) || $gradinginfo['hasadvancedgrading'];
+
+// Build feedback PDF download URL.
+$feedbackdownloadurl = (new moodle_url('/local/unifiedgrader/download_feedback.php', [
+    'cmid' => $cmid,
+    'fileid' => $selectedfile ? $selectedfile['fileid'] : 0,
+]))->out(false);
 
 // Prepare template context.
 $templatedata = [
@@ -566,8 +395,9 @@ $templatedata = [
     'pdffilesjson' => json_encode($pdffiles),
     'hasannotatedpdf' => $hasannotatedpdf,
     'annotatedpdfurl' => $hasannotatedpdf ? $annotatedpdfmap[$selectedfile['fileid']] : '',
-    'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '.pdf'),
+    'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
     'annotatedpdfmapjson' => json_encode($annotatedpdfmap),
+    'feedbackdownloadurl' => $feedbackdownloadurl,
     'submissionpreviewurl' => $submissionpreviewurl,
     'userid' => $userid,
     'hasfeedbackfiles' => $hasfeedbackfiles,
@@ -578,15 +408,17 @@ $templatedata = [
     'commentcount' => $commentcount,
     'canpostcomments' => $canpostcomments,
     'showrightcolumn' => $showrightcolumn,
-    'hasrubric' => $hasrubric,
-    'rubriccriteria' => $rubriccriteria,
-    'rubrictotal' => $rubrictotal,
-    'hasguide' => $hasguide,
-    'guidecriteria' => $guidecriteria,
-    'guidetotal' => round($guidetotal, 2),
-    'guidemaxtotal' => round($guidemaxtotal, 2),
-    'hasadvancedgrading' => $hasadvancedgrading,
-    'gradingmethodname' => $gradingmethodname,
+    'hasrubric' => $gradinginfo['hasrubric'],
+    'rubriccriteria' => $gradinginfo['rubriccriteria'],
+    'rubrictotal' => $gradinginfo['rubrictotal'],
+    'hasguide' => $gradinginfo['hasguide'],
+    'guidecriteria' => $gradinginfo['guidecriteria'],
+    'guidetotal' => $gradinginfo['guidetotal'],
+    'guidemaxtotal' => $gradinginfo['guidemaxtotal'],
+    'hasadvancedgrading' => $gradinginfo['hasadvancedgrading'],
+    'gradingmethodname' => $gradinginfo['gradingmethodname'],
+    'haspenalties' => $penaltyinfo['haspenalties'],
+    'penalties' => $penaltyinfo['penalties'],
 ];
 
 // Output.

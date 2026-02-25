@@ -394,6 +394,7 @@ class quiz_adapter extends base_adapter {
         array $advancedgradingdata = [],
         int $draftitemid = 0,
         int $feedbackfilesdraftid = 0,
+        int $attemptnumber = -1,
     ): bool {
         global $USER;
 

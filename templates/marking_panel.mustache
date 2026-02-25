@@ -8,6 +8,20 @@
 }}
 <div data-region="marking-content" class="p-3">
 
+    {{! Attempt selector (shown by JS when multiple attempts exist) }}
+    <div data-region="attempt-selector" class="d-none mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <label class="small fw-bold mb-0" for="attempt-select-{{uniqid}}">
+                {{#str}} attempt, local_unifiedgrader {{/str}}
+            </label>
+            <select id="attempt-select-{{uniqid}}"
+                    data-action="attempt-select"
+                    class="form-select form-select-sm"
+                    style="max-width: 250px;">
+            </select>
+        </div>
+    </div>
+
     {{! Late submission indicator (shown by JS when submission is past due date) }}
     <div data-region="late-indicator" class="d-none mb-3">
         <span class="badge bg-warning text-dark w-100 py-2 d-flex align-items-center justify-content-center gap-1">
@@ -33,29 +47,45 @@
             <h6 class="mb-0">{{#str}} grade, local_unifiedgrader {{/str}}</h6>
         </div>
         <div class="card-body">
+            <div class="d-flex align-items-start gap-2">
+                {{! Grade input (constrained width) }}
+                <div style="max-width: 300px; flex-shrink: 0;">
+                    {{! Simple grading: number input with percentage }}
+                    <div data-region="simple-grade">
+                        <div class="input-group">
+                            <input type="number"
+                                   data-action="grade-input"
+                                   class="form-control"
+                                   step="any"
+                                   min="0"
+                                   placeholder="{{#str}} grade, local_unifiedgrader {{/str}}"
+                                   aria-label="{{#str}} grade, local_unifiedgrader {{/str}}">
+                            <span class="input-group-text" data-region="max-grade">/ --</span>
+                            <span class="input-group-text text-muted" data-region="grade-percentage"></span>
+                        </div>
+                    </div>
 
-            {{! Simple grading: number input with percentage }}
-            <div data-region="simple-grade">
-                <div class="input-group">
-                    <input type="number"
-                           data-action="grade-input"
-                           class="form-control"
-                           step="any"
-                           min="0"
-                           placeholder="{{#str}} grade, local_unifiedgrader {{/str}}"
-                           aria-label="{{#str}} grade, local_unifiedgrader {{/str}}">
-                    <span class="input-group-text" data-region="max-grade">/ --</span>
-                    <span class="input-group-text text-muted" data-region="grade-percentage"></span>
+                    {{! Scale grading: dropdown selector (hidden by default) }}
+                    <div data-region="scale-grade" class="d-none">
+                        <select data-action="scale-input"
+                                class="form-select"
+                                aria-label="{{#str}} grade, local_unifiedgrader {{/str}}">
+                        </select>
+                    </div>
                 </div>
+
+                {{! Penalties button }}
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm mt-1"
+                        data-action="toggle-penalties"
+                        title="{{#str}} penalties, local_unifiedgrader {{/str}}">
+                    <i class="fa fa-minus-circle me-1" aria-hidden="true"></i>
+                    {{#str}} penalties, local_unifiedgrader {{/str}}
+                </button>
             </div>
 
-            {{! Scale grading: dropdown selector (hidden by default, shown by JS when activity uses a scale) }}
-            <div data-region="scale-grade" class="d-none">
-                <select data-action="scale-input"
-                        class="form-select"
-                        aria-label="{{#str}} grade, local_unifiedgrader {{/str}}">
-                </select>
-            </div>
+            {{! Penalty badges (rendered by JS) }}
+            <div data-region="penalty-badges" class="mt-2 d-flex flex-wrap gap-1"></div>
 
             {{! Advanced grading placeholder (rubric/marking guide) }}
             <div data-region="advanced-grading" class="d-none mb-3"></div>

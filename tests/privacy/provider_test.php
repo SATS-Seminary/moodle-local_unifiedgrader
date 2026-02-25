@@ -50,6 +50,7 @@ final class provider_test extends provider_testcase {
         $this->assertContains('local_unifiedgrader_prefs', $tables);
         $this->assertContains('local_unifiedgrader_clib', $tables);
         $this->assertContains('local_unifiedgrader_cltag', $tables);
+        $this->assertContains('local_unifiedgrader_penalty', $tables);
     }
 
     /**
@@ -348,5 +349,259 @@ final class provider_test extends provider_testcase {
         $this->assertEquals(0, $DB->count_records('local_unifiedgrader_notes', ['userid' => $student2->id]));
         // Student3 should be untouched.
         $this->assertEquals(1, $DB->count_records('local_unifiedgrader_notes', ['userid' => $student3->id]));
+    }
+
+    // -------------------------------------------------------------------------
+    // Penalty-specific privacy tests.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Helper: create a penalty record directly in the DB.
+     *
+     * @param int $cmid Course module ID.
+     * @param int $userid Student user ID.
+     * @param int $authorid Teacher user ID.
+     * @param string $category Penalty category.
+     * @param string $label Penalty label.
+     * @param int $percentage Penalty percentage.
+     * @return \stdClass The created record.
+     */
+    private function create_penalty(
+        int $cmid,
+        int $userid,
+        int $authorid,
+        string $category = 'wordcount',
+        string $label = '',
+        int $percentage = 10,
+    ): \stdClass {
+        global $DB;
+        $now = time();
+        $record = (object) [
+            'cmid' => $cmid,
+            'userid' => $userid,
+            'authorid' => $authorid,
+            'category' => $category,
+            'label' => $label,
+            'percentage' => $percentage,
+            'timecreated' => $now,
+            'timemodified' => $now,
+        ];
+        $record->id = $DB->insert_record('local_unifiedgrader_penalty', $record);
+        return $record;
+    }
+
+    /**
+     * Test get_contexts_for_userid returns contexts for penalty subjects.
+     */
+    public function test_get_contexts_for_userid_penalty_subject(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student->id, $teacher->id);
+
+        $contextlist = provider::get_contexts_for_userid($student->id);
+        $contextids = array_map('intval', $contextlist->get_contextids());
+        $this->assertContains($context->id, $contextids);
+    }
+
+    /**
+     * Test get_contexts_for_userid returns contexts for penalty authors.
+     */
+    public function test_get_contexts_for_userid_penalty_author(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student->id, $teacher->id);
+
+        $contextlist = provider::get_contexts_for_userid($teacher->id);
+        $contextids = array_map('intval', $contextlist->get_contextids());
+        $this->assertContains($context->id, $contextids);
+    }
+
+    /**
+     * Test get_users_in_context returns penalty subjects and authors.
+     */
+    public function test_get_users_in_context_penalties(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student->id, $teacher->id);
+
+        $userlist = new userlist($context, 'local_unifiedgrader');
+        provider::get_users_in_context($userlist);
+
+        $userids = $userlist->get_userids();
+        $this->assertContains((int) $student->id, $userids);
+        $this->assertContains((int) $teacher->id, $userids);
+    }
+
+    /**
+     * Test export_user_data exports penalties.
+     */
+    public function test_export_user_data_penalties(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student->id, $teacher->id, 'wordcount', '', 10);
+        $this->create_penalty($cm->id, $student->id, $teacher->id, 'other', 'Late', 5);
+
+        $contextlist = new approved_contextlist($student, 'local_unifiedgrader', [$context->id]);
+        provider::export_user_data($contextlist);
+
+        $data = writer::with_context($context)->get_data([
+            get_string('penalties', 'local_unifiedgrader'),
+        ]);
+        $this->assertNotEmpty($data);
+        $this->assertNotEmpty($data->penalties);
+        $this->assertCount(2, $data->penalties);
+    }
+
+    /**
+     * Test delete_data_for_all_users_in_context deletes penalties.
+     */
+    public function test_delete_data_for_all_users_in_context_penalties(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student1->id, $teacher->id);
+        $this->create_penalty($cm->id, $student2->id, $teacher->id);
+
+        $this->assertEquals(2, $DB->count_records('local_unifiedgrader_penalty', ['cmid' => $cm->id]));
+
+        provider::delete_data_for_all_users_in_context($context);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_penalty', ['cmid' => $cm->id]));
+    }
+
+    /**
+     * Test delete_data_for_user deletes penalties for the target user only.
+     */
+    public function test_delete_data_for_user_penalties(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student1->id, $teacher->id);
+        $this->create_penalty($cm->id, $student2->id, $teacher->id);
+
+        $contextlist = new approved_contextlist($student1, 'local_unifiedgrader', [$context->id]);
+        provider::delete_data_for_user($contextlist);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student1->id]));
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student2->id]));
+    }
+
+    /**
+     * Test delete_data_for_user deletes penalties authored by the user.
+     */
+    public function test_delete_data_for_user_penalties_authored(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher1 = $gen->create_user();
+        $teacher2 = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student->id, $teacher1->id);
+        $this->create_penalty($cm->id, $student->id, $teacher2->id, 'other', 'Late', 5);
+
+        $contextlist = new approved_contextlist($teacher1, 'local_unifiedgrader', [$context->id]);
+        provider::delete_data_for_user($contextlist);
+
+        // Teacher1's authored penalty should be gone.
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_penalty', ['authorid' => $teacher1->id]));
+        // Teacher2's penalty should remain.
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_penalty', ['authorid' => $teacher2->id]));
+    }
+
+    /**
+     * Test delete_data_for_users deletes penalties for multiple users.
+     */
+    public function test_delete_data_for_users_penalties(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+        $student3 = $gen->create_user();
+
+        $this->create_penalty($cm->id, $student1->id, $teacher->id);
+        $this->create_penalty($cm->id, $student2->id, $teacher->id);
+        $this->create_penalty($cm->id, $student3->id, $teacher->id);
+
+        $userlist = new approved_userlist(
+            $context,
+            'local_unifiedgrader',
+            [$student1->id, $student2->id],
+        );
+        provider::delete_data_for_users($userlist);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student1->id]));
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student2->id]));
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student3->id]));
     }
 }

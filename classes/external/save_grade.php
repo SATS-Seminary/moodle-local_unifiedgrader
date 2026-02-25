@@ -31,6 +31,7 @@ use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
 use local_unifiedgrader\adapter\adapter_factory;
+use local_unifiedgrader\penalty_manager;
 
 /**
  * Saves a grade and feedback for a student.
@@ -52,6 +53,9 @@ class save_grade extends external_api {
             'draftitemid' => new external_value(PARAM_INT, 'Draft area item ID for feedback files', VALUE_DEFAULT, 0),
             'feedbackfilesdraftid' => new external_value(
                 PARAM_INT, 'Draft area item ID for feedback files (assignfeedback_file)', VALUE_DEFAULT, 0,
+            ),
+            'attemptnumber' => new external_value(
+                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
             ),
         ]);
     }
@@ -76,6 +80,7 @@ class save_grade extends external_api {
         string $advancedgradingdata = '',
         int $draftitemid = 0,
         int $feedbackfilesdraftid = 0,
+        int $attemptnumber = -1,
     ): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
@@ -86,6 +91,7 @@ class save_grade extends external_api {
             'advancedgradingdata' => $advancedgradingdata,
             'draftitemid' => $draftitemid,
             'feedbackfilesdraftid' => $feedbackfilesdraftid,
+            'attemptnumber' => $attemptnumber,
         ]);
 
         $context = \context_module::instance($params['cmid']);
@@ -95,6 +101,23 @@ class save_grade extends external_api {
         $adapter = adapter_factory::create($params['cmid']);
 
         $gradevalue = $params['grade'] >= 0 ? $params['grade'] : null;
+
+        // Apply penalty deductions to numeric grades (not scale).
+        if ($gradevalue !== null) {
+            $activityinfo = $adapter->get_activity_info();
+            if (empty($activityinfo['usescale'])) {
+                $maxgrade = (float) ($activityinfo['maxgrade'] ?? 100);
+                $deduction = penalty_manager::get_total_deduction(
+                    $params['cmid'],
+                    $params['userid'],
+                    $maxgrade,
+                );
+                if ($deduction > 0) {
+                    $gradevalue = max(0, $gradevalue - $deduction);
+                }
+            }
+        }
+
         $advanceddata = [];
         if (!empty($params['advancedgradingdata'])) {
             $advanceddata = json_decode($params['advancedgradingdata'], true) ?: [];
@@ -108,6 +131,7 @@ class save_grade extends external_api {
             $advanceddata,
             $params['draftitemid'],
             $params['feedbackfilesdraftid'],
+            $params['attemptnumber'],
         );
 
         return ['success' => $success];

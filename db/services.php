@@ -217,4 +217,22 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_get_penalties' => [
+        'classname' => 'local_unifiedgrader\external\get_penalties',
+        'description' => 'Get grade penalties for a student in an activity.',
+        'type' => 'read',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_save_penalty' => [
+        'classname' => 'local_unifiedgrader\external\save_penalty',
+        'description' => 'Save a grade penalty for a student.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_delete_penalty' => [
+        'classname' => 'local_unifiedgrader\external\delete_penalty',
+        'description' => 'Delete a grade penalty.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
 ];

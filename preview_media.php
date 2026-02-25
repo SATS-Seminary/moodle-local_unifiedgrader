@@ -66,8 +66,6 @@ $filesrc = (new moodle_url('/local/unifiedgrader/preview_file.php', [
     'cmid' => $cmid,
 ]))->out(false);
 
-$tag = $isaudio ? 'audio' : 'video';
-
 // Output a standalone HTML page (no Moodle chrome needed).
 header('Content-Type: text/html; charset=utf-8');
 ?>
@@ -161,10 +159,16 @@ header('Content-Type: text/html; charset=utf-8');
         height: 100%;
         object-fit: contain;
     }
+
+    /* Hidden until JS decides which layout to use for video/* MIME types. */
+    .detect-layout { display: none; }
 </style>
 </head>
 <body>
 <?php if ($isaudio): ?>
+    <!--
+        Pure audio/* MIME type (mp3, m4a, aac, ogg, wav, etc.) — render audio player directly.
+    -->
     <div class="player-container">
         <div class="audio-wrapper">
             <div class="file-icon">
@@ -176,9 +180,51 @@ header('Content-Type: text/html; charset=utf-8');
         </div>
     </div>
 <?php else: ?>
-    <div class="video-wrapper">
-        <video controls preload="metadata" src="<?php echo s($filesrc); ?>"></video>
+    <!--
+        video/* MIME type — could be a real video OR an audio-only container
+        (e.g. .mp4 with audio track only). Use a <video> probe to detect
+        whether there is a video track; if not, switch to the audio layout.
+    -->
+    <div id="audio-layout" class="player-container detect-layout">
+        <div class="audio-wrapper">
+            <div class="file-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            </div>
+            <div class="file-name"><?php echo s($filename); ?></div>
+            <div class="file-meta"><?php echo s($filesize); ?></div>
+            <audio id="audio-el" controls preload="metadata" src="<?php echo s($filesrc); ?>"></audio>
+        </div>
     </div>
+    <div id="video-layout" class="video-wrapper detect-layout">
+        <video id="video-el" controls preload="metadata" src="<?php echo s($filesrc); ?>"></video>
+    </div>
+    <script>
+        // Probe the video element to detect audio-only containers.
+        // Files like .mp4 and .mpeg get a video/* MIME type even when they
+        // contain only an audio track. After metadata loads we check
+        // videoWidth — if 0, the file has no video track.
+        const probe = document.getElementById('video-el');
+        probe.addEventListener('loadedmetadata', function() {
+            if (probe.videoWidth === 0 && probe.videoHeight === 0) {
+                // Audio-only file in a video container — show audio layout.
+                document.getElementById('audio-layout').style.display = '';
+                document.getElementById('audio-layout').classList.remove('detect-layout');
+                // Pause the probe video so only the audio element plays.
+                probe.pause();
+                probe.removeAttribute('src');
+                probe.load();
+            } else {
+                // Real video — show video layout.
+                document.getElementById('video-layout').style.display = '';
+                document.getElementById('video-layout').classList.remove('detect-layout');
+            }
+        });
+        // Fallback: if metadata never loads (error), show video layout anyway.
+        probe.addEventListener('error', function() {
+            document.getElementById('video-layout').style.display = '';
+            document.getElementById('video-layout').classList.remove('detect-layout');
+        });
+    </script>
 <?php endif; ?>
 </body>
 </html>
