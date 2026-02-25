@@ -35,6 +35,7 @@ use local_unifiedgrader\pdf\combined_feedback_pdf;
 
 $cmid = required_param('cmid', PARAM_INT);
 $fileid = optional_param('fileid', 0, PARAM_INT);
+$attemptnum = optional_param('attempt', 0, PARAM_INT);
 
 // Load course module and course.
 [$course, $cm] = get_course_and_cm_from_cmid($cmid);
@@ -45,7 +46,7 @@ $context = context_module::instance($cm->id);
 require_capability('local/unifiedgrader:viewfeedback', $context);
 
 // Only supported activity types.
-$supported = ['assign', 'forum'];
+$supported = ['assign', 'forum', 'quiz'];
 if (!in_array($cm->modname, $supported)) {
     throw new moodle_exception('invalidactivitytype', 'local_unifiedgrader');
 }
@@ -91,8 +92,22 @@ if ($cm->modname === 'assign') {
         }
     }
 } else {
-    // Forum feedback is already rewritten by get_grade_data().
+    // Forum and quiz feedback is already rewritten by get_grade_data().
     $feedback = $gradedata['feedback'] ?? '';
+}
+
+// Plagiarism report links (available for all activity types).
+$plagiarismlinks = $adapter->get_plagiarism_links($userid);
+
+// For quizzes, get the rendered attempt content to include after the summary.
+$additionalcontent = '';
+if ($cm->modname === 'quiz') {
+    if ($attemptnum > 0) {
+        $submissiondata = $adapter->get_submission_data_for_attempt($userid, $attemptnum);
+    } else {
+        $submissiondata = $adapter->get_submission_data($userid);
+    }
+    $additionalcontent = $submissiondata['content'] ?? '';
 }
 
 // Build the summary data array.
@@ -114,6 +129,11 @@ $summarydata = [
     'guidecriteria' => $gradinginfo['guidecriteria'],
     'penalties' => $penaltyinfo['penalties'],
     'dategraded' => $dategraded,
+    'plagiarismlinks' => $plagiarismlinks,
+    'additionalcontent' => $additionalcontent,
+    'additionalcontenttitle' => $cm->modname === 'quiz'
+        ? get_string('quiz_your_attempt', 'local_unifiedgrader')
+        : '',
 ];
 
 // Generate the summary PDF.

@@ -102,10 +102,11 @@ class save_grade extends external_api {
 
         $gradevalue = $params['grade'] >= 0 ? $params['grade'] : null;
 
-        // Apply penalty deductions to numeric grades (not scale).
+        // Apply penalty deductions to numeric grades (not scale, not quiz).
+        // Quiz grades are computed by the question engine; penalties are not applicable.
         if ($gradevalue !== null) {
             $activityinfo = $adapter->get_activity_info();
-            if (empty($activityinfo['usescale'])) {
+            if (empty($activityinfo['usescale']) && ($activityinfo['type'] ?? '') !== 'quiz') {
                 $maxgrade = (float) ($activityinfo['maxgrade'] ?? 100);
                 $deduction = penalty_manager::get_total_deduction(
                     $params['cmid'],

@@ -84,6 +84,8 @@ export default class extends BaseComponent {
         this._rubricSelections = {};
         this._guideScores = {};
         this._guideRemarks = {};
+        this._guideBaseTotal = 0;
+        this._quizBaseGrade = undefined;
         this._lastFocusedField = null;
         this._clibPopout = null;
         this._autoSaveTimer = null;
@@ -339,6 +341,28 @@ export default class extends BaseComponent {
         this._renderAdvancedGrading(state);
 
         const usescale = state.activity?.usescale || false;
+        const isQuiz = state.activity?.type === 'quiz';
+
+        // Hide penalty UI for scale-based grading (non-sequitur) and quizzes
+        // (teachers can adjust individual question marks instead).
+        const hidePenalties = usescale || isQuiz;
+        const penaltyBtn = this.getElement(this.selectors.TOGGLE_PENALTIES);
+        const badgesEl = this.getElement(this.selectors.PENALTY_BADGES);
+        if (hidePenalties) {
+            if (penaltyBtn) {
+                penaltyBtn.classList.add('d-none');
+            }
+            if (badgesEl) {
+                badgesEl.classList.add('d-none');
+            }
+        } else {
+            if (penaltyBtn) {
+                penaltyBtn.classList.remove('d-none');
+            }
+            if (badgesEl) {
+                badgesEl.classList.remove('d-none');
+            }
+        }
 
         if (usescale) {
             // Scale: set the dropdown value.
@@ -362,6 +386,13 @@ export default class extends BaseComponent {
                     }
                 }
                 gradeInput.value = displayGrade !== null ? displayGrade : '';
+
+                // Store the full quiz grade as the base for quizmanual delta calculations.
+                // _updateGuideTotal uses this so manual question edits adjust the full
+                // quiz grade (auto + manual) rather than replacing it with just the manual total.
+                if (this._gradingDefinition?.method === 'quizmanual') {
+                    this._quizBaseGrade = displayGrade !== null ? parseFloat(displayGrade) : 0;
+                }
 
                 // When advanced grading is active and manual override is not allowed,
                 // make the grade input readonly so teachers must use the rubric/guide.
@@ -390,6 +421,9 @@ export default class extends BaseComponent {
         // Auto-expand the overall feedback section if feedback exists, collapse if not.
         const feedbackHtml = state.grade?.feedbackdraft || state.grade?.feedback || '';
         this._setFeedbackSectionExpanded(this._hasMeaningfulFeedback(feedbackHtml));
+
+        // Show late penalty badge extracted from external module feedback (e.g. quizaccess_duedate).
+        this._renderLatePenaltyBadge(state);
     }
 
     /**
@@ -752,6 +786,11 @@ export default class extends BaseComponent {
             return;
         }
 
+        // Penalties are not applicable for scale-based grading or quizzes.
+        if (this.reactive.state.activity?.usescale || this.reactive.state.activity?.type === 'quiz') {
+            return;
+        }
+
         const penalties = this._getPenaltiesArray();
         badgesEl.innerHTML = '';
 
@@ -762,6 +801,9 @@ export default class extends BaseComponent {
             badge.textContent = '-' + p.percentage + '% ' + displayLabel;
             badgesEl.appendChild(badge);
         });
+
+        // Re-append the late penalty badge (if any) since innerHTML cleared it.
+        this._renderLatePenaltyBadge(this.reactive.state);
 
         // Update the popout if it's open.
         if (this._penaltyPopout) {
@@ -783,6 +825,47 @@ export default class extends BaseComponent {
                 penaltyBtn.classList.add('btn-outline-secondary');
             }
         }
+    }
+
+    /**
+     * Show a read-only badge for late penalties applied by external modules.
+     *
+     * Parses the grade feedback text for the quizaccess_duedate penalty format
+     * ("Late penalty of X% applied.") and renders a badge in the penalty area.
+     *
+     * @param {object} state Current state.
+     */
+    _renderLatePenaltyBadge(state) {
+        const badgesEl = this.getElement(this.selectors.PENALTY_BADGES);
+        if (!badgesEl) {
+            return;
+        }
+
+        // Remove any existing late penalty badge before re-rendering.
+        badgesEl.querySelectorAll('[data-penalty="late"]').forEach((el) => el.remove());
+
+        // Not applicable for scale-based grading.
+        if (state.activity?.usescale) {
+            return;
+        }
+
+        const feedback = state.grade?.feedback || '';
+        if (!feedback) {
+            return;
+        }
+
+        // Match quizaccess_duedate format: "Late penalty of X% applied."
+        const match = feedback.match(/Late penalty of (\d+)% applied/i);
+        if (!match) {
+            return;
+        }
+
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-danger local-unifiedgrader-penalty-badge';
+        badge.dataset.penalty = 'late';
+        badge.textContent = '-' + match[1] + '% Late';
+        badge.title = match[0];
+        badgesEl.appendChild(badge);
     }
 
     /**
@@ -1137,6 +1220,20 @@ export default class extends BaseComponent {
         });
 
         this._updateGuideTotal();
+
+        // Store the initial manual-question total so _updateGuideTotal can
+        // compute deltas for quizmanual mode (where the guide only shows a
+        // subset of the quiz questions, not the full grade).
+        if (this._gradingDefinition?.method === 'quizmanual') {
+            let baseTotal = 0;
+            for (const val of Object.values(this._guideScores)) {
+                const num = parseFloat(val);
+                if (!isNaN(num)) {
+                    baseTotal += num;
+                }
+            }
+            this._guideBaseTotal = baseTotal;
+        }
     }
 
     /**
@@ -1164,7 +1261,16 @@ export default class extends BaseComponent {
         // Sync total into the simple grade input and update percentage.
         const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
         if (gradeInput) {
-            gradeInput.value = total;
+            if (this._gradingDefinition?.method === 'quizmanual' && this._quizBaseGrade !== undefined) {
+                // For quiz manual grading, the guide only shows manually-graded
+                // questions. Compute the delta from the initial manual total and
+                // apply it to the full quiz grade so auto-graded marks are preserved.
+                const delta = total - (this._guideBaseTotal ?? 0);
+                const newGrade = Math.max(0, Math.round((this._quizBaseGrade + delta) * 100) / 100);
+                gradeInput.value = newGrade;
+            } else {
+                gradeInput.value = total;
+            }
         }
         this._updatePercentage();
     }
@@ -1367,7 +1473,8 @@ export default class extends BaseComponent {
             }
         }
 
-        // Hide if single-attempt assignment or only one attempt exists.
+        // Hide if single-attempt activity or only one attempt exists.
+        // maxattempts: 0 = unlimited (quiz), -1 = unlimited (assign), 1 = single attempt.
         if (maxattempts === 1 || attemptList.length <= 1) {
             wrapper.classList.add('d-none');
             return;
@@ -1376,13 +1483,15 @@ export default class extends BaseComponent {
         wrapper.classList.remove('d-none');
 
         // Populate the dropdown options.
+        // Assignment attempts are 0-based (display as +1), quiz attempts are 1-based (display as-is).
+        const isZeroBased = state.activity?.type === 'assign';
         const currentAttempt = state.submission.attemptnumber;
         select.innerHTML = '';
 
         attemptList.forEach((attempt) => {
             const option = document.createElement('option');
             option.value = attempt.attemptnumber;
-            const num = attempt.attemptnumber + 1;
+            const num = isZeroBased ? attempt.attemptnumber + 1 : attempt.attemptnumber;
             const statusLabel = attempt.graded ? 'graded' : attempt.status;
             option.textContent = `Attempt ${num} (${statusLabel})`;
             option.selected = attempt.attemptnumber === currentAttempt;

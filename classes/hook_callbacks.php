@@ -71,13 +71,25 @@ class hook_callbacks {
         }
 
         $modname = $cm->modname;
-        $supported = ['assign', 'forum'];
+        $supported = ['assign', 'forum', 'quiz'];
         if (!in_array($modname, $supported)) {
             return;
         }
 
         if (!get_config('local_unifiedgrader', 'enable_' . $modname)) {
             return;
+        }
+
+        // For quizzes, only act on the overview page — not attempt/review/summary pages.
+        if ($modname === 'quiz') {
+            try {
+                $pagepath = $PAGE->url->get_path();
+            } catch (\Throwable $e) {
+                return;
+            }
+            if (strpos($pagepath, '/mod/quiz/view.php') === false) {
+                return;
+            }
         }
 
         $cangrade = has_capability('local/unifiedgrader:grade', $context);
@@ -124,9 +136,19 @@ class hook_callbacks {
             ]);
 
             // Also show the feedback banner for discovery.
-            $labelkey = $modname === 'assign' ? 'view_annotated_feedback' : 'view_forum_feedback';
+            $labelmapping = [
+                'assign' => 'view_annotated_feedback',
+                'forum' => 'view_forum_feedback',
+                'quiz' => 'view_quiz_feedback',
+            ];
+            $bannermapping = [
+                'assign' => 'view_annotated_feedback',
+                'forum' => 'forum_feedback_banner',
+                'quiz' => 'quiz_feedback_banner',
+            ];
+            $labelkey = $labelmapping[$modname] ?? 'view_feedback';
             $bannertext = get_string(
-                $modname === 'assign' ? 'view_annotated_feedback' : 'forum_feedback_banner',
+                $bannermapping[$modname] ?? 'view_feedback',
                 'local_unifiedgrader',
             );
             $PAGE->requires->js_call_amd('local_unifiedgrader/feedback_banner', 'init', [

@@ -252,6 +252,11 @@ $string['forum_posts_pill'] = 'Posts';
 $string['submission_content_pill'] = 'Submission';
 $string['forum_tab_posts'] = 'Posts';
 $string['forum_tab_files'] = 'Annotated Files';
+$string['view_quiz_feedback'] = 'View Quiz Feedback';
+$string['quiz_feedback_banner'] = 'Your teacher has provided feedback on your quiz.';
+$string['quiz_your_attempt'] = 'Your Attempt';
+$string['quiz_no_attempt'] = 'You have not completed any attempts for this quiz.';
+$string['quiz_select_attempt'] = 'Select attempt';
 
 // Post grades.
 $string['grades_posted'] = 'Grades posted';

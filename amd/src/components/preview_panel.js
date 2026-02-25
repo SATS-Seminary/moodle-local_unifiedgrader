@@ -316,8 +316,14 @@ export default class extends BaseComponent {
         const cmid = this.reactive.state.activity?.cmid;
         const userid = this.reactive.state.submission?.userid;
         if (cmid && userid) {
-            iframe.src = `${M.cfg.wwwroot}/local/unifiedgrader/preview_submission.php`
+            let url = `${M.cfg.wwwroot}/local/unifiedgrader/preview_submission.php`
                 + `?cmid=${cmid}&userid=${userid}`;
+            // Include attempt number for quiz multi-attempt support.
+            const attemptnumber = this.reactive.state.submission?.attemptnumber;
+            if (attemptnumber !== undefined && attemptnumber !== null && attemptnumber >= 0) {
+                url += `&attempt=${attemptnumber}`;
+            }
+            iframe.src = url;
             docPreview.classList.remove('d-none');
         }
     }

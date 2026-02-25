@@ -119,6 +119,7 @@ class quiz_adapter extends base_adapter {
             'hasduedateplugin' => $hasduedateplugin,
             'canmanageextensions' => $hasduedateplugin
                 && has_capability('quizaccess/duedate:manageoverrides', $this->context),
+            'maxattempts' => (int) ($this->quiz->attempts ?? 0),
         ];
     }
 
@@ -268,7 +269,28 @@ class quiz_adapter extends base_adapter {
     }
 
     /**
-     * Get quiz attempt rendered as HTML for preview.
+     * Get the list of finished quiz attempts for a user.
+     *
+     * @param int $userid The user ID.
+     * @return array List of arrays with keys: id, attemptnumber, status, timemodified, graded.
+     */
+    public function get_attempts(int $userid): array {
+        $attempts = quiz_get_user_attempts($this->quiz->id, $userid, 'finished');
+        $result = [];
+        foreach ($attempts as $attempt) {
+            $result[] = [
+                'id' => (int) $attempt->attempt,
+                'attemptnumber' => (int) $attempt->attempt,
+                'status' => 'finished',
+                'timemodified' => (int) ($attempt->timefinish ?: $attempt->timemodified),
+                'graded' => $attempt->sumgrades !== null,
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Get quiz attempt rendered as HTML for preview (latest attempt).
      *
      * @param int $userid
      * @return array
@@ -280,11 +302,39 @@ class quiz_adapter extends base_adapter {
             return $this->empty_submission($userid);
         }
 
-        // Load question usage.
+        return $this->build_submission_data($userid, $attempt);
+    }
+
+    /**
+     * Get submission data for a specific quiz attempt.
+     *
+     * @param int $userid The user ID.
+     * @param int $attemptnumber Attempt number (1-based for quiz), or -1 for latest.
+     * @return array
+     */
+    public function get_submission_data_for_attempt(int $userid, int $attemptnumber = -1): array {
+        if ($attemptnumber < 1) {
+            return $this->get_submission_data($userid);
+        }
+
+        $attempt = $this->get_attempt_by_number($userid, $attemptnumber);
+        if (!$attempt) {
+            return $this->empty_submission($userid);
+        }
+
+        return $this->build_submission_data($userid, $attempt);
+    }
+
+    /**
+     * Build submission data array from an attempt record.
+     *
+     * @param int $userid
+     * @param \stdClass $attempt The attempt record.
+     * @return array
+     */
+    private function build_submission_data(int $userid, \stdClass $attempt): array {
         $quba = question_engine::load_questions_usage_by_activity($attempt->uniqueid);
         $slots = $quba->get_slots();
-
-        // Render each question as HTML.
         $content = $this->render_attempt_as_html($quba, $slots, $attempt);
 
         return [
@@ -292,7 +342,7 @@ class quiz_adapter extends base_adapter {
             'status' => 'submitted',
             'content' => $content,
             'hascontent' => !empty($content),
-            'files' => $this->get_submission_files($userid),
+            'files' => $this->get_submission_files_for_attempt($attempt),
             'onlinetext' => '',
             'timecreated' => (int) $attempt->timestart,
             'timemodified' => (int) ($attempt->timefinish ?: $attempt->timemodified),
@@ -301,22 +351,53 @@ class quiz_adapter extends base_adapter {
     }
 
     /**
-     * Get current grade and per-question manual grading data.
+     * Get current grade and per-question manual grading data (latest attempt).
      *
      * @param int $userid
      * @return array
      */
     public function get_grade_data(int $userid): array {
+        $attempt = $this->get_latest_finished_attempt($userid);
+        return $this->build_grade_data($userid, $attempt);
+    }
+
+    /**
+     * Get grade data for a specific quiz attempt.
+     *
+     * Overall grade and feedback are per-user (same across all attempts).
+     * Per-question manual grading data comes from the specified attempt.
+     *
+     * @param int $userid The user ID.
+     * @param int $attemptnumber Attempt number (1-based for quiz), or -1 for latest.
+     * @return array
+     */
+    public function get_grade_data_for_attempt(int $userid, int $attemptnumber = -1): array {
+        if ($attemptnumber < 1) {
+            return $this->get_grade_data($userid);
+        }
+
+        $attempt = $this->get_attempt_by_number($userid, $attemptnumber);
+        return $this->build_grade_data($userid, $attempt);
+    }
+
+    /**
+     * Build grade data array from an attempt record.
+     *
+     * @param int $userid
+     * @param \stdClass|null $attempt The attempt record (for per-question grading data).
+     * @return array
+     */
+    private function build_grade_data(int $userid, ?\stdClass $attempt): array {
         global $DB;
 
-        // Get overall quiz grade.
+        // Get overall quiz grade (per-user, not per-attempt).
         $quizgrade = $DB->get_record('quiz_grades', [
             'quiz' => $this->quiz->id,
             'userid' => $userid,
         ]);
         $hasgrade = $quizgrade && $quizgrade->grade !== null;
 
-        // Get feedback from gradebook (quiz has no feedback table).
+        // Get feedback from gradebook (per-user, not per-attempt).
         $feedbacktext = '';
         $feedbackformat = (int) FORMAT_HTML;
         $gradeitem = \grade_item::fetch([
@@ -344,10 +425,9 @@ class quiz_adapter extends base_adapter {
             }
         }
 
-        // Build per-question manual grading data from the latest finished attempt.
+        // Build per-question manual grading data from the specified attempt.
         $gradingdefinition = '';
         $rubricdata = '';
-        $attempt = $this->get_latest_finished_attempt($userid);
 
         if ($attempt) {
             $quba = question_engine::load_questions_usage_by_activity($attempt->uniqueid);
@@ -398,7 +478,11 @@ class quiz_adapter extends base_adapter {
     ): bool {
         global $USER;
 
-        $attempt = $this->get_latest_finished_attempt($userid);
+        if ($attemptnumber >= 1) {
+            $attempt = $this->get_attempt_by_number($userid, $attemptnumber);
+        } else {
+            $attempt = $this->get_latest_finished_attempt($userid);
+        }
 
         if (!empty($advancedgradingdata['method']) && $advancedgradingdata['method'] === 'quizmanual'
                 && !empty($advancedgradingdata['questions']) && $attempt) {
@@ -544,7 +628,16 @@ class quiz_adapter extends base_adapter {
         if (!$attempt) {
             return [];
         }
+        return $this->get_submission_files_for_attempt($attempt);
+    }
 
+    /**
+     * Get essay question file attachments from a specific attempt.
+     *
+     * @param \stdClass $attempt The attempt record.
+     * @return array
+     */
+    private function get_submission_files_for_attempt(\stdClass $attempt): array {
         $quba = question_engine::load_questions_usage_by_activity($attempt->uniqueid);
         $slots = $quba->get_slots();
         $result = [];
@@ -597,14 +690,40 @@ class quiz_adapter extends base_adapter {
     }
 
     /**
-     * Quizzes do not support PDF annotations, so grades are never "released"
-     * in the annotation feedback sense.
+     * Check whether the quiz grade is released and visible to the student.
+     *
+     * A grade is considered released when:
+     * 1. A quiz_grades record exists with a non-null grade.
+     * 2. The quiz review options allow marks visibility based on the
+     *    current state (open vs closed). This is consistent with
+     *    set_grades_posted() which toggles the same bitmask bits.
      *
      * @param int $userid
-     * @return bool Always false.
+     * @return bool
      */
     public function is_grade_released(int $userid): bool {
-        return false;
+        global $DB;
+
+        $quizgrade = $DB->get_record('quiz_grades', [
+            'quiz' => $this->quiz->id,
+            'userid' => $userid,
+        ]);
+        if (!$quizgrade || $quizgrade->grade === null) {
+            return false;
+        }
+
+        // Review option bit constants from \mod_quiz\question\display_options.
+        $laterwhileopen = 0x00100;
+        $afterclose     = 0x00010;
+        $reviewmarks = (int) $this->quiz->reviewmarks;
+        $timeclose = (int) ($this->quiz->timeclose ?? 0);
+
+        if ($timeclose > 0 && time() >= $timeclose) {
+            // Quiz is closed — check AFTER_CLOSE bit.
+            return (bool) ($reviewmarks & $afterclose);
+        }
+        // Quiz is still open (or no close date) — check LATER_WHILE_OPEN bit.
+        return (bool) ($reviewmarks & $laterwhileopen);
     }
 
     /**
@@ -857,6 +976,23 @@ class quiz_adapter extends base_adapter {
     }
 
     /**
+     * Find a specific finished attempt by its 1-based attempt number.
+     *
+     * @param int $userid The user ID.
+     * @param int $attemptnumber The 1-based attempt number.
+     * @return \stdClass|null The attempt record or null.
+     */
+    private function get_attempt_by_number(int $userid, int $attemptnumber): ?\stdClass {
+        $attempts = quiz_get_user_attempts($this->quiz->id, $userid, 'finished');
+        foreach ($attempts as $attempt) {
+            if ((int) $attempt->attempt === $attemptnumber) {
+                return $attempt;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Resolve display status from attempt stats and grade data.
      *
      * @param \stdClass|null $stats Attempt stats (attemptcount, hasfinished, hasinprogress).
@@ -999,9 +1135,17 @@ class quiz_adapter extends base_adapter {
             $mark = isset($data['mark']) && $data['mark'] !== '' ? (float) $data['mark'] : null;
             $comment = $data['comment'] ?? '';
 
-            // Only grade if a mark is provided.
             if ($mark !== null) {
+                // Mark provided — save both mark and comment.
                 $quba->manual_grade($slot, $comment, $mark, FORMAT_HTML);
+            } else if (!empty($comment)) {
+                // Comment-only update — reuse the existing mark if available.
+                // When $existingmark is null (never graded), manual_grade() with
+                // null mark saves just the comment via the question engine's
+                // comment-only path (no grade change, state preserved).
+                $qa = $quba->get_question_attempt($slot);
+                $existingmark = $qa->get_mark();
+                $quba->manual_grade($slot, $comment, $existingmark, FORMAT_HTML);
             }
         }
 

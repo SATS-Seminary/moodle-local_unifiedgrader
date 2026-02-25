@@ -42,7 +42,7 @@ $context = context_module::instance($cm->id);
 require_capability('local/unifiedgrader:viewfeedback', $context);
 
 // Only supported activity types.
-$supported = ['assign', 'forum'];
+$supported = ['assign', 'forum', 'quiz'];
 if (!in_array($cm->modname, $supported)) {
     throw new moodle_exception('invalidactivitytype', 'local_unifiedgrader');
 }
@@ -198,6 +198,107 @@ if ($cm->modname === 'forum') {
 
     echo $OUTPUT->header();
     echo $OUTPUT->render_from_template('local_unifiedgrader/feedback_view_forum', $templatedata);
+    echo $OUTPUT->footer();
+    exit;
+}
+
+// ──────────────────────────────────────────────
+//  Quiz feedback view.
+// ──────────────────────────────────────────────
+if ($cm->modname === 'quiz') {
+    $attemptnum = optional_param('attempt', 0, PARAM_INT);
+    $activityinfo = $adapter->get_activity_info();
+
+    // Load all finished attempts for the attempt selector.
+    $attempts = $adapter->get_attempts($userid);
+    $hasmultipleattempts = count($attempts) > 1;
+
+    // Determine which attempt to show (default to latest).
+    $selectedattempt = 0;
+    if ($attemptnum > 0) {
+        $selectedattempt = $attemptnum;
+    } else if (!empty($attempts)) {
+        $selectedattempt = end($attempts)['attemptnumber'];
+    }
+
+    // Load data for the selected attempt.
+    if ($selectedattempt > 0) {
+        $gradedata = $adapter->get_grade_data_for_attempt($userid, $selectedattempt);
+        $submissiondata = $adapter->get_submission_data_for_attempt($userid, $selectedattempt);
+    } else {
+        $gradedata = $adapter->get_grade_data($userid);
+        $submissiondata = $adapter->get_submission_data($userid);
+    }
+
+    // Set up the page.
+    $PAGE->set_url(new moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cmid]));
+    $PAGE->set_context($context);
+    $PAGE->set_title(
+        get_string('view_feedback', 'local_unifiedgrader') . ': ' .
+        format_string($cm->name),
+    );
+    $PAGE->set_heading($course->fullname);
+    $PAGE->set_pagelayout('standard');
+    $PAGE->activityheader->disable();
+    $PAGE->add_body_class('local-unifiedgrader-feedback-page');
+
+    // Parse grade and penalties via shared helper.
+    $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
+    $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
+    $gradedisplay = $gradeinfo['gradedisplay'];
+
+    // Feedback text (from gradebook for quizzes). Already formatted by get_grade_data()
+    // with pluginfile.php URLs rewritten and format_text() applied.
+    $feedback = $gradedata['feedback'] ?? '';
+
+    $showrightcolumn = !empty($feedback);
+
+    // Build feedback PDF download URL (includes attempt number).
+    $downloadparams = ['cmid' => $cmid];
+    if ($selectedattempt > 0) {
+        $downloadparams['attempt'] = $selectedattempt;
+    }
+    $feedbackdownloadurl = (new moodle_url('/local/unifiedgrader/download_feedback.php',
+        $downloadparams))->out(false);
+
+    // Build attempt selector data for the template.
+    $attemptlist = [];
+    foreach ($attempts as $att) {
+        $attemptlist[] = [
+            'attemptnumber' => $att['attemptnumber'],
+            'label' => get_string('attempt', 'quiz', $att['attemptnumber']),
+            'date' => userdate($att['timemodified'], get_string('strftimedatetimeshort')),
+            'selected' => ($att['attemptnumber'] === $selectedattempt),
+            'url' => (new moodle_url('/local/unifiedgrader/view_feedback.php', [
+                'cmid' => $cmid,
+                'attempt' => $att['attemptnumber'],
+            ]))->out(false),
+        ];
+    }
+
+    // Prepare template context.
+    $templatedata = [
+        'cmid' => $cmid,
+        'activityname' => $activityinfo['name'],
+        'activityurl' => (new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]))->out(false),
+        'gradedisplay' => $gradedisplay,
+        'feedback' => $feedback,
+        'hasfeedback' => !empty($feedback),
+        'attemptcontent' => $submissiondata['content'] ?? '',
+        'hasattempt' => !empty($submissiondata['content']),
+        'feedbackdownloadurl' => $feedbackdownloadurl,
+        'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
+        'userid' => $userid,
+        'showrightcolumn' => $showrightcolumn,
+        'haspenalties' => $penaltyinfo['haspenalties'],
+        'penalties' => $penaltyinfo['penalties'],
+        'hasmultipleattempts' => $hasmultipleattempts,
+        'attempts' => $attemptlist,
+        'selectedattempt' => $selectedattempt,
+    ];
+
+    echo $OUTPUT->header();
+    echo $OUTPUT->render_from_template('local_unifiedgrader/feedback_view_quiz', $templatedata);
     echo $OUTPUT->footer();
     exit;
 }

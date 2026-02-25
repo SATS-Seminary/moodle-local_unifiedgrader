@@ -41,6 +41,7 @@ use mod_quiz\quiz_attempt;
 
 $cmid = required_param('cmid', PARAM_INT);
 $userid = required_param('userid', PARAM_INT);
+$attemptnum = optional_param('attempt', 0, PARAM_INT);
 
 // Load course module and validate access.
 [$course, $cm] = get_course_and_cm_from_cmid($cmid);
@@ -93,7 +94,20 @@ if ($cm->modname === 'assign') {
     // types (including audio responses, file uploads, drag-and-drop) render correctly.
     $quiz = $DB->get_record('quiz', ['id' => $cm->instance], '*', MUST_EXIST);
     $attempts = quiz_get_user_attempts($quiz->id, $userid, 'finished');
-    $attempt = $attempts ? end($attempts) : null;
+
+    // Use specific attempt if requested, otherwise latest.
+    $attempt = null;
+    if ($attemptnum > 0) {
+        foreach ($attempts as $a) {
+            if ((int) $a->attempt === $attemptnum) {
+                $attempt = $a;
+                break;
+            }
+        }
+    }
+    if (!$attempt) {
+        $attempt = $attempts ? end($attempts) : null;
+    }
 
     if ($attempt) {
         $attemptobj = quiz_attempt::create($attempt->id);

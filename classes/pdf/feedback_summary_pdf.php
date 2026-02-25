@@ -79,6 +79,11 @@ class feedback_summary_pdf extends \pdf {
      *   - guidecriteria (array)
      *   - penalties (array) Each with 'text' key
      *   - dategraded (string)
+     *   - plagiarismlinks (array) Optional. Each with 'label' and 'html' keys.
+     *   - additionalcontent (string) Optional. HTML content for additional pages
+     *     (e.g. rendered quiz attempt). Bootstrap classes are converted to
+     *     inline styles for TCPDF compatibility.
+     *   - additionalcontenttitle (string) Optional. Heading for additional pages.
      * @return string PDF content as binary string
      */
     public function generate(array $data): string {
@@ -94,9 +99,15 @@ class feedback_summary_pdf extends \pdf {
         $this->render_header_band($data);
         $this->render_grade_display($data);
         $this->render_penalties($data);
+        $this->render_plagiarism_section($data);
         $this->render_feedback_section($data);
         $this->render_grading_section($data);
         $this->render_footer($data);
+
+        // Additional content pages (e.g. quiz attempt).
+        if (!empty($data['additionalcontent'])) {
+            $this->render_additional_content($data);
+        }
 
         return $this->Output('', 'S');
     }
@@ -459,6 +470,178 @@ class feedback_summary_pdf extends \pdf {
         );
 
         $this->SetY($this->GetY() + 4);
+    }
+
+    /**
+     * Render plagiarism report links on the summary page.
+     *
+     * @param array $data
+     */
+    private function render_plagiarism_section(array $data): void {
+        if (empty($data['plagiarismlinks'])) {
+            return;
+        }
+
+        $pagewidth = $this->getPageWidth();
+        $contentwidth = $pagewidth - (self::MARGIN_H * 2);
+
+        $this->render_section_heading(
+            get_string('plagiarism', 'local_unifiedgrader')
+        );
+
+        $html = '<table cellpadding="3" cellspacing="0" style="font-size: 8pt;">';
+        foreach ($data['plagiarismlinks'] as $link) {
+            $label = htmlspecialchars($link['label'] ?? '');
+            // Strip HTML tags from plagiarism output but keep the text content.
+            // The HTML often contains <a> tags with report links that won't work in PDF.
+            $text = trim(strip_tags($link['html'] ?? ''));
+            if (empty($text)) {
+                $text = get_string('plagiarism_pending', 'local_unifiedgrader');
+            }
+
+            $html .= '<tr>'
+                . '<td style="font-weight: bold; width: 35%; vertical-align: top; '
+                . 'border-bottom: 1px solid #DEE2E6;">'
+                . $label . '</td>'
+                . '<td style="width: 65%; vertical-align: top; '
+                . 'border-bottom: 1px solid #DEE2E6;">'
+                . htmlspecialchars($text) . '</td>'
+                . '</tr>';
+        }
+        $html .= '</table>';
+
+        $this->writeHTMLCell(
+            $contentwidth - 6, 0,
+            self::MARGIN_H + 6, $this->GetY(),
+            $html, 0, 1, false, true, 'L'
+        );
+
+        $this->SetY($this->GetY() + 4);
+    }
+
+    /**
+     * Render additional content (e.g. quiz attempt) on new pages after the summary.
+     *
+     * Converts Bootstrap-class HTML from the adapter's render methods into
+     * TCPDF-compatible inline-styled HTML, then renders with auto page breaks.
+     *
+     * @param array $data
+     */
+    private function render_additional_content(array $data): void {
+        // Re-enable auto page break for multi-page content.
+        $this->SetAutoPageBreak(true, 15);
+        $this->AddPage('P', 'A4');
+
+        $pagewidth = $this->getPageWidth();
+        $contentwidth = $pagewidth - (self::MARGIN_H * 2);
+
+        // Section heading.
+        $title = $data['additionalcontenttitle']
+            ?? get_string('quiz_your_attempt', 'local_unifiedgrader');
+        $this->render_section_heading($title);
+
+        // Convert Bootstrap HTML to TCPDF-compatible inline styles.
+        $html = $this->convert_bootstrap_to_pdf_html($data['additionalcontent']);
+
+        // Sanitise (strip media, event handlers).
+        $html = $this->sanitise_feedback_html($html);
+
+        // Wrap in styled container.
+        $html = '<div style="font-size: 8pt; color: #212529; line-height: 1.4;">'
+            . $html . '</div>';
+
+        $this->writeHTMLCell(
+            $contentwidth, 0,
+            self::MARGIN_H, $this->GetY(),
+            $html, 0, 1, false, true, 'L'
+        );
+    }
+
+    /**
+     * Convert Bootstrap-class HTML to TCPDF-compatible inline-styled HTML.
+     *
+     * The quiz adapter's render_attempt_as_html() uses Bootstrap classes
+     * (card, badge, etc.) that TCPDF cannot interpret. This method replaces
+     * those class-based patterns with inline CSS that TCPDF supports.
+     *
+     * @param string $html
+     * @return string
+     */
+    private function convert_bootstrap_to_pdf_html(string $html): string {
+        // Strip all class attributes — we'll rely on structural replacements.
+        // First, do targeted replacements for known patterns.
+
+        // Card containers → bordered divs.
+        $html = preg_replace(
+            '/<div\s+class="card[^"]*"/',
+            '<div style="border: 1px solid #DEE2E6; margin-bottom: 4mm;"',
+            $html,
+        );
+
+        // Card headers → shaded header divs.
+        $html = preg_replace(
+            '/<div\s+class="card-header[^"]*"/',
+            '<div style="background-color: #F8F9FA; padding: 2mm 3mm; font-weight: bold; '
+            . 'border-bottom: 1px solid #DEE2E6;"',
+            $html,
+        );
+
+        // Card bodies → padded content.
+        $html = preg_replace(
+            '/<div\s+class="card-body[^"]*"/',
+            '<div style="padding: 2mm 3mm;"',
+            $html,
+        );
+
+        // Badges → inline styled spans.
+        $badgemap = [
+            'bg-secondary' => 'background-color: #6C757D; color: #FFFFFF;',
+            'bg-success'   => 'background-color: #198754; color: #FFFFFF;',
+            'bg-warning'   => 'background-color: #FFC107; color: #000000;',
+            'bg-danger'    => 'background-color: #DC3545; color: #FFFFFF;',
+            'bg-info'      => 'background-color: #0DCAF0; color: #000000;',
+            'bg-primary'   => 'background-color: #0D6EFD; color: #FFFFFF;',
+        ];
+        foreach ($badgemap as $class => $style) {
+            $html = preg_replace(
+                '/<span\s+class="badge\s+' . preg_quote($class, '/') . '[^"]*"/',
+                '<span style="' . $style . ' font-size: 7pt; padding: 1px 3px;"',
+                $html,
+            );
+        }
+
+        // Catch any remaining badge spans.
+        $html = preg_replace(
+            '/<span\s+class="badge[^"]*"/',
+            '<span style="background-color: #6C757D; color: #FFFFFF; font-size: 7pt; padding: 1px 3px;"',
+            $html,
+        );
+
+        // Bold text (fw-bold).
+        $html = preg_replace(
+            '/<(span|div)\s+class="[^"]*fw-bold[^"]*"/',
+            '<$1 style="font-weight: bold;"',
+            $html,
+        );
+
+        // Muted text (text-muted).
+        $html = preg_replace(
+            '/<(span|div)\s+class="[^"]*text-muted[^"]*"/',
+            '<$1 style="color: #6C757D;"',
+            $html,
+        );
+
+        // Border-top dividers.
+        $html = preg_replace(
+            '/<div\s+class="[^"]*border-top[^"]*"/',
+            '<div style="border-top: 1px solid #DEE2E6; padding-top: 2mm; margin-top: 2mm;"',
+            $html,
+        );
+
+        // Strong tags are fine for TCPDF. Clean up remaining class attrs.
+        $html = preg_replace('/\s+class="[^"]*"/', '', $html);
+
+        return $html;
     }
 
     /**
