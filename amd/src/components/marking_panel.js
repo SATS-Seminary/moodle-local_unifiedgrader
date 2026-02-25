@@ -71,6 +71,10 @@ export default class extends BaseComponent {
             FEEDBACK_COLLAPSE: '[data-region="feedback-collapse"]',
             TOGGLE_PENALTIES: '[data-action="toggle-penalties"]',
             PENALTY_BADGES: '[data-region="penalty-badges"]',
+            FINAL_GRADE_DISPLAY: '[data-region="final-grade-display"]',
+            FINAL_GRADE_VALUE: '[data-region="final-grade-value"]',
+            FINAL_GRADE_MAX: '[data-region="final-grade-max"]',
+            FINAL_GRADE_PERCENTAGE: '[data-region="final-grade-percentage"]',
             ATTEMPT_SELECTOR: '[data-region="attempt-selector"]',
             ATTEMPT_SELECT: '[data-action="attempt-select"]',
         };
@@ -116,10 +120,13 @@ export default class extends BaseComponent {
         this._setupEventListeners();
         this._updateMaxGrade(state);
 
-        // Listen for grade input changes to update percentage in real time.
+        // Listen for grade input changes to update percentage and final grade in real time.
         const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
         if (gradeInput) {
-            gradeInput.addEventListener('input', () => this._updatePercentage());
+            gradeInput.addEventListener('input', () => {
+                this._updatePercentage();
+                this._updateFinalGradeDisplay();
+            });
         }
 
         if (state.grade) {
@@ -364,8 +371,9 @@ export default class extends BaseComponent {
             }
         }
 
-        // Update the percentage display (not applicable for scales).
+        // Update the percentage display and final grade after penalties.
         this._updatePercentage();
+        this._updateFinalGradeDisplay();
 
         // Use draft-ready content (with rewritten file URLs) when available.
         if (state.grade && state.grade.feedbackdraft !== undefined) {
@@ -639,11 +647,57 @@ export default class extends BaseComponent {
             return;
         }
 
-        // Apply penalty deduction for percentage display.
-        const totalDeduction = this._getTotalPenaltyDeduction(this.reactive.state);
-        const effectiveGrade = Math.max(0, rawGrade - totalDeduction);
-        const pct = Math.round((effectiveGrade / maxgrade) * 100);
+        // Show the raw grade percentage (before penalties).
+        const pct = Math.round((rawGrade / maxgrade) * 100);
         percentEl.textContent = '(' + pct + '%)';
+    }
+
+    /**
+     * Update the "Final grade after penalties" display below the penalty badges.
+     * Visible only when penalties exist and a grade has been entered.
+     */
+    _updateFinalGradeDisplay() {
+        const displayEl = this.getElement(this.selectors.FINAL_GRADE_DISPLAY);
+        if (!displayEl) {
+            return;
+        }
+
+        // Not applicable for scale-based grading.
+        if (this.reactive.state.activity?.usescale) {
+            displayEl.classList.add('d-none');
+            return;
+        }
+
+        const penalties = this._getPenaltiesArray();
+        const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
+        const rawGrade = gradeInput ? parseFloat(gradeInput.value) : NaN;
+        const maxgrade = parseFloat(gradeInput?.max) || 100;
+
+        // Hide if no penalties or no grade entered.
+        if (!penalties.length || isNaN(rawGrade) || rawGrade < 0) {
+            displayEl.classList.add('d-none');
+            return;
+        }
+
+        const totalDeduction = this._getTotalPenaltyDeduction(this.reactive.state);
+        const finalGrade = Math.max(0, Math.round((rawGrade - totalDeduction) * 100) / 100);
+        const finalPct = Math.round((finalGrade / maxgrade) * 100);
+
+        const valueEl = this.getElement(this.selectors.FINAL_GRADE_VALUE);
+        const maxEl = this.getElement(this.selectors.FINAL_GRADE_MAX);
+        const pctEl = this.getElement(this.selectors.FINAL_GRADE_PERCENTAGE);
+
+        if (valueEl) {
+            valueEl.textContent = finalGrade;
+        }
+        if (maxEl) {
+            maxEl.textContent = maxgrade;
+        }
+        if (pctEl) {
+            pctEl.textContent = '(' + finalPct + '%)';
+        }
+
+        displayEl.classList.remove('d-none');
     }
 
     /**
@@ -714,8 +768,9 @@ export default class extends BaseComponent {
             this._penaltyPopout.updatePenalties(penalties);
         }
 
-        // Recalculate percentage display with updated penalties.
+        // Recalculate percentage and final grade displays with updated penalties.
         this._updatePercentage();
+        this._updateFinalGradeDisplay();
 
         // Update the penalties button to indicate active penalties.
         const penaltyBtn = this.getElement(this.selectors.TOGGLE_PENALTIES);

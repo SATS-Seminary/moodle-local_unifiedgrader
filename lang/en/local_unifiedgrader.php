@@ -366,6 +366,7 @@ $string['penalty_custom'] = 'Custom';
 $string['penalty_label_placeholder'] = 'Label (max 15 chars)';
 $string['penalty_active'] = 'Active penalties';
 $string['penalty_badge'] = '-{$a->percentage}% {$a->label}';
+$string['finalgradeafterpenalties'] = 'Final grade after penalties:';
 
 // Feedback summary PDF.
 $string['download_feedback_pdf'] = 'Download feedback PDF';

@@ -60,6 +60,11 @@ export default class {
                     methodname: 'local_unifiedgrader_get_notes',
                     args: {cmid, userid},
                 }])[0],
+                // Load penalties in the same batch to avoid a second await while state is writable.
+                Ajax.call([{
+                    methodname: 'local_unifiedgrader_get_penalties',
+                    args: {cmid, userid},
+                }])[0].catch(() => []),
             ];
 
             // Prepare the feedback draft area in parallel if a draftitemid exists.
@@ -79,8 +84,8 @@ export default class {
             }
 
             const results = await Promise.all(calls);
-            const [submissionData, gradeData, notes] = results;
-            const feedbackDraft = (draftitemid ? results[3] : null) || {feedbackhtml: ''};
+            const [submissionData, gradeData, notes, penalties] = results;
+            const feedbackDraft = (draftitemid ? results[4] : null) || {feedbackhtml: ''};
 
             stateManager.setReadOnly(false);
             // Use Object.assign to update properties on the existing proxy.
@@ -92,17 +97,7 @@ export default class {
             // Notes is a StateMap (array with id fields) — must replace entirely.
             // Watcher uses state.notes:updated to catch this.
             stateManager.state.notes = notes;
-
-            // Load penalties in parallel (non-blocking if it fails).
-            try {
-                const penalties = await Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_penalties',
-                    args: {cmid, userid},
-                }])[0];
-                stateManager.state.penalties = penalties;
-            } catch (_) {
-                stateManager.state.penalties = [];
-            }
+            stateManager.state.penalties = penalties;
 
             // Update submission comment count and reset loaded flag.
             stateManager.state.submissionComments.count = submissionData.commentcount || 0;

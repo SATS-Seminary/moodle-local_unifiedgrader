@@ -120,12 +120,14 @@ $summarydata = [
 $summarypdf = new feedback_summary_pdf();
 $summarybytes = $summarypdf->generate($summarydata);
 
-// Check for an annotated PDF in file storage.
-$finalpdf = $summarybytes;
-$hasannotatedpdf = false;
+// Find the submission PDF to append after the summary.
+// Priority: annotated PDF > original submission file (or its PDF conversion).
+$submissionpdfbytes = null;
 
 if ($fileid > 0) {
     $fs = get_file_storage();
+
+    // 1. Check for a flattened annotated PDF.
     $annotatedfile = $fs->get_file(
         $context->id,
         'local_unifiedgrader',
@@ -136,18 +138,51 @@ if ($fileid > 0) {
     );
 
     if ($annotatedfile && !$annotatedfile->is_directory()) {
-        $hasannotatedpdf = true;
-        $annotatedbytes = $annotatedfile->get_content();
-
-        // Combine summary + annotated PDF.
-        try {
-            $combiner = new combined_feedback_pdf();
-            $finalpdf = $combiner->combine($summarybytes, $annotatedbytes);
-        } catch (\Exception $e) {
-            // If FPDI fails to parse the annotated PDF, fall back to summary only.
-            debugging('Failed to combine PDFs: ' . $e->getMessage(), DEBUG_DEVELOPER);
-            $finalpdf = $summarybytes;
+        $submissionpdfbytes = $annotatedfile->get_content();
+    } else {
+        // 2. Fall back to the original submission file.
+        $originalfile = $fs->get_file_by_id($fileid);
+        if ($originalfile && !$originalfile->is_directory()) {
+            if ($originalfile->get_mimetype() === 'application/pdf') {
+                $submissionpdfbytes = $originalfile->get_content();
+            } else {
+                // 3. Try the converted-to-PDF version (for Word docs, etc.).
+                $converter = new \core_files\converter();
+                $conversion = $converter->start_conversion($originalfile, 'pdf');
+                // Poll briefly for conversion to complete.
+                $maxpolls = 5;
+                $pollcount = 0;
+                $status = $conversion->get('status');
+                while (
+                    $status !== \core_files\conversion::STATUS_COMPLETE
+                    && $status !== \core_files\conversion::STATUS_FAILED
+                    && $pollcount < $maxpolls
+                ) {
+                    sleep(1);
+                    $converter->poll_conversion($conversion);
+                    $status = $conversion->get('status');
+                    $pollcount++;
+                }
+                if ($status === \core_files\conversion::STATUS_COMPLETE) {
+                    $convertedfile = $conversion->get_destfile();
+                    if ($convertedfile) {
+                        $submissionpdfbytes = $convertedfile->get_content();
+                    }
+                }
+            }
         }
+    }
+}
+
+// Combine summary + submission PDF if we have one.
+$finalpdf = $summarybytes;
+if ($submissionpdfbytes) {
+    try {
+        $combiner = new combined_feedback_pdf();
+        $finalpdf = $combiner->combine($summarybytes, $submissionpdfbytes);
+    } catch (\Exception $e) {
+        debugging('Failed to combine PDFs: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        $finalpdf = $summarybytes;
     }
 }
 

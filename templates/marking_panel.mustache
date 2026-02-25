@@ -87,6 +87,15 @@
             {{! Penalty badges (rendered by JS) }}
             <div data-region="penalty-badges" class="mt-2 d-flex flex-wrap gap-1"></div>
 
+            {{! Final grade after penalties (hidden when no penalties active) }}
+            <div data-region="final-grade-display" class="d-none mt-2">
+                <small class="fw-bold text-danger">
+                    {{#str}} finalgradeafterpenalties, local_unifiedgrader {{/str}}
+                    <span data-region="final-grade-value"></span> / <span data-region="final-grade-max"></span>
+                    <span data-region="final-grade-percentage" class="text-muted"></span>
+                </small>
+            </div>
+
             {{! Advanced grading placeholder (rubric/marking guide) }}
             <div data-region="advanced-grading" class="d-none mb-3"></div>
 
