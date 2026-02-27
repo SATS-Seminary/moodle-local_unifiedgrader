@@ -85,8 +85,8 @@ export default class extends BaseComponent {
         this._setupProfilePopout();
         this._initGroupSelector(state);
 
-        // Prefetch action strings for assign and quiz activities.
-        if (state.activity.type === 'assign' || state.activity.type === 'quiz') {
+        // Prefetch action strings for assign, quiz, and forum activities.
+        if (state.activity.type === 'assign' || state.activity.type === 'quiz' || state.activity.type === 'forum') {
             await this._prefetchStrings();
         }
 
@@ -671,7 +671,7 @@ export default class extends BaseComponent {
     _buildStatusDropdown(wrapper, student) {
         const state = this.reactive.state;
         const actType = state.activity.type;
-        const hasDropdown = actType === 'assign' || actType === 'quiz';
+        const hasDropdown = actType === 'assign' || actType === 'quiz' || actType === 'forum';
         const statusInfo = this._getStatusInfo(student.status);
 
         // For unsupported activities or if strings aren't loaded, show plain badge.
@@ -810,8 +810,8 @@ export default class extends BaseComponent {
             }
         }
 
-        // For quiz: extension actions (if duedate plugin) + override actions.
-        if (actType === 'quiz') {
+        // For quiz and forum: extension actions + override actions.
+        if (actType === 'quiz' || actType === 'forum') {
             const extensionActions = [];
             if (state.activity.canmanageextensions) {
                 if (hasExtension) {
@@ -928,9 +928,13 @@ export default class extends BaseComponent {
             return;
         }
 
-        // Delete duedate extension uses its own mutation.
+        // Delete extension uses activity-specific mutations.
         if (action.id === 'delete_extension') {
-            this.reactive.dispatch('deleteDuedateExtension', state.activity.cmid, student.id);
+            if (state.activity.type === 'forum') {
+                this.reactive.dispatch('deleteForumExtension', state.activity.cmid, student.id);
+            } else {
+                this.reactive.dispatch('deleteDuedateExtension', state.activity.cmid, student.id);
+            }
             return;
         }
 

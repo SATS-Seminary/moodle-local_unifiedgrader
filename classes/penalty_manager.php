@@ -186,6 +186,66 @@ class penalty_manager {
     }
 
     /**
+     * Synchronise the auto-calculated late penalty for a student.
+     *
+     * Creates, updates, or deletes the 'late' penalty record to match the
+     * current penalty rules. Called before returning penalties or saving grades
+     * for forum activities.
+     *
+     * @param int $cmid Course module ID.
+     * @param int $userid Student user ID.
+     * @param int|null $percentage Penalty percentage (null or 0 to remove).
+     * @param int $dayslate Number of whole days late (for the label).
+     */
+    public static function sync_late_penalty(int $cmid, int $userid, ?int $percentage, int $dayslate = 0): void {
+        global $DB, $USER;
+
+        $existing = $DB->get_record(self::TABLE, [
+            'cmid' => $cmid,
+            'userid' => $userid,
+            'category' => 'late',
+        ]);
+
+        // Remove if no penalty applies.
+        if (empty($percentage)) {
+            if ($existing) {
+                $DB->delete_records(self::TABLE, ['id' => $existing->id]);
+            }
+            return;
+        }
+
+        $label = $dayslate > 0
+            ? get_string('penalty_late_days', 'local_unifiedgrader', $dayslate)
+            : get_string('penalty_late', 'local_unifiedgrader');
+        $label = \core_text::substr($label, 0, 15);
+        $now = time();
+
+        if ($existing) {
+            // Only update if something changed.
+            if ((int) $existing->percentage !== $percentage || $existing->label !== $label) {
+                $existing->percentage = $percentage;
+                $existing->label = $label;
+                $existing->timemodified = $now;
+                $DB->update_record(self::TABLE, $existing);
+            }
+            return;
+        }
+
+        // Create new late penalty record.
+        $record = (object) [
+            'cmid' => $cmid,
+            'userid' => $userid,
+            'authorid' => isset($USER->id) ? (int) $USER->id : 0,
+            'category' => 'late',
+            'label' => $label,
+            'percentage' => $percentage,
+            'timecreated' => $now,
+            'timemodified' => $now,
+        ];
+        $DB->insert_record(self::TABLE, $record);
+    }
+
+    /**
      * Get the sum of penalty percentages for a student.
      *
      * @param int $cmid Course module ID.

@@ -15,7 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * External function: delete penalty.
+ * External function: delete a forum due date extension.
+ *
+ * Removes the user's forum extension from the local_unifiedgrader_fext table.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary
@@ -30,12 +32,11 @@ use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use local_unifiedgrader\penalty_manager;
 
 /**
- * Deletes a grade penalty.
+ * Deletes a forum due date extension for a user.
  */
-class delete_penalty extends external_api {
+class delete_forum_extension extends external_api {
 
     /**
      * Parameter definition.
@@ -43,8 +44,8 @@ class delete_penalty extends external_api {
      */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'cmid' => new external_value(PARAM_INT, 'Course module ID (for capability check)'),
-            'penaltyid' => new external_value(PARAM_INT, 'Penalty ID to delete'),
+            'cmid' => new external_value(PARAM_INT, 'Course module ID'),
+            'userid' => new external_value(PARAM_INT, 'Student user ID'),
         ]);
     }
 
@@ -52,27 +53,36 @@ class delete_penalty extends external_api {
      * Execute the function.
      *
      * @param int $cmid
-     * @param int $penaltyid
+     * @param int $userid
      * @return array
      */
-    public static function execute(int $cmid, int $penaltyid): array {
+    public static function execute(int $cmid, int $userid): array {
+        global $DB;
+
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
-            'penaltyid' => $penaltyid,
+            'userid' => $userid,
         ]);
 
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
 
-        // Prevent deletion of auto-managed late penalties.
-        global $DB;
-        $record = $DB->get_record('local_unifiedgrader_penalty', ['id' => $params['penaltyid']]);
-        if ($record && $record->category === 'late') {
-            throw new \moodle_exception('cannotdeleteautopenalty', 'local_unifiedgrader');
-        }
+        $DB->delete_records('local_unifiedgrader_fext', [
+            'cmid' => $params['cmid'],
+            'userid' => $params['userid'],
+        ]);
 
-        penalty_manager::delete_penalty($params['penaltyid']);
+        // Re-sync the late penalty and gradebook grade now that the effective due date changed.
+        $adapter = \local_unifiedgrader\adapter\adapter_factory::create($params['cmid']);
+        $lateinfo = $adapter->calculate_late_penalty($params['userid']);
+        \local_unifiedgrader\penalty_manager::sync_late_penalty(
+            $params['cmid'],
+            $params['userid'],
+            $lateinfo['percentage'] ?? null,
+            $lateinfo['dayslate'] ?? 0,
+        );
+        $adapter->sync_gradebook_penalty($params['userid']);
 
         return ['success' => true];
     }
@@ -83,7 +93,7 @@ class delete_penalty extends external_api {
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'success' => new external_value(PARAM_BOOL, 'Whether the penalty was deleted'),
+            'success' => new external_value(PARAM_BOOL, 'Whether the delete succeeded'),
         ]);
     }
 }

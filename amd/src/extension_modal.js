@@ -40,7 +40,14 @@ export const openExtensionModal = async(cmid, userid, hasExtension, activityType
         'local_unifiedgrader',
     );
 
-    const page = activityType === 'quiz' ? 'quiz_extension.php' : 'extension.php';
+    let page;
+    if (activityType === 'quiz') {
+        page = 'quiz_extension.php';
+    } else if (activityType === 'forum') {
+        page = 'forum_extension.php';
+    } else {
+        page = 'extension.php';
+    }
     const iframeUrl = M.cfg.wwwroot + '/local/unifiedgrader/' + page
         + '?cmid=' + cmid + '&userid=' + userid;
 

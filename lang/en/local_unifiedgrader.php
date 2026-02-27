@@ -305,6 +305,12 @@ $string['quiz_extension_new_duedate'] = 'Extension due date';
 $string['quiz_extension_must_be_after_duedate'] = 'The extension date must be after the current due date.';
 $string['quiz_extension_plugin_missing'] = 'The quizaccess_duedate plugin is required for quiz extensions but is not installed.';
 
+// Forum extensions.
+$string['forum_extension_original_duedate'] = 'Forum due date';
+$string['forum_extension_current_extension'] = 'Current extension';
+$string['forum_extension_new_duedate'] = 'Extension due date';
+$string['forum_extension_must_be_after_duedate'] = 'The extension date must be after the forum due date.';
+
 // Student profile popout.
 $string['profile_view_full'] = 'View full profile';
 $string['profile_login_as'] = 'Login as';
@@ -366,6 +372,9 @@ $string['privacy:metadata:cltag:name'] = 'The tag name.';
 
 // Penalties.
 $string['penalties'] = 'Penalties';
+$string['penalty_late'] = 'Late submission';
+$string['penalty_late_days'] = '{$a} day(s) late';
+$string['penalty_late_auto'] = 'Automatically calculated based on penalty rules';
 $string['penalty_wordcount'] = 'Word count';
 $string['penalty_other'] = 'Other';
 $string['penalty_custom'] = 'Custom';
@@ -373,6 +382,7 @@ $string['penalty_label_placeholder'] = 'Label (max 15 chars)';
 $string['penalty_active'] = 'Active penalties';
 $string['penalty_badge'] = '-{$a->percentage}% {$a->label}';
 $string['finalgradeafterpenalties'] = 'Final grade after penalties:';
+$string['cannotdeleteautopenalty'] = 'Late penalties are automatically calculated and cannot be deleted.';
 
 // Feedback summary PDF.
 $string['download_feedback_pdf'] = 'Download feedback PDF';
@@ -394,6 +404,10 @@ $string['privacy:metadata:penalty:authorid'] = 'The teacher who applied the pena
 $string['privacy:metadata:penalty:category'] = 'The penalty category (word count or other).';
 $string['privacy:metadata:penalty:label'] = 'The custom label for the penalty.';
 $string['privacy:metadata:penalty:percentage'] = 'The penalty percentage.';
+$string['privacy:metadata:fext'] = 'Forum due date extensions granted by teachers in the Unified Grader.';
+$string['privacy:metadata:fext:userid'] = 'The student the extension was granted to.';
+$string['privacy:metadata:fext:authorid'] = 'The teacher who granted the extension.';
+$string['privacy:metadata:fext:extensionduedate'] = 'The extended due date.';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'All changes saved';

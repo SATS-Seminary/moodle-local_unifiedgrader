@@ -102,11 +102,29 @@ class save_grade extends external_api {
 
         $gradevalue = $params['grade'] >= 0 ? $params['grade'] : null;
 
-        // Apply penalty deductions to numeric grades (not scale, not quiz).
+        // Apply penalty deductions to numeric grades (not scale, not quiz, not forum).
         // Quiz grades are computed by the question engine; penalties are not applicable.
+        // Forum grades store the raw (teacher-given) grade; penalties are applied
+        // separately when pushing to the gradebook via sync_gradebook_penalty().
+        $activityinfo = null;
         if ($gradevalue !== null) {
             $activityinfo = $adapter->get_activity_info();
-            if (empty($activityinfo['usescale']) && ($activityinfo['type'] ?? '') !== 'quiz') {
+            $acttype = $activityinfo['type'] ?? '';
+
+            // Sync late penalty for forums before saving (ensures penalty record is current).
+            if ($acttype === 'forum') {
+                $lateinfo = $adapter->calculate_late_penalty($params['userid']);
+                penalty_manager::sync_late_penalty(
+                    $params['cmid'],
+                    $params['userid'],
+                    $lateinfo['percentage'] ?? null,
+                    $lateinfo['dayslate'] ?? 0,
+                );
+            }
+
+            // Apply penalty deduction for non-forum, non-quiz, non-scale activities.
+            // These activities store the penalized grade directly (e.g. assignments).
+            if (empty($activityinfo['usescale']) && $acttype !== 'quiz' && $acttype !== 'forum') {
                 $maxgrade = (float) ($activityinfo['maxgrade'] ?? 100);
                 $deduction = penalty_manager::get_total_deduction(
                     $params['cmid'],
@@ -134,6 +152,15 @@ class save_grade extends external_api {
             $params['feedbackfilesdraftid'],
             $params['attemptnumber'],
         );
+
+        // For forums, push the penalized grade to the gradebook.
+        // The raw grade is stored in forum_grades; the gradebook gets rawgrade - penalties.
+        if ($activityinfo === null) {
+            $activityinfo = $adapter->get_activity_info();
+        }
+        if (($activityinfo['type'] ?? '') === 'forum') {
+            $adapter->sync_gradebook_penalty($params['userid']);
+        }
 
         return ['success' => $success];
     }

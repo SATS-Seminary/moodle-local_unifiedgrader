@@ -443,12 +443,12 @@ export default class extends BaseComponent {
             }
         } else {
             // Points: set the numeric input value.
-            // The grade from Moodle is the adjusted (post-penalty) value.
-            // Reverse-calculate the raw (pre-penalty) grade for display.
+            // Forums store the raw (teacher-given) grade — display as-is.
+            // Other activities store the post-penalty grade — reverse-calculate for display.
             const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
             if (gradeInput && state.grade) {
                 let displayGrade = state.grade.grade;
-                if (displayGrade !== null) {
+                if (displayGrade !== null && state.activity?.type !== 'forum') {
                     const totalDeduction = this._getTotalPenaltyDeduction(state);
                     if (totalDeduction > 0) {
                         displayGrade = parseFloat(displayGrade) + totalDeduction;
@@ -894,13 +894,20 @@ export default class extends BaseComponent {
 
         penalties.forEach((p) => {
             const badge = document.createElement('span');
-            badge.className = 'badge bg-warning text-dark local-unifiedgrader-penalty-badge';
-            const displayLabel = p.category === 'wordcount' ? 'Word count' : (p.label || 'Other');
-            badge.textContent = '-' + p.percentage + '% ' + displayLabel;
+            if (p.category === 'late') {
+                // Late penalties get a red badge — they are auto-managed and not editable.
+                badge.className = 'badge bg-danger local-unifiedgrader-penalty-badge';
+                badge.textContent = '-' + p.percentage + '% ' + (p.label || 'Late');
+            } else {
+                badge.className = 'badge bg-warning text-dark local-unifiedgrader-penalty-badge';
+                const displayLabel = p.category === 'wordcount' ? 'Word count' : (p.label || 'Other');
+                badge.textContent = '-' + p.percentage + '% ' + displayLabel;
+            }
             badgesEl.appendChild(badge);
         });
 
-        // Re-append the late penalty badge (if any) since innerHTML cleared it.
+        // Re-append the late penalty badge from external modules (e.g. quizaccess_duedate)
+        // since innerHTML cleared it. This is separate from the 'late' category above.
         this._renderLatePenaltyBadge(this.reactive.state);
 
         // Update the popout if it's open.
@@ -1614,7 +1621,9 @@ export default class extends BaseComponent {
 
         // Use the per-user effective due date, falling back to the global activity due date.
         const duedate = state.submission.effectiveduedate || state.activity.duedate || 0;
-        const submitted = state.submission.timemodified || 0;
+        // Use timecreated (first submission / first post) for lateness — a student who
+        // submitted on time but later modified or added follow-up posts is NOT late.
+        const submitted = state.submission.timecreated || state.submission.timemodified || 0;
 
         if (!duedate || !submitted || submitted <= duedate) {
             indicator.classList.add('d-none');

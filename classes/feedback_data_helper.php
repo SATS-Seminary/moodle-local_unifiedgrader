@@ -69,9 +69,13 @@ class feedback_data_helper {
         $penaltybadges = [];
 
         foreach ($penalties as $p) {
-            $label = $p['category'] === 'wordcount'
-                ? get_string('penalty_wordcount', 'local_unifiedgrader')
-                : ($p['label'] ?: get_string('penalty_other', 'local_unifiedgrader'));
+            if ($p['category'] === 'late') {
+                $label = get_string('penalty_late', 'local_unifiedgrader');
+            } else if ($p['category'] === 'wordcount') {
+                $label = get_string('penalty_wordcount', 'local_unifiedgrader');
+            } else {
+                $label = $p['label'] ?: get_string('penalty_other', 'local_unifiedgrader');
+            }
             $penaltybadges[] = [
                 'text' => '-' . $p['percentage'] . '% ' . $label,
             ];

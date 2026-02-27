@@ -110,6 +110,7 @@ class forum_adapter extends base_adapter {
             'gradingmethod' => $gradingmethod ?: 'simple',
             'teamsubmission' => false,
             'blindmarking' => false,
+            'canmanageextensions' => has_capability('local/unifiedgrader:grade', $this->context),
         ];
     }
 
@@ -142,8 +143,8 @@ class forum_adapter extends base_adapter {
         $graders = get_enrolled_users($this->context, 'mod/forum:grade', $groupid, 'u.id');
         $enrolledusers = array_diff_key($enrolledusers, $graders);
 
-        // Batch-load post counts and last post time per user.
-        $sql = "SELECT p.userid, COUNT(p.id) AS postcount, MAX(p.created) AS lastpost
+        // Batch-load post counts, first post time (for lateness), and last post time per user.
+        $sql = "SELECT p.userid, COUNT(p.id) AS postcount, MIN(p.created) AS firstpost, MAX(p.created) AS lastpost
                   FROM {forum_posts} p
                   JOIN {forum_discussions} d ON d.id = p.discussion
                  WHERE d.forum = :forumid AND p.deleted = 0
@@ -155,6 +156,17 @@ class forum_adapter extends base_adapter {
             'forum' => $forumid,
             'itemnumber' => 1,
         ], '', 'userid, grade, timemodified');
+
+        // Batch-load forum extensions.
+        $extensions = $DB->get_records('local_unifiedgrader_fext', [
+            'cmid' => (int) $this->cm->id,
+        ], '', 'userid, extensionduedate');
+        $extensionset = [];
+        foreach ($extensions as $ext) {
+            $extensionset[(int) $ext->userid] = (int) $ext->extensionduedate;
+        }
+
+        $forumduedate = (int) $this->forum->get_due_date();
 
         $result = [];
         foreach ($enrolledusers as $user) {
@@ -170,9 +182,12 @@ class forum_adapter extends base_adapter {
             $userpicture->size = 64;
             $profileimageurl = $userpicture->get_url($PAGE)->out(false);
 
-            $submittedat = $userposts ? (int) $userposts->lastpost : 0;
-            $forumduedate = (int) $this->forum->get_due_date();
-            $islate = $forumduedate > 0 && $submittedat > 0 && $submittedat > $forumduedate;
+            // Use the first post time to determine lateness — a student who posted
+            // on time but added follow-up posts after the due date is NOT late.
+            $firstpostat = $userposts ? (int) $userposts->firstpost : 0;
+            $submittedat = $userposts ? (int) $userposts->firstpost : 0;
+            $effectiveduedate = $extensionset[$userid] ?? $forumduedate;
+            $islate = $effectiveduedate > 0 && $firstpostat > 0 && $firstpostat > $effectiveduedate;
 
             $entry = [
                 'id' => $userid,
@@ -183,6 +198,7 @@ class forum_adapter extends base_adapter {
                 'submittedat' => $submittedat,
                 'gradevalue' => $hasgrade ? (float) $usergrade->grade : null,
                 'islate' => $islate,
+                'hasextension' => isset($extensionset[$userid]),
             ];
 
             // Apply status filter.
@@ -1269,7 +1285,7 @@ SCRIPT;
 
         $forumid = $this->forum->get_id();
 
-        // Get or create the grade record.
+        // Get or create the grade record (stores the raw teacher-given grade).
         $graderecord = $DB->get_record('forum_grades', [
             'forum' => $forumid,
             'itemnumber' => 1,
@@ -1292,9 +1308,68 @@ SCRIPT;
             $DB->insert_record('forum_grades', $graderecord);
         }
 
-        // Sync to gradebook.
+        // Note: gradebook sync is handled by sync_gradebook_penalty() which is
+        // called by the save_grade web service after this method returns.
+        // This ensures the gradebook gets the penalized grade while forum_grades
+        // retains the raw teacher-given grade.
+    }
+
+    /**
+     * Push the penalized grade to the gradebook.
+     *
+     * Reads the raw (teacher-given) grade from forum_grades, calculates the
+     * total penalty deduction, and pushes (rawgrade - deduction) to the
+     * Moodle gradebook. This keeps forum_grades as the source of truth for
+     * the teacher's intended grade while the gradebook reflects penalties.
+     *
+     * Called after grade save, extension grant/delete, and penalty changes.
+     *
+     * @param int $userid Student user ID.
+     */
+    public function sync_gradebook_penalty(int $userid): void {
+        global $DB, $CFG;
+        require_once($CFG->libdir . '/gradelib.php');
+        require_once($CFG->dirroot . '/mod/forum/lib.php');
+
+        $forumid = $this->forum->get_id();
+
+        $graderecord = $DB->get_record('forum_grades', [
+            'forum' => $forumid,
+            'itemnumber' => 1,
+            'userid' => $userid,
+        ]);
+
+        // Build the grade to push. If no grade exists, push null to clear.
         $this->forumrecord->cmidnumber = $this->cm->idnumber;
-        forum_update_grades($this->forumrecord, $userid);
+
+        if (!$graderecord || $graderecord->grade === null) {
+            // No grade yet — just ensure the grade item exists.
+            forum_grade_item_update($this->forumrecord);
+            return;
+        }
+
+        $rawgrade = (float) $graderecord->grade;
+
+        // Calculate penalty deduction.
+        $maxgrade = (float) $this->forum->get_grade_for_forum();
+        $deduction = \local_unifiedgrader\penalty_manager::get_total_deduction(
+            (int) $this->cm->id,
+            $userid,
+            $maxgrade > 0 ? $maxgrade : 100,
+        );
+
+        $penalizedgrade = $deduction > 0 ? max(0, $rawgrade - $deduction) : $rawgrade;
+
+        // Push the penalized grade to the gradebook.
+        $forumgrades = [
+            $userid => (object) [
+                'userid' => $userid,
+                'rawgrade' => $penalizedgrade,
+                'datesubmitted' => 0,
+                'dategraded' => (int) $graderecord->timemodified,
+            ],
+        ];
+        forum_grade_item_update($this->forumrecord, null, $forumgrades);
     }
 
     /**
@@ -1421,5 +1496,166 @@ SCRIPT;
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Calculate the late penalty for a student based on Moodle's penalty rules.
+     *
+     * Uses the gradepenalty_duedate plugin's configured rules (module → course → system
+     * context hierarchy) to determine the penalty percentage for late forum submissions.
+     *
+     * @param int $userid Student user ID.
+     * @return array|null Array with 'percentage' (int) and 'dayslate' (int), or null if not late/not applicable.
+     */
+    public function calculate_late_penalty(int $userid): ?array {
+        global $DB;
+
+        // No penalty if gradepenalty_duedate plugin is not installed.
+        if (!class_exists('\gradepenalty_duedate\penalty_calculator')) {
+            return null;
+        }
+
+        // Use effective due date (accounts for extensions).
+        $duedate = $this->get_effective_duedate($userid);
+        if ($duedate <= 0) {
+            return null;
+        }
+
+        // No penalty for scale-based grading.
+        if ((int) $this->forum->get_grade_for_forum() < 0) {
+            return null;
+        }
+
+        // Use the first post time to determine lateness — a student who posted
+        // on time but added follow-up posts after the due date is NOT late.
+        $forumid = $this->forum->get_id();
+        $firstpost = $DB->get_field_sql(
+            "SELECT MIN(p.created)
+               FROM {forum_posts} p
+               JOIN {forum_discussions} d ON d.id = p.discussion
+              WHERE d.forum = :forumid AND p.userid = :userid AND p.deleted = 0",
+            ['forumid' => $forumid, 'userid' => $userid],
+        );
+
+        if (empty($firstpost)) {
+            return null;
+        }
+
+        $submissiontime = (int) $firstpost;
+
+        // Not late.
+        if ($submissiontime <= $duedate) {
+            return null;
+        }
+
+        // Get penalty percentage from Moodle's duedate penalty rules.
+        $percentage = \gradepenalty_duedate\penalty_calculator::get_penalty_from_rules(
+            $this->cm,
+            $submissiontime,
+            $duedate,
+        );
+
+        $pct = (int) round($percentage);
+        if ($pct <= 0) {
+            return null;
+        }
+
+        $secondslate = $submissiontime - $duedate;
+        $dayslate = (int) ceil($secondslate / DAYSECS);
+
+        return [
+            'percentage' => $pct,
+            'dayslate' => $dayslate,
+        ];
+    }
+
+    /**
+     * Get the effective due date for a student, accounting for extensions.
+     *
+     * @param int $userid Student user ID.
+     * @return int Effective due date timestamp (0 if no due date).
+     */
+    public function get_effective_duedate(int $userid): int {
+        global $DB;
+
+        $extension = $DB->get_field('local_unifiedgrader_fext', 'extensionduedate', [
+            'cmid' => (int) $this->cm->id,
+            'userid' => $userid,
+        ]);
+
+        if ($extension !== false && (int) $extension > 0) {
+            return (int) $extension;
+        }
+
+        return (int) $this->forum->get_due_date();
+    }
+
+    /**
+     * Get the forum extension for a student.
+     *
+     * @param int $userid Student user ID.
+     * @return array|null Extension data or null if no extension.
+     */
+    public function get_forum_extension(int $userid): ?array {
+        global $DB;
+
+        $record = $DB->get_record('local_unifiedgrader_fext', [
+            'cmid' => (int) $this->cm->id,
+            'userid' => $userid,
+        ]);
+
+        if (!$record) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $record->id,
+            'extensionduedate' => (int) $record->extensionduedate,
+        ];
+    }
+
+    /**
+     * Save a forum extension for a student.
+     *
+     * @param int $userid Student user ID.
+     * @param int $extensionduedate Extended due date timestamp.
+     */
+    public function save_forum_extension(int $userid, int $extensionduedate): void {
+        global $DB, $USER;
+
+        $now = time();
+        $existing = $DB->get_record('local_unifiedgrader_fext', [
+            'cmid' => (int) $this->cm->id,
+            'userid' => $userid,
+        ]);
+
+        if ($existing) {
+            $existing->extensionduedate = $extensionduedate;
+            $existing->timemodified = $now;
+            $DB->update_record('local_unifiedgrader_fext', $existing);
+        } else {
+            $DB->insert_record('local_unifiedgrader_fext', (object) [
+                'cmid' => (int) $this->cm->id,
+                'userid' => $userid,
+                'extensionduedate' => $extensionduedate,
+                'authorid' => (int) $USER->id,
+                'timecreated' => $now,
+                'timemodified' => $now,
+            ]);
+        }
+    }
+
+    /**
+     * Delete a forum extension for a student.
+     *
+     * @param int $userid Student user ID.
+     */
+    public function delete_forum_extension(int $userid): void {
+        global $DB;
+
+        $DB->delete_records('local_unifiedgrader_fext', [
+            'cmid' => (int) $this->cm->id,
+            'userid' => $userid,
+        ]);
     }
 }

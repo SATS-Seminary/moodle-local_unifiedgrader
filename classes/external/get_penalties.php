@@ -31,6 +31,7 @@ use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_unifiedgrader\adapter\adapter_factory;
 use local_unifiedgrader\penalty_manager;
 
 /**
@@ -65,6 +66,19 @@ class get_penalties extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
+
+        // Auto-sync late penalty for forums before returning penalties.
+        $cm = get_coursemodule_from_id('', $params['cmid'], 0, false, MUST_EXIST);
+        if ($cm->modname === 'forum') {
+            $adapter = adapter_factory::create($params['cmid']);
+            $lateinfo = $adapter->calculate_late_penalty($params['userid']);
+            penalty_manager::sync_late_penalty(
+                $params['cmid'],
+                $params['userid'],
+                $lateinfo['percentage'] ?? null,
+                $lateinfo['dayslate'] ?? 0,
+            );
+        }
 
         return penalty_manager::get_penalties($params['cmid'], $params['userid']);
     }

@@ -217,6 +217,12 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_delete_forum_extension' => [
+        'classname' => 'local_unifiedgrader\external\delete_forum_extension',
+        'description' => 'Delete a forum due date extension for a user.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
     'local_unifiedgrader_get_penalties' => [
         'classname' => 'local_unifiedgrader\external\get_penalties',
         'description' => 'Get grade penalties for a student in an activity.',

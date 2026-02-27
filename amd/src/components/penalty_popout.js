@@ -421,22 +421,34 @@ export default class PenaltyPopout {
         }
 
         this._penalties.forEach((p) => {
+            const isLate = p.category === 'late';
             const badge = document.createElement('span');
-            badge.className = 'badge bg-warning text-dark penalty-active-item local-unifiedgrader-penalty-badge';
+            badge.className = isLate
+                ? 'badge bg-danger penalty-active-item local-unifiedgrader-penalty-badge'
+                : 'badge bg-warning text-dark penalty-active-item local-unifiedgrader-penalty-badge';
 
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'btn-close btn-close-sm ms-1';
-            removeBtn.style.fontSize = '0.55rem';
-            removeBtn.setAttribute('aria-label', 'Remove');
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this._onDelete(p.id);
-            });
+            // Late penalties are auto-managed — no delete button.
+            if (!isLate) {
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn-close btn-close-sm ms-1';
+                removeBtn.style.fontSize = '0.55rem';
+                removeBtn.setAttribute('aria-label', 'Remove');
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this._onDelete(p.id);
+                });
+                const displayLabel = p.category === 'wordcount' ? 'Word count' : (p.label || 'Other');
+                badge.textContent = '-' + p.percentage + '% ' + displayLabel;
+                badge.appendChild(removeBtn);
+            } else {
+                badge.textContent = '-' + p.percentage + '% ' + (p.label || 'Late');
+                badge.title = 'Automatically calculated based on penalty rules';
+                getString('penalty_late_auto', 'local_unifiedgrader').then((s) => {
+                    badge.title = s;
+                });
+            }
 
-            const displayLabel = p.category === 'wordcount' ? 'Word count' : (p.label || 'Other');
-            badge.textContent = '-' + p.percentage + '% ' + displayLabel;
-            badge.appendChild(removeBtn);
             this._activeListEl.appendChild(badge);
         });
     }
