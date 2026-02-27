@@ -87,10 +87,11 @@ export default class {
             ];
 
             // Prepare the feedback draft area in parallel if a draftitemid exists.
+            // Pass attemptnumber -1 to load the latest attempt's feedback.
             if (draftitemid) {
                 calls.push(Ajax.call([{
                     methodname: 'local_unifiedgrader_prepare_feedback_draft',
-                    args: {cmid, userid, draftitemid},
+                    args: {cmid, userid, draftitemid, attemptnumber: -1},
                 }])[0]);
             }
 
@@ -164,11 +165,11 @@ export default class {
                 }])[0],
             ];
 
-            // Re-prepare the feedback draft area for this attempt's grade.
+            // Re-prepare the feedback draft area for this attempt's feedback.
             if (draftitemid) {
                 calls.push(Ajax.call([{
                     methodname: 'local_unifiedgrader_prepare_feedback_draft',
-                    args: {cmid, userid, draftitemid},
+                    args: {cmid, userid, draftitemid, attemptnumber},
                 }])[0]);
             }
 
@@ -258,7 +259,7 @@ export default class {
             if (draftitemid) {
                 refreshCalls.push(Ajax.call([{
                     methodname: 'local_unifiedgrader_prepare_feedback_draft',
-                    args: {cmid, userid, draftitemid},
+                    args: {cmid, userid, draftitemid, attemptnumber: currentAttempt},
                 }])[0]);
             }
 

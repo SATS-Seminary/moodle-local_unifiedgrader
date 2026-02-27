@@ -50,6 +50,9 @@ class prepare_feedback_draft extends external_api {
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'userid' => new external_value(PARAM_INT, 'Student user ID'),
             'draftitemid' => new external_value(PARAM_INT, 'Draft area item ID'),
+            'attemptnumber' => new external_value(
+                PARAM_INT, 'Attempt number (1-based for quiz), -1 for latest', VALUE_DEFAULT, -1
+            ),
         ]);
     }
 
@@ -59,13 +62,15 @@ class prepare_feedback_draft extends external_api {
      * @param int $cmid
      * @param int $userid
      * @param int $draftitemid
+     * @param int $attemptnumber
      * @return array
      */
-    public static function execute(int $cmid, int $userid, int $draftitemid): array {
+    public static function execute(int $cmid, int $userid, int $draftitemid, int $attemptnumber = -1): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'userid' => $userid,
             'draftitemid' => $draftitemid,
+            'attemptnumber' => $attemptnumber,
         ]);
 
         $context = \context_module::instance($params['cmid']);
@@ -74,7 +79,7 @@ class prepare_feedback_draft extends external_api {
 
         $adapter = adapter_factory::create($params['cmid']);
 
-        return $adapter->prepare_feedback_draft($params['userid'], $params['draftitemid']);
+        return $adapter->prepare_feedback_draft($params['userid'], $params['draftitemid'], $params['attemptnumber']);
     }
 
     /**

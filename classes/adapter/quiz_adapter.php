@@ -364,8 +364,9 @@ class quiz_adapter extends base_adapter {
     /**
      * Get grade data for a specific quiz attempt.
      *
-     * Overall grade and feedback are per-user (same across all attempts).
-     * Per-question manual grading data comes from the specified attempt.
+     * Overall grade is per-user. Feedback is per-attempt (stored in
+     * local_unifiedgrader_qfb) with gradebook fallback. Per-question
+     * manual grading data comes from the specified attempt.
      *
      * @param int $userid The user ID.
      * @param int $attemptnumber Attempt number (1-based for quiz), or -1 for latest.
@@ -377,17 +378,21 @@ class quiz_adapter extends base_adapter {
         }
 
         $attempt = $this->get_attempt_by_number($userid, $attemptnumber);
-        return $this->build_grade_data($userid, $attempt);
+        return $this->build_grade_data($userid, $attempt, $attemptnumber);
     }
 
     /**
      * Build grade data array from an attempt record.
      *
+     * Feedback is loaded from the per-attempt table (local_unifiedgrader_qfb)
+     * first, falling back to the gradebook for backwards compatibility.
+     *
      * @param int $userid
      * @param \stdClass|null $attempt The attempt record (for per-question grading data).
+     * @param int $attemptnumber Attempt number (1-based), or -1 for latest.
      * @return array
      */
-    private function build_grade_data(int $userid, ?\stdClass $attempt): array {
+    private function build_grade_data(int $userid, ?\stdClass $attempt, int $attemptnumber = -1): array {
         global $DB;
 
         // Get overall quiz grade (per-user, not per-attempt).
@@ -397,31 +402,60 @@ class quiz_adapter extends base_adapter {
         ]);
         $hasgrade = $quizgrade && $quizgrade->grade !== null;
 
-        // Get feedback from gradebook (per-user, not per-attempt).
+        // Resolve attemptnumber: use the attempt record if available, otherwise latest.
+        $resolvedattempt = $attemptnumber;
+        if ($resolvedattempt < 1 && $attempt) {
+            $resolvedattempt = (int) $attempt->attempt;
+        }
+
+        // Try per-attempt feedback from our table first.
         $feedbacktext = '';
         $feedbackformat = (int) FORMAT_HTML;
-        $gradeitem = \grade_item::fetch([
-            'itemtype' => 'mod',
-            'itemmodule' => 'quiz',
-            'iteminstance' => $this->quiz->id,
-            'itemnumber' => 0,
-            'courseid' => $this->course->id,
-        ]);
-        if ($gradeitem) {
-            $gradegrade = \grade_grade::fetch([
-                'itemid' => $gradeitem->id,
+        $qfb = null;
+        if ($resolvedattempt >= 1) {
+            $qfb = $DB->get_record('local_unifiedgrader_qfb', [
+                'cmid' => $this->cm->id,
                 'userid' => $userid,
+                'attemptnumber' => $resolvedattempt,
             ]);
-            if ($gradegrade && !empty($gradegrade->feedback)) {
-                $feedbacktext = file_rewrite_pluginfile_urls(
-                    $gradegrade->feedback,
-                    'pluginfile.php',
-                    $this->context->id,
-                    'local_unifiedgrader',
-                    'quizfeedback',
-                    (int) $gradegrade->id,
-                );
-                $feedbackformat = (int) ($gradegrade->feedbackformat ?? FORMAT_HTML);
+        }
+
+        if ($qfb && !empty($qfb->feedback)) {
+            // Per-attempt feedback found — use qfb.id as itemid for file URLs.
+            $feedbacktext = file_rewrite_pluginfile_urls(
+                $qfb->feedback,
+                'pluginfile.php',
+                $this->context->id,
+                'local_unifiedgrader',
+                'quizfeedback',
+                (int) $qfb->id,
+            );
+            $feedbackformat = (int) ($qfb->feedbackformat ?? FORMAT_HTML);
+        } else {
+            // Fall back to gradebook feedback (backwards compat).
+            $gradeitem = \grade_item::fetch([
+                'itemtype' => 'mod',
+                'itemmodule' => 'quiz',
+                'iteminstance' => $this->quiz->id,
+                'itemnumber' => 0,
+                'courseid' => $this->course->id,
+            ]);
+            if ($gradeitem) {
+                $gradegrade = \grade_grade::fetch([
+                    'itemid' => $gradeitem->id,
+                    'userid' => $userid,
+                ]);
+                if ($gradegrade && !empty($gradegrade->feedback)) {
+                    $feedbacktext = file_rewrite_pluginfile_urls(
+                        $gradegrade->feedback,
+                        'pluginfile.php',
+                        $this->context->id,
+                        'local_unifiedgrader',
+                        'quizfeedback',
+                        (int) $gradegrade->id,
+                    );
+                    $feedbackformat = (int) ($gradegrade->feedbackformat ?? FORMAT_HTML);
+                }
             }
         }
 
@@ -452,7 +486,7 @@ class quiz_adapter extends base_adapter {
             'rubricdata' => $rubricdata,
             'gradingdefinition' => $gradingdefinition,
             'timegraded' => $quizgrade ? (int) ($quizgrade->timemodified ?? 0) : 0,
-            'grader' => 0,
+            'grader' => $qfb ? (int) $qfb->grader : 0,
         ];
     }
 
@@ -476,7 +510,7 @@ class quiz_adapter extends base_adapter {
         int $feedbackfilesdraftid = 0,
         int $attemptnumber = -1,
     ): bool {
-        global $USER;
+        global $DB, $USER;
 
         if ($attemptnumber >= 1) {
             $attempt = $this->get_attempt_by_number($userid, $attemptnumber);
@@ -490,9 +524,125 @@ class quiz_adapter extends base_adapter {
             $this->save_manual_question_grades($attempt, $advancedgradingdata['questions']);
         }
 
-        // Process feedback files from the draft area before saving feedback text.
+        // Resolve attempt number for per-attempt feedback storage.
+        $resolvedattempt = $attemptnumber;
+        if ($resolvedattempt < 1 && $attempt) {
+            $resolvedattempt = (int) $attempt->attempt;
+        }
+        if ($resolvedattempt < 1) {
+            $resolvedattempt = 1;
+        }
+
+        // Insert or update the per-attempt feedback record.
+        $qfb = $DB->get_record('local_unifiedgrader_qfb', [
+            'cmid' => $this->cm->id,
+            'userid' => $userid,
+            'attemptnumber' => $resolvedattempt,
+        ]);
+
+        $now = time();
+        if ($qfb) {
+            $qfb->feedback = $feedback;
+            $qfb->feedbackformat = $feedbackformat;
+            $qfb->grader = $USER->id;
+            $qfb->timemodified = $now;
+            $DB->update_record('local_unifiedgrader_qfb', $qfb);
+            $qfbid = (int) $qfb->id;
+        } else {
+            $qfbid = $DB->insert_record('local_unifiedgrader_qfb', (object) [
+                'cmid' => $this->cm->id,
+                'userid' => $userid,
+                'attemptnumber' => $resolvedattempt,
+                'feedback' => $feedback,
+                'feedbackformat' => $feedbackformat,
+                'grader' => $USER->id,
+                'timemodified' => $now,
+            ]);
+        }
+
+        // Process feedback files from the draft area using qfb.id as itemid.
         $feedbacktosave = $feedback;
         if ($draftitemid > 0) {
+            $feedbacktosave = file_save_draft_area_files(
+                $draftitemid,
+                $this->context->id,
+                'local_unifiedgrader',
+                'quizfeedback',
+                $qfbid,
+                $this->get_editor_options(),
+                $feedback,
+            );
+            // Update the record with rewritten @@PLUGINFILE@@ URLs.
+            $DB->set_field('local_unifiedgrader_qfb', 'feedback', $feedbacktosave, ['id' => $qfbid]);
+        }
+
+        // Sync gradebook with the latest attempt's feedback (not necessarily
+        // the one being saved — if the teacher edits an earlier attempt, the
+        // gradebook should still show the latest attempt's feedback).
+        $latestqfb = $this->get_latest_attempt_feedback($userid);
+        if ($latestqfb) {
+            $this->save_feedback_to_gradebook(
+                $userid, $latestqfb->feedback ?? '', (int) $latestqfb->feedbackformat, (int) $latestqfb->id
+            );
+        } else {
+            $this->save_feedback_to_gradebook($userid, $feedbacktosave, $feedbackformat, $qfbid);
+        }
+
+        return true;
+    }
+
+    /**
+     * Get the feedback record for the latest attempt from local_unifiedgrader_qfb.
+     *
+     * @param int $userid
+     * @return \stdClass|null
+     */
+    private function get_latest_attempt_feedback(int $userid): ?\stdClass {
+        global $DB;
+
+        $records = $DB->get_records('local_unifiedgrader_qfb', [
+            'cmid' => $this->cm->id,
+            'userid' => $userid,
+        ], 'attemptnumber DESC', '*', 0, 1);
+
+        return $records ? reset($records) : null;
+    }
+
+    /**
+     * Prepare the feedback draft area for a student.
+     *
+     * Clears the shared draft area, copies the student's existing feedback
+     * files into it, and returns the feedback HTML with draft URLs.
+     *
+     * @param int $userid The student user ID.
+     * @param int $draftitemid The shared draft area item ID.
+     * @param int $attemptnumber Attempt number (1-based), or -1 for latest.
+     * @return array With key 'feedbackhtml'.
+     */
+    public function prepare_feedback_draft(int $userid, int $draftitemid, int $attemptnumber = -1): array {
+        global $USER, $DB;
+
+        // Resolve attempt number.
+        $resolvedattempt = $attemptnumber;
+        if ($resolvedattempt < 1) {
+            $latest = $this->get_latest_finished_attempt($userid);
+            $resolvedattempt = $latest ? (int) $latest->attempt : 1;
+        }
+
+        // Try per-attempt feedback from our table.
+        $feedbacktext = '';
+        $fileitemid = 0;
+        $qfb = $DB->get_record('local_unifiedgrader_qfb', [
+            'cmid' => $this->cm->id,
+            'userid' => $userid,
+            'attemptnumber' => $resolvedattempt,
+        ]);
+
+        if ($qfb) {
+            $feedbacktext = $qfb->feedback ?? '';
+            $fileitemid = (int) $qfb->id;
+        } else {
+            // Fall back to gradebook feedback (backwards compat).
             $gradeitem = \grade_item::fetch([
                 'itemtype' => 'mod',
                 'itemmodule' => 'quiz',
@@ -506,56 +656,9 @@ class quiz_adapter extends base_adapter {
                     'userid' => $userid,
                 ]);
                 if ($gradegrade) {
-                    $feedbacktosave = file_save_draft_area_files(
-                        $draftitemid,
-                        $this->context->id,
-                        'local_unifiedgrader',
-                        'quizfeedback',
-                        (int) $gradegrade->id,
-                        $this->get_editor_options(),
-                        $feedback,
-                    );
+                    $feedbacktext = $gradegrade->feedback ?? '';
+                    $fileitemid = (int) $gradegrade->id;
                 }
-            }
-        }
-
-        // Save feedback to gradebook.
-        $this->save_feedback_to_gradebook($userid, $feedbacktosave, $feedbackformat);
-
-        return true;
-    }
-
-    /**
-     * Prepare the feedback draft area for a student.
-     *
-     * Clears the shared draft area, copies the student's existing feedback
-     * files into it, and returns the feedback HTML with draft URLs.
-     *
-     * @param int $userid The student user ID.
-     * @param int $draftitemid The shared draft area item ID.
-     * @return array With key 'feedbackhtml'.
-     */
-    public function prepare_feedback_draft(int $userid, int $draftitemid): array {
-        global $USER;
-
-        $feedbacktext = '';
-        $gradegradeid = 0;
-
-        $gradeitem = \grade_item::fetch([
-            'itemtype' => 'mod',
-            'itemmodule' => 'quiz',
-            'iteminstance' => $this->quiz->id,
-            'itemnumber' => 0,
-            'courseid' => $this->course->id,
-        ]);
-        if ($gradeitem) {
-            $gradegrade = \grade_grade::fetch([
-                'itemid' => $gradeitem->id,
-                'userid' => $userid,
-            ]);
-            if ($gradegrade) {
-                $gradegradeid = (int) $gradegrade->id;
-                $feedbacktext = $gradegrade->feedback ?? '';
             }
         }
 
@@ -565,12 +668,12 @@ class quiz_adapter extends base_adapter {
         $fs->delete_area_files($usercontext->id, 'user', 'draft', $draftitemid);
 
         // Copy this student's feedback files from permanent storage into the draft area.
-        if ($gradegradeid) {
+        if ($fileitemid) {
             $files = $fs->get_area_files(
                 $this->context->id,
                 'local_unifiedgrader',
                 'quizfeedback',
-                $gradegradeid,
+                $fileitemid,
             );
             $filerecord = [
                 'contextid' => $usercontext->id,
@@ -1344,13 +1447,19 @@ class quiz_adapter extends base_adapter {
     }
 
     /**
-     * Save feedback text to the gradebook.
+     * Save feedback text (and associated files) to the gradebook.
+     *
+     * Sets the grade_grade.feedbackfiles property so that Moodle's built-in
+     * grade_grade::add_feedback_files() copies our files to the 'grade'/'feedback'
+     * filearea. This makes embedded audio/video/images work in the gradebook and
+     * student activity overview.
      *
      * @param int $userid
      * @param string $feedback
      * @param int $feedbackformat
+     * @param int $qfbid The local_unifiedgrader_qfb record ID (used as file itemid).
      */
-    private function save_feedback_to_gradebook(int $userid, string $feedback, int $feedbackformat): void {
+    private function save_feedback_to_gradebook(int $userid, string $feedback, int $feedbackformat, int $qfbid = 0): void {
         $gradeitem = \grade_item::fetch([
             'itemtype' => 'mod',
             'itemmodule' => 'quiz',
@@ -1369,8 +1478,27 @@ class quiz_adapter extends base_adapter {
         ]);
 
         if ($gradegrade) {
+            // Load grade_item so that update_feedback_files() can run.
+            // Without this, grade_grade::update_feedback_files() silently
+            // skips the file copy because $this->grade_item is null after fetch().
+            $gradegrade->grade_item = $gradeitem;
+
             $gradegrade->feedback = $feedback;
             $gradegrade->feedbackformat = $feedbackformat;
+
+            // Tell the gradebook where to copy feedback files from.
+            // Moodle's grade_grade::update_feedback_files() will delete old
+            // files and copy ours to the 'grade'/'feedback' filearea so they
+            // render correctly in grade reports and student activity views.
+            if ($qfbid > 0) {
+                $gradegrade->feedbackfiles = [
+                    'contextid' => $this->context->id,
+                    'component' => 'local_unifiedgrader',
+                    'filearea' => 'quizfeedback',
+                    'itemid' => $qfbid,
+                ];
+            }
+
             $gradegrade->update('local/unifiedgrader');
         }
     }

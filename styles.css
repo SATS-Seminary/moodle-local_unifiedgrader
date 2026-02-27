@@ -280,20 +280,41 @@
 
 /* Responsive media in marking panel (teacher grading view). */
 .local-unifiedgrader-container [data-region="marking-panel"] video,
-.local-unifiedgrader-container [data-region="marking-panel"] audio,
 .local-unifiedgrader-container [data-region="marking-panel"] img,
 .local-unifiedgrader-container [data-region="marking-panel"] iframe {
     max-width: 100%;
     height: auto;
 }
 
+/* Audio elements need block display and must NOT have height:auto (no intrinsic height). */
+.local-unifiedgrader-container [data-region="marking-panel"] audio {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Feedback display banner — ensure audio/video players render visibly. */
+.local-unifiedgrader-container [data-region="feedback-display-content"] audio,
+.local-unifiedgrader-container [data-region="feedback-display-content"] video {
+    display: block;
+    width: 100%;
+    margin: 0.5rem 0;
+}
+
 /* Student feedback view — responsive media in feedback panel. */
 .local-unifiedgrader-feedback .card-body video,
-.local-unifiedgrader-feedback .card-body audio,
 .local-unifiedgrader-feedback .card-body img,
 .local-unifiedgrader-feedback .card-body iframe {
     max-width: 100%;
     height: auto;
+}
+
+/* Student feedback view — audio needs block display, no height:auto. */
+.local-unifiedgrader-feedback .card-body audio {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 0.5rem 0;
 }
 
 /* Student feedback view — hide annotation toolbar (read-only mode). */
@@ -825,4 +846,12 @@
 .local-unifiedgrader-penalty-badge {
     font-size: 0.75rem;
     font-weight: 500;
+}
+
+/* Hide the broken feedback section on the quiz view page.
+   Gradebook feedback with embedded media (audio/video) cannot serve files
+   through the quiz module's pluginfile handler. Students access full feedback
+   via the Unified Grader feedback view instead. */
+#page-mod-quiz-view #feedback {
+    display: none !important;
 }

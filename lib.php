@@ -157,12 +157,13 @@ function local_unifiedgrader_pluginfile(
         return false;
     }
 
-    // Forum/quiz feedback files: itemid = grade_grades.id, filepath = '/'.
-    if ($filearea === 'forumfeedback' || $filearea === 'quizfeedback') {
+    // Forum feedback files: itemid = grade_grades.id.
+    if ($filearea === 'forumfeedback') {
         global $DB;
 
         $itemid = (int) array_shift($args);
-        $filename = array_shift($args);
+        $filename = array_pop($args);
+        $filepath = '/' . ($args ? implode('/', $args) . '/' : '');
 
         // Students: verify this grade_grade belongs to them and grade is released.
         if ($isstudent) {
@@ -177,7 +178,49 @@ function local_unifiedgrader_pluginfile(
         }
 
         $fs = get_file_storage();
-        $file = $fs->get_file($context->id, 'local_unifiedgrader', $filearea, $itemid, '/', $filename);
+        $file = $fs->get_file($context->id, 'local_unifiedgrader', $filearea, $itemid, $filepath, $filename);
+        if (!$file || $file->is_directory()) {
+            return false;
+        }
+
+        send_stored_file($file, 0, 0, $forcedownload, $options);
+        return true;
+    }
+
+    // Quiz feedback files: itemid = local_unifiedgrader_qfb.id (per-attempt),
+    // with fallback to grade_grades.id for pre-migration files.
+    if ($filearea === 'quizfeedback') {
+        global $DB;
+
+        $itemid = (int) array_shift($args);
+        $filename = array_pop($args);
+        $filepath = '/' . ($args ? implode('/', $args) . '/' : '');
+
+        // Students: verify the record belongs to them and grade is released.
+        if ($isstudent) {
+            $allowed = false;
+            // Try per-attempt feedback table first.
+            $qfb = $DB->get_record('local_unifiedgrader_qfb', ['id' => $itemid]);
+            if ($qfb && (int) $qfb->userid === (int) $USER->id) {
+                $allowed = true;
+            } else {
+                // Fallback: check grade_grades for pre-migration files.
+                $gradegrade = $DB->get_record('grade_grades', ['id' => $itemid]);
+                if ($gradegrade && (int) $gradegrade->userid === (int) $USER->id) {
+                    $allowed = true;
+                }
+            }
+            if (!$allowed) {
+                return false;
+            }
+            $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
+            if (!$adapter->is_grade_released((int) $USER->id)) {
+                return false;
+            }
+        }
+
+        $fs = get_file_storage();
+        $file = $fs->get_file($context->id, 'local_unifiedgrader', $filearea, $itemid, $filepath, $filename);
         if (!$file || $file->is_directory()) {
             return false;
         }

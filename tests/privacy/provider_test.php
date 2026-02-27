@@ -604,4 +604,223 @@ final class provider_test extends provider_testcase {
         $this->assertEquals(0, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student2->id]));
         $this->assertEquals(1, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student3->id]));
     }
+
+    // -------------------------------------------------------------------------
+    // Per-attempt quiz feedback (qfb) privacy tests.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Helper: create a quiz feedback record directly in the DB.
+     *
+     * @param int $cmid Course module ID.
+     * @param int $userid Student user ID.
+     * @param int $grader Teacher user ID.
+     * @param int $attemptnumber Attempt number.
+     * @param string $feedback Feedback text.
+     * @return \stdClass The created record.
+     */
+    private function create_qfb(
+        int $cmid,
+        int $userid,
+        int $grader,
+        int $attemptnumber = 1,
+        string $feedback = '<p>Test feedback</p>',
+    ): \stdClass {
+        global $DB;
+        $record = (object) [
+            'cmid' => $cmid,
+            'userid' => $userid,
+            'attemptnumber' => $attemptnumber,
+            'feedback' => $feedback,
+            'feedbackformat' => FORMAT_HTML,
+            'grader' => $grader,
+            'timemodified' => time(),
+        ];
+        $record->id = $DB->insert_record('local_unifiedgrader_qfb', $record);
+        return $record;
+    }
+
+    /**
+     * Test get_contexts_for_userid returns contexts for qfb subjects.
+     */
+    public function test_get_contexts_for_userid_qfb_subject(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $quiz = $gen->create_module('quiz', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_qfb($cm->id, $student->id, $teacher->id);
+
+        $contextlist = provider::get_contexts_for_userid($student->id);
+        $contextids = array_map('intval', $contextlist->get_contextids());
+        $this->assertContains($context->id, $contextids);
+    }
+
+    /**
+     * Test get_contexts_for_userid returns contexts for qfb graders.
+     */
+    public function test_get_contexts_for_userid_qfb_grader(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $quiz = $gen->create_module('quiz', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_qfb($cm->id, $student->id, $teacher->id);
+
+        $contextlist = provider::get_contexts_for_userid($teacher->id);
+        $contextids = array_map('intval', $contextlist->get_contextids());
+        $this->assertContains($context->id, $contextids);
+    }
+
+    /**
+     * Test get_users_in_context returns qfb subjects and graders.
+     */
+    public function test_get_users_in_context_qfb(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $quiz = $gen->create_module('quiz', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_qfb($cm->id, $student->id, $teacher->id);
+
+        $userlist = new userlist($context, 'local_unifiedgrader');
+        provider::get_users_in_context($userlist);
+
+        $userids = $userlist->get_userids();
+        $this->assertContains((int) $student->id, $userids);
+        $this->assertContains((int) $teacher->id, $userids);
+    }
+
+    /**
+     * Test export_user_data exports quiz feedback.
+     */
+    public function test_export_user_data_qfb(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $quiz = $gen->create_module('quiz', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_qfb($cm->id, $student->id, $teacher->id, 1, '<p>Attempt 1</p>');
+        $this->create_qfb($cm->id, $student->id, $teacher->id, 2, '<p>Attempt 2</p>');
+
+        $contextlist = new approved_contextlist($student, 'local_unifiedgrader', [$context->id]);
+        provider::export_user_data($contextlist);
+
+        $data = writer::with_context($context)->get_data(['Quiz feedback']);
+        $this->assertNotEmpty($data);
+        $this->assertNotEmpty($data->quiz_feedback);
+        $this->assertCount(2, $data->quiz_feedback);
+    }
+
+    /**
+     * Test delete_data_for_all_users_in_context deletes quiz feedback.
+     */
+    public function test_delete_data_for_all_users_in_context_qfb(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $quiz = $gen->create_module('quiz', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+
+        $this->create_qfb($cm->id, $student1->id, $teacher->id);
+        $this->create_qfb($cm->id, $student2->id, $teacher->id);
+
+        $this->assertEquals(2, $DB->count_records('local_unifiedgrader_qfb', ['cmid' => $cm->id]));
+
+        provider::delete_data_for_all_users_in_context($context);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_qfb', ['cmid' => $cm->id]));
+    }
+
+    /**
+     * Test delete_data_for_user deletes quiz feedback for the target user only.
+     */
+    public function test_delete_data_for_user_qfb(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $quiz = $gen->create_module('quiz', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+
+        $this->create_qfb($cm->id, $student1->id, $teacher->id);
+        $this->create_qfb($cm->id, $student2->id, $teacher->id);
+
+        $contextlist = new approved_contextlist($student1, 'local_unifiedgrader', [$context->id]);
+        provider::delete_data_for_user($contextlist);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student1->id]));
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student2->id]));
+    }
+
+    /**
+     * Test delete_data_for_users deletes quiz feedback for multiple users.
+     */
+    public function test_delete_data_for_users_qfb(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $quiz = $gen->create_module('quiz', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+        $student3 = $gen->create_user();
+
+        $this->create_qfb($cm->id, $student1->id, $teacher->id);
+        $this->create_qfb($cm->id, $student2->id, $teacher->id);
+        $this->create_qfb($cm->id, $student3->id, $teacher->id);
+
+        $userlist = new approved_userlist(
+            $context,
+            'local_unifiedgrader',
+            [$student1->id, $student2->id],
+        );
+        provider::delete_data_for_users($userlist);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student1->id]));
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student2->id]));
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student3->id]));
+    }
 }

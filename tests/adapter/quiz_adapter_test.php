@@ -274,4 +274,186 @@ final class quiz_adapter_test extends \advanced_testcase {
         $this->assertFalse($s->adapter->supports_feature('filesubmission'));
         $this->assertFalse($s->adapter->supports_feature('annotations'));
     }
+
+    // -------------------------------------------------------------------------
+    // Per-attempt feedback tests.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Test save_grade stores per-attempt feedback in local_unifiedgrader_qfb.
+     */
+    public function test_save_grade_stores_per_attempt_feedback(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario(['studentcount' => 1]);
+        $student = $s->scenario->students[0];
+
+        $s->adapter->save_grade($student->id, null, '<p>Feedback for attempt 1</p>', FORMAT_HTML, [], 0, 0, 1);
+
+        $record = $DB->get_record('local_unifiedgrader_qfb', [
+            'cmid' => $s->scenario->cm->id,
+            'userid' => $student->id,
+            'attemptnumber' => 1,
+        ]);
+
+        $this->assertNotFalse($record);
+        $this->assertStringContainsString('Feedback for attempt 1', $record->feedback);
+    }
+
+    /**
+     * Test save_grade stores different feedback per attempt.
+     */
+    public function test_save_grade_different_feedback_per_attempt(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario(['studentcount' => 1]);
+        $student = $s->scenario->students[0];
+
+        $s->adapter->save_grade($student->id, null, '<p>Attempt 1 feedback</p>', FORMAT_HTML, [], 0, 0, 1);
+        $s->adapter->save_grade($student->id, null, '<p>Attempt 2 feedback</p>', FORMAT_HTML, [], 0, 0, 2);
+
+        $rec1 = $DB->get_record('local_unifiedgrader_qfb', [
+            'cmid' => $s->scenario->cm->id,
+            'userid' => $student->id,
+            'attemptnumber' => 1,
+        ]);
+        $rec2 = $DB->get_record('local_unifiedgrader_qfb', [
+            'cmid' => $s->scenario->cm->id,
+            'userid' => $student->id,
+            'attemptnumber' => 2,
+        ]);
+
+        $this->assertNotFalse($rec1);
+        $this->assertNotFalse($rec2);
+        $this->assertStringContainsString('Attempt 1 feedback', $rec1->feedback);
+        $this->assertStringContainsString('Attempt 2 feedback', $rec2->feedback);
+    }
+
+    /**
+     * Test save_grade updates existing per-attempt feedback record.
+     */
+    public function test_save_grade_updates_existing_feedback(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario(['studentcount' => 1]);
+        $student = $s->scenario->students[0];
+
+        $s->adapter->save_grade($student->id, null, '<p>Original</p>', FORMAT_HTML, [], 0, 0, 1);
+        $s->adapter->save_grade($student->id, null, '<p>Updated</p>', FORMAT_HTML, [], 0, 0, 1);
+
+        $count = $DB->count_records('local_unifiedgrader_qfb', [
+            'cmid' => $s->scenario->cm->id,
+            'userid' => $student->id,
+            'attemptnumber' => 1,
+        ]);
+        $this->assertEquals(1, $count);
+
+        $record = $DB->get_record('local_unifiedgrader_qfb', [
+            'cmid' => $s->scenario->cm->id,
+            'userid' => $student->id,
+            'attemptnumber' => 1,
+        ]);
+        $this->assertStringContainsString('Updated', $record->feedback);
+    }
+
+    /**
+     * Test gradebook syncs with the latest attempt's feedback.
+     */
+    public function test_save_grade_syncs_gradebook_with_latest_attempt(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario(['studentcount' => 1]);
+        $student = $s->scenario->students[0];
+
+        // Save feedback for attempt 2 (latest).
+        $s->adapter->save_grade($student->id, null, '<p>Latest attempt</p>', FORMAT_HTML, [], 0, 0, 2);
+        // Save feedback for attempt 1 (earlier) — gradebook should still have attempt 2's.
+        $s->adapter->save_grade($student->id, null, '<p>Earlier attempt</p>', FORMAT_HTML, [], 0, 0, 1);
+
+        $gradeitem = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => 'quiz',
+            'iteminstance' => $s->scenario->activity->id,
+            'itemnumber' => 0,
+            'courseid' => $s->scenario->course->id,
+        ]);
+        if ($gradeitem) {
+            $gradegrade = \grade_grade::fetch([
+                'itemid' => $gradeitem->id,
+                'userid' => $student->id,
+            ]);
+            if ($gradegrade) {
+                $this->assertStringContainsString('Latest attempt', $gradegrade->feedback);
+            }
+        }
+    }
+
+    /**
+     * Test get_grade_data_for_attempt returns per-attempt feedback when available.
+     */
+    public function test_get_grade_data_for_attempt_returns_per_attempt_feedback(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario(['studentcount' => 1]);
+        $student = $s->scenario->students[0];
+
+        $DB->insert_record('local_unifiedgrader_qfb', (object) [
+            'cmid' => $s->scenario->cm->id,
+            'userid' => $student->id,
+            'attemptnumber' => 1,
+            'feedback' => '<p>Per-attempt feedback</p>',
+            'feedbackformat' => FORMAT_HTML,
+            'grader' => $s->scenario->teacher->id,
+            'timemodified' => time(),
+        ]);
+
+        $data = $s->adapter->get_grade_data_for_attempt($student->id, 1);
+
+        $this->assertStringContainsString('Per-attempt feedback', $data['feedback']);
+    }
+
+    /**
+     * Test get_grade_data falls back to gradebook when no per-attempt record exists.
+     */
+    public function test_get_grade_data_falls_back_to_gradebook(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario(['studentcount' => 1]);
+        $student = $s->scenario->students[0];
+
+        $data = $s->adapter->get_grade_data_for_attempt($student->id, 1);
+
+        $this->assertEmpty(strip_tags($data['feedback']));
+    }
+
+    /**
+     * Test prepare_feedback_draft returns per-attempt feedback.
+     */
+    public function test_prepare_feedback_draft_per_attempt(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario(['studentcount' => 1]);
+        $student = $s->scenario->students[0];
+
+        $DB->insert_record('local_unifiedgrader_qfb', (object) [
+            'cmid' => $s->scenario->cm->id,
+            'userid' => $student->id,
+            'attemptnumber' => 1,
+            'feedback' => '<p>Draft test feedback</p>',
+            'feedbackformat' => FORMAT_HTML,
+            'grader' => $s->scenario->teacher->id,
+            'timemodified' => time(),
+        ]);
+
+        $draftitemid = file_get_unused_draft_itemid();
+        $result = $s->adapter->prepare_feedback_draft($student->id, $draftitemid, 1);
+
+        $this->assertArrayHasKey('feedbackhtml', $result);
+        $this->assertStringContainsString('Draft test feedback', $result['feedbackhtml']);
+    }
 }

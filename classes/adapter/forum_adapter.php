@@ -463,7 +463,7 @@ class forum_adapter extends base_adapter {
      * @param int $draftitemid The shared draft area item ID.
      * @return array With key 'feedbackhtml'.
      */
-    public function prepare_feedback_draft(int $userid, int $draftitemid): array {
+    public function prepare_feedback_draft(int $userid, int $draftitemid, int $attemptnumber = -1): array {
         global $USER;
 
         $feedbacktext = '';

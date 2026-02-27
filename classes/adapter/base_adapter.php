@@ -214,9 +214,10 @@ abstract class base_adapter {
      *
      * @param int $userid The student user ID.
      * @param int $draftitemid The shared draft area item ID.
+     * @param int $attemptnumber Attempt number (activity-specific), or -1 for latest.
      * @return array With key 'feedbackhtml' containing HTML with draft URLs.
      */
-    public function prepare_feedback_draft(int $userid, int $draftitemid): array {
+    public function prepare_feedback_draft(int $userid, int $draftitemid, int $attemptnumber = -1): array {
         return ['feedbackhtml' => ''];
     }
 

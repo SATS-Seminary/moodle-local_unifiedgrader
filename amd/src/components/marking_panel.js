@@ -529,6 +529,8 @@ export default class extends BaseComponent {
             editorWrapper.classList.add('d-none');
             if (displayContent) {
                 displayContent.innerHTML = feedbackHtml;
+                // Force browsers to initialise media elements created via innerHTML.
+                displayContent.querySelectorAll('audio, video').forEach(el => el.load());
             }
         } else {
             // Edit mode: hide banner, show editor.

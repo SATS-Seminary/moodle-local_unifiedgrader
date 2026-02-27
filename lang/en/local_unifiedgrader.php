@@ -410,6 +410,11 @@ $string['privacy:metadata:fext'] = 'Forum due date extensions granted by teacher
 $string['privacy:metadata:fext:userid'] = 'The student the extension was granted to.';
 $string['privacy:metadata:fext:authorid'] = 'The teacher who granted the extension.';
 $string['privacy:metadata:fext:extensionduedate'] = 'The extended due date.';
+$string['privacy:metadata:qfb'] = 'Per-attempt quiz feedback stored by the Unified Grader.';
+$string['privacy:metadata:qfb:userid'] = 'The student the feedback is for.';
+$string['privacy:metadata:qfb:grader'] = 'The teacher who provided the feedback.';
+$string['privacy:metadata:qfb:feedback'] = 'The feedback text.';
+$string['privacy:metadata:qfb:attemptnumber'] = 'The quiz attempt number.';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'All changes saved';
