@@ -541,11 +541,15 @@ export default class extends BaseComponent {
      * Check whether feedback HTML contains meaningful content.
      *
      * @param {string} html The feedback HTML.
-     * @return {boolean} True if there is non-empty text content.
+     * @return {boolean} True if there is non-empty text or multimedia content.
      */
     _hasMeaningfulFeedback(html) {
         if (!html) {
             return false;
+        }
+        // Multimedia elements (audio/video recordings, images, embeds) count as meaningful.
+        if (/<(audio|video|img|object|embed|iframe)\b/i.test(html)) {
+            return true;
         }
         // Strip HTML tags and check for non-whitespace content.
         const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();

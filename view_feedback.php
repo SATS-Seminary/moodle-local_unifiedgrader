@@ -307,10 +307,23 @@ if ($cm->modname === 'quiz') {
 //  Assignment feedback view.
 // ──────────────────────────────────────────────
 
-// Load grade data and submission files.
-$gradedata = $adapter->get_grade_data($userid);
-$submissionfiles = $adapter->get_submission_files($userid);
+// Load attempts and determine which one to show.
+$attemptnum = optional_param('attempt', -1, PARAM_INT);
 $activityinfo = $adapter->get_activity_info();
+$attempts = $adapter->get_attempts($userid);
+$hasmultipleattempts = count($attempts) > 1;
+
+// Default to latest attempt (highest attemptnumber).
+$selectedattempt = -1;
+if ($attemptnum >= 0) {
+    $selectedattempt = $attemptnum;
+} else if (!empty($attempts)) {
+    $selectedattempt = end($attempts)['attemptnumber'];
+}
+
+// Load grade data and submission files for the selected attempt.
+$gradedata = $adapter->get_grade_data_for_attempt($userid, $selectedattempt);
+$submissionfiles = $adapter->get_submission_files_for_attempt($userid, $selectedattempt);
 
 // Filter to PDF files and files convertible to PDF (annotations apply to both).
 $pdffiles = array_values(array_filter($submissionfiles, function ($f) {
@@ -399,7 +412,7 @@ $assign = new \assign($context, $cm, $course);
 // Rewrite @@PLUGINFILE@@ URLs in feedback text so embedded files (videos, images) load.
 $feedback = $gradedata['feedback'];
 if (!empty($feedback)) {
-    $grade = $assign->get_user_grade($userid, false);
+    $grade = $assign->get_user_grade($userid, false, $selectedattempt);
     if ($grade) {
         $feedback = file_rewrite_pluginfile_urls(
             $feedback,
@@ -415,7 +428,7 @@ if (!empty($feedback)) {
 // Check for feedback files (assignfeedback_file plugin).
 $feedbackfiles = [];
 $hasfeedbackfiles = false;
-$grade = $assign->get_user_grade($userid, false) ?: null;
+$grade = $assign->get_user_grade($userid, false, $selectedattempt) ?: null;
 if ($grade && $adapter->has_feedback_plugin('file')) {
     $fs = get_file_storage();
     $files = $fs->get_area_files(
@@ -450,7 +463,7 @@ if ($grade && $adapter->has_feedback_plugin('file')) {
 $hascommentsfeature = false;
 $commentcount = 0;
 $canpostcomments = false;
-$submission = $assign->get_user_submission($userid, false);
+$submission = $assign->get_user_submission($userid, false, $selectedattempt);
 if ($submission) {
     foreach ($assign->get_submission_plugins() as $plugin) {
         if ($plugin->get_type() === 'comments' && $plugin->is_enabled()) {
@@ -473,11 +486,31 @@ if ($submission) {
 
 $showrightcolumn = !empty($feedback) || $gradinginfo['hasadvancedgrading'];
 
-// Build feedback PDF download URL.
-$feedbackdownloadurl = (new moodle_url('/local/unifiedgrader/download_feedback.php', [
+// Build feedback PDF download URL (include attempt number if set).
+$downloadparams = [
     'cmid' => $cmid,
     'fileid' => $selectedfile ? $selectedfile['fileid'] : 0,
-]))->out(false);
+];
+if ($selectedattempt >= 0) {
+    $downloadparams['attempt'] = $selectedattempt;
+}
+$feedbackdownloadurl = (new moodle_url('/local/unifiedgrader/download_feedback.php',
+    $downloadparams))->out(false);
+
+// Build attempt selector data for the template.
+$attemptlist = [];
+foreach ($attempts as $att) {
+    $attemptlist[] = [
+        'attemptnumber' => $att['attemptnumber'],
+        'label' => get_string('attempt_label', 'local_unifiedgrader', $att['attemptnumber'] + 1),
+        'date' => userdate($att['timemodified'], get_string('strftimedatetimeshort')),
+        'selected' => ($att['attemptnumber'] === $selectedattempt),
+        'url' => (new moodle_url('/local/unifiedgrader/view_feedback.php', [
+            'cmid' => $cmid,
+            'attempt' => $att['attemptnumber'],
+        ]))->out(false),
+    ];
+}
 
 // Prepare template context.
 $templatedata = [
@@ -520,6 +553,8 @@ $templatedata = [
     'gradingmethodname' => $gradinginfo['gradingmethodname'],
     'haspenalties' => $penaltyinfo['haspenalties'],
     'penalties' => $penaltyinfo['penalties'],
+    'hasmultipleattempts' => $hasmultipleattempts,
+    'attempts' => $attemptlist,
 ];
 
 // Output.

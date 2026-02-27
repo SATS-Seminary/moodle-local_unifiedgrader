@@ -420,6 +420,10 @@ class forum_adapter extends base_adapter {
             $this->save_grade_directly($userid, $grade);
         }
 
+        // Ensure the gradebook record exists before processing feedback files,
+        // since file storage is keyed by grade_grade.id.
+        $this->sync_gradebook_penalty($userid);
+
         // Process feedback files from the draft area before saving feedback text.
         $feedbacktosave = $feedback;
         if ($draftitemid > 0) {

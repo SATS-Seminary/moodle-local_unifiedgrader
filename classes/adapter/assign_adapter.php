@@ -621,6 +621,18 @@ class assign_adapter extends base_adapter {
     }
 
     /**
+     * Get submission files for a specific attempt.
+     *
+     * @param int $userid
+     * @param int $attemptnumber 0-based attempt number, -1 for latest.
+     * @return array
+     */
+    public function get_submission_files_for_attempt(int $userid, int $attemptnumber = -1): array {
+        $submission = $this->assign->get_user_submission($userid, false, $attemptnumber);
+        return $this->build_submission_files($submission ?: null);
+    }
+
+    /**
      * Build the file list for a given submission record.
      *
      * @param \stdClass|null $submission
