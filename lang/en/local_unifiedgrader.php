@@ -29,6 +29,8 @@ $string['pluginname'] = 'Unified Grader';
 $string['grading_interface'] = 'Unified Grader';
 $string['nopermission'] = 'You do not have permission to use the Unified Grader.';
 $string['invalidactivitytype'] = 'This activity type is not supported by the Unified Grader.';
+$string['invalidmodule'] = 'Invalid activity module.';
+$string['viewfeedback'] = 'View feedback';
 
 // Attempts.
 $string['attempt'] = 'Attempt';
@@ -59,6 +61,8 @@ $string['savefeedback'] = 'Save feedback';
 $string['savinggrade'] = 'Saving grade...';
 $string['gradesaved'] = 'Grade saved';
 $string['error_saving'] = 'Error saving grade.';
+$string['error_network'] = 'Unable to connect to the server. Please check your connection and try again.';
+$string['error_offline_comments'] = 'Cannot add comments while offline.';
 $string['feedback'] = 'Feedback';
 $string['overall_feedback'] = 'Overall Feedback';
 $string['feedback_saved'] = 'Feedback (saved)';
@@ -165,6 +169,7 @@ $string['view_feedback'] = 'View feedback';
 $string['view_annotated_feedback'] = 'View Annotated Feedback';
 $string['feedback_not_available'] = 'Your feedback is not yet available. Please check back after your submission has been graded and released.';
 $string['no_annotated_files'] = 'There are no annotated PDF files for your submission.';
+$string['feedback_banner_default'] = 'Your teacher has provided feedback on your submission.';
 
 // Document conversion.
 $string['conversion_failed'] = 'This file could not be converted to PDF for preview.';
@@ -415,6 +420,8 @@ $string['privacy:metadata:qfb:userid'] = 'The student the feedback is for.';
 $string['privacy:metadata:qfb:grader'] = 'The teacher who provided the feedback.';
 $string['privacy:metadata:qfb:feedback'] = 'The feedback text.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'The quiz attempt number.';
+$string['privacy_forum_extensions'] = 'Forum extensions';
+$string['privacy_quiz_feedback'] = 'Quiz feedback';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'All changes saved';

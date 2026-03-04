@@ -30,6 +30,13 @@ namespace local_unifiedgrader;
 
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Event observer callbacks for keeping the plugin in sync with native activity UIs.
+ *
+ * @package    local_unifiedgrader
+ * @copyright  2026 South African Theological Seminary
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class observer {
 
     /**

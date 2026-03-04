@@ -26,6 +26,13 @@ namespace local_unifiedgrader;
 
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * PSR-14 hook callback implementations.
+ *
+ * @package    local_unifiedgrader
+ * @copyright  2026 South African Theological Seminary
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class hook_callbacks {
 
     /**

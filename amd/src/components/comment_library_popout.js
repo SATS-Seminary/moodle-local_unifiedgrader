@@ -41,7 +41,7 @@ const _handleError = (err) => {
     if (err && (err.errorcode || err.debuginfo)) {
         Notification.exception(err);
     } else {
-        Notification.alert('Error', 'Unable to connect to the server. Please check your connection and try again.');
+        Notification.alert(getString('error'), getString('error_network', 'local_unifiedgrader'));
         window.console.warn('[comment_library_popout] Network error:', err);
     }
 };
@@ -500,7 +500,7 @@ export default class CommentLibraryPopout {
      */
     async _handleQuickAdd() {
         if (this._offline) {
-            Notification.alert('Error', 'Cannot add comments while offline.');
+            Notification.alert(getString('error'), getString('error_offline_comments', 'local_unifiedgrader'));
             return;
         }
         const text = this._quickInput.value.trim();

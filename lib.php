@@ -64,14 +64,9 @@ function local_unifiedgrader_extend_settings_navigation(
     }
 
     $cangrade = has_capability('local/unifiedgrader:grade', $context);
-    $canviewfeedback = has_capability('local/unifiedgrader:viewfeedback', $context);
 
     // Student feedback is handled by the PSR-14 hook (feedback_banner.js +
     // assessment_criteria.js) — no secondary nav node needed.
-    if (!$cangrade) {
-        return;
-    }
-
     // Teacher grading tab — requires the 'modulesettings' node in the settings
     // navigation tree (always present for users with editing capabilities).
     if (!$cangrade) {

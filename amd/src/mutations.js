@@ -26,6 +26,7 @@
 
 import Ajax from 'core/ajax';
 import Notification from 'core/notification';
+import {get_string as getString} from 'core/str';
 import * as SaveQueue from 'local_unifiedgrader/save_queue';
 import * as DirtyTracker from 'local_unifiedgrader/dirty_tracker';
 import * as OfflineCache from 'local_unifiedgrader/offline_cache';
@@ -41,7 +42,7 @@ const _handleError = (error) => {
     if (error?.errorcode) {
         Notification.exception(error);
     } else {
-        Notification.alert('Error', 'Unable to connect to the server. Please check your connection and try again.');
+        Notification.alert(getString('error'), getString('error_network', 'local_unifiedgrader'));
         window.console.warn('[mutations] Network error:', error);
     }
 };

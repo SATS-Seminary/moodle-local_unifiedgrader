@@ -43,7 +43,11 @@ const createButton = (navKey, href, text) => {
     btn.href = href;
     btn.className = 'btn btn-sm btn-outline-primary d-flex align-items-center gap-1 ms-auto text-nowrap';
     btn.setAttribute('role', 'menuitem');
-    btn.innerHTML = '<i class="fa ' + icon + '" aria-hidden="true"></i> ' + text;
+    const iconEl = document.createElement('i');
+    iconEl.className = 'fa ' + icon;
+    iconEl.setAttribute('aria-hidden', 'true');
+    btn.appendChild(iconEl);
+    btn.appendChild(document.createTextNode(' ' + text));
 
     const li = document.createElement('li');
     li.className = 'nav-item d-flex align-items-center ms-auto';
@@ -134,8 +138,20 @@ const injectFallbackBanner = (navKey, href, text) => {
     const banner = document.createElement('div');
     banner.id = 'ug-feedback-banner';
     banner.className = 'alert alert-info d-flex justify-content-between align-items-center mb-3';
-    banner.innerHTML = '<span><i class="fa ' + icon + ' me-2" aria-hidden="true"></i>' + text + '</span>'
-        + '<a href="' + href + '" class="btn btn-primary btn-sm">' + text + '</a>';
+    const spanEl = document.createElement('span');
+    const spanIcon = document.createElement('i');
+    spanIcon.className = 'fa ' + icon + ' me-2';
+    spanIcon.setAttribute('aria-hidden', 'true');
+    spanEl.appendChild(spanIcon);
+    spanEl.appendChild(document.createTextNode(text));
+
+    const linkEl = document.createElement('a');
+    linkEl.href = href;
+    linkEl.className = 'btn btn-primary btn-sm';
+    linkEl.textContent = text;
+
+    banner.appendChild(spanEl);
+    banner.appendChild(linkEl);
 
     // Insert at the top of the main content region.
     const mainRegion = document.getElementById('region-main')

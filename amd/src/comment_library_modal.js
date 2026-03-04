@@ -43,7 +43,7 @@ const _handleError = (err) => {
     if (err && (err.errorcode || err.debuginfo)) {
         Notification.exception(err);
     } else {
-        Notification.alert('Error', 'Unable to connect to the server. Please check your connection and try again.');
+        Notification.alert(getString('error'), getString('error_network', 'local_unifiedgrader'));
         window.console.warn('[comment_library_modal] Network error:', err);
     }
 };

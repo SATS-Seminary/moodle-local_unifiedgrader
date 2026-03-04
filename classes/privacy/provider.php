@@ -382,7 +382,7 @@ class provider implements
                 }, $fexts);
 
                 writer::with_context($context)->export_data(
-                    ['Forum extensions'],
+                    [get_string('privacy_forum_extensions', 'local_unifiedgrader')],
                     (object) ['forum_extensions' => array_values($exportdata)],
                 );
             }
@@ -404,7 +404,7 @@ class provider implements
                 }, $qfbs);
 
                 writer::with_context($context)->export_data(
-                    ['Quiz feedback'],
+                    [get_string('privacy_quiz_feedback', 'local_unifiedgrader')],
                     (object) ['quiz_feedback' => array_values($exportdata)],
                 );
             }

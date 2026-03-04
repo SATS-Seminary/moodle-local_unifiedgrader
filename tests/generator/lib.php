@@ -48,6 +48,9 @@ class local_unifiedgrader_generator extends component_generator_base {
     /** @var int Counter for penalties. */
     protected int $penaltycount = 0;
 
+    /** @var int Counter for grading scenarios (used for unique course shortnames). */
+    protected int $scenariocount = 0;
+
     /**
      * Reset generator counters.
      */
@@ -57,6 +60,7 @@ class local_unifiedgrader_generator extends component_generator_base {
         $this->clibcount = 0;
         $this->tagcount = 0;
         $this->penaltycount = 0;
+        $this->scenariocount = 0;
         parent::reset();
     }
 
@@ -255,8 +259,12 @@ class local_unifiedgrader_generator extends component_generator_base {
             set_config("enable_{$modname}", 1, 'local_unifiedgrader');
         }
 
-        // Create course.
-        $course = $gen->create_course(['shortname' => 'TEST101-2026-S1', 'fullname' => 'Test Course']);
+        // Create course with unique shortname.
+        $this->scenariocount++;
+        $course = $gen->create_course([
+            'shortname' => 'TEST101-2026-S1-' . $this->scenariocount,
+            'fullname' => 'Test Course',
+        ]);
 
         // Create activity.
         $defaults = ['course' => $course->id, 'name' => "Test {$modname}"];
@@ -277,13 +285,14 @@ class local_unifiedgrader_generator extends component_generator_base {
         $context = \context_module::instance($cm->id);
 
         // Create teacher and enrol.
-        $teacher = $gen->create_user(['username' => 'teacher1']);
+        $sc = $this->scenariocount;
+        $teacher = $gen->create_user(['username' => "teacher{$sc}"]);
         $gen->enrol_user($teacher->id, $course->id, 'editingteacher');
 
         // Create students and enrol.
         $students = [];
         for ($i = 1; $i <= $studentcount; $i++) {
-            $student = $gen->create_user(['username' => "student{$i}"]);
+            $student = $gen->create_user(['username' => "student{$sc}_{$i}"]);
             $gen->enrol_user($student->id, $course->id, 'student');
             $students[] = $student;
         }

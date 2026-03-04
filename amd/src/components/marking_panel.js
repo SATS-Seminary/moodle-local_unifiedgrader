@@ -567,6 +567,8 @@ export default class extends BaseComponent {
             display.classList.remove('d-none');
             editorWrapper.classList.add('d-none');
             if (displayContent) {
+                // Trust boundary: feedbackHtml is TinyMCE editor output processed through
+                // format_text() server-side. innerHTML is intentional to preserve rich formatting.
                 displayContent.innerHTML = feedbackHtml;
                 // Force browsers to initialise media elements created via innerHTML.
                 displayContent.querySelectorAll('audio, video').forEach(el => el.load());
@@ -1334,7 +1336,8 @@ export default class extends BaseComponent {
             header.appendChild(maxEl);
             row.appendChild(header);
 
-            // Description for markers (sanitized server-side via format_text in the adapter).
+            // Trust boundary: descriptionmarkers is sanitized server-side via format_text()
+            // in the adapter. innerHTML is intentional to preserve rich formatting.
             if (criterion.descriptionmarkers) {
                 const markerDesc = document.createElement('div');
                 markerDesc.className = 'small text-muted mb-2';
