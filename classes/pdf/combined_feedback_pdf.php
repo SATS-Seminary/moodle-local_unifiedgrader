@@ -29,7 +29,7 @@ defined('MOODLE_INTERNAL') || die();
  * GhostScript is already a Moodle system requirement for assignfeedback_editpdf.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary (https://www.sats.ac.za)
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za) (https://www.sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class combined_feedback_pdf {

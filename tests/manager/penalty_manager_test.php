@@ -23,7 +23,7 @@ use local_unifiedgrader\penalty_manager;
  *
  * @package    local_unifiedgrader
  * @category   test
- * @copyright  2026 South African Theological Seminary
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers \local_unifiedgrader\penalty_manager
  */

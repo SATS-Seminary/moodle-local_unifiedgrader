@@ -25,7 +25,7 @@ defined('MOODLE_INTERNAL') || die();
  * feedback PDF download endpoint (download_feedback.php).
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary (https://www.sats.ac.za)
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za) (https://www.sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class feedback_data_helper {

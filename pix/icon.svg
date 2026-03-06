@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- U (lighter, top-left) -->
-  <path d="M8,4 L8,24 C8,36 14,42 24,42 C34,42 40,36 40,24 L40,4"
-        fill="none" stroke="#7a7a9e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- G (darker, bottom-right, overlapping) -->
-  <path d="M56,30 C56,30 50,20 38,20 C26,20 20,30 20,40 C20,50 26,58 38,58 C50,58 56,50 56,44 L56,40 L42,40"
-        fill="none" stroke="#1a1a2e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>

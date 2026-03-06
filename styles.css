@@ -12,10 +12,21 @@
     height: calc(100vh - 60px);
 }
 
+/* Below 1200px the header text wraps — increase header height to accommodate. */
+@media (max-width: 1199px) {
+    .local-unifiedgrader-container > .d-flex.border-bottom {
+        height: 110px !important;
+    }
+}
+
 .local-unifiedgrader-container [data-region="preview-panel"],
 .local-unifiedgrader-container [data-region="marking-panel"] {
     height: 100%;
     overflow-y: auto;
+}
+
+.local-unifiedgrader-container [data-region="document-preview"] {
+    padding-left: 20px;
 }
 
 .local-unifiedgrader-container [data-region="preview-content"] .card-body {
@@ -127,6 +138,10 @@
 }
 
 /* Annotation toolbar. */
+.local-unifiedgrader-container [data-region="annotation-toolbar"] {
+    padding-left: 12px;
+}
+
 .local-unifiedgrader-container [data-region="annotation-toolbar-inner"] {
     min-height: 36px;
 }

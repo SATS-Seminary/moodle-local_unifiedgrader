@@ -21,7 +21,7 @@
  * are a separate system not handled here.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -174,6 +174,24 @@ class forum_adapter extends base_adapter {
 
         $forumduedate = (int) $this->forum->get_due_date();
 
+        // For grading-disabled forums, batch-load gradebook feedback to determine
+        // "graded" status (since forum_grades won't have entries).
+        $gradingenabled = $this->forum->is_grading_enabled();
+        $feedbackuserids = [];
+        if (!$gradingenabled) {
+            $gradeitem = $this->fetch_grade_item();
+            if ($gradeitem) {
+                $gradegrades = \grade_grade::fetch_all(['itemid' => $gradeitem->id]);
+                if ($gradegrades) {
+                    foreach ($gradegrades as $gg) {
+                        if (!empty($gg->feedback)) {
+                            $feedbackuserids[(int) $gg->userid] = true;
+                        }
+                    }
+                }
+            }
+        }
+
         $result = [];
         foreach ($enrolledusers as $user) {
             $userid = (int) $user->id;
@@ -182,6 +200,10 @@ class forum_adapter extends base_adapter {
 
             $hasposts = $userposts && (int) $userposts->postcount > 0;
             $hasgrade = $usergrade && $usergrade->grade !== null;
+            // For grading-disabled forums, treat "has gradebook feedback" as graded.
+            if (!$gradingenabled && !$hasgrade && isset($feedbackuserids[$userid])) {
+                $hasgrade = true;
+            }
             $status = $this->resolve_status($hasposts, $hasgrade);
 
             $userpicture = new \user_picture($user);

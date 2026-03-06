@@ -27,7 +27,7 @@ defined('MOODLE_INTERNAL') || die();
  * types — including comments, penalties, student view, and feedback download.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \local_unifiedgrader\adapter\assign_adapter
  * @covers     \local_unifiedgrader\adapter\forum_adapter

@@ -80,6 +80,8 @@ export default class extends BaseComponent {
             FINAL_GRADE_PERCENTAGE: '[data-region="final-grade-percentage"]',
             ATTEMPT_SELECTOR: '[data-region="attempt-selector"]',
             ATTEMPT_SELECT: '[data-action="attempt-select"]',
+            MARK_GRADED_SECTION: '[data-region="mark-graded-section"]',
+            MARK_GRADED_TOGGLE: '[data-action="mark-graded-toggle"]',
         };
         this._editingFeedback = false;
         this._penaltyPopout = null;
@@ -153,6 +155,15 @@ export default class extends BaseComponent {
                     DirtyTracker.markDirty('grade');
                     this._cacheGradeValue();
                 }
+            });
+        }
+
+        // "Mark as graded" toggle — save immediately on change.
+        const markGradedToggle = this.getElement(this.selectors.MARK_GRADED_TOGGLE);
+        if (markGradedToggle) {
+            markGradedToggle.addEventListener('change', () => {
+                DirtyTracker.markDirty('grade');
+                this._handleSaveGrade();
             });
         }
 
@@ -412,6 +423,7 @@ export default class extends BaseComponent {
         const gradingDisabled = state.activity?.gradingdisabled || false;
         const gradeSection = this.getElement(this.selectors.GRADE_SECTION);
         const rubricSection = this.getElement(this.selectors.RUBRIC_SECTION);
+        const markGradedSection = this.getElement(this.selectors.MARK_GRADED_SECTION);
         if (gradingDisabled) {
             if (gradeSection) {
                 gradeSection.classList.add('d-none');
@@ -419,9 +431,23 @@ export default class extends BaseComponent {
             if (rubricSection) {
                 rubricSection.classList.add('d-none');
             }
+            // Show the "Mark as graded" toggle for feedback-only activities.
+            if (markGradedSection) {
+                markGradedSection.classList.remove('d-none');
+                const toggle = this.getElement(this.selectors.MARK_GRADED_TOGGLE);
+                if (toggle) {
+                    toggle.checked = state.grade?.grade !== null
+                        && state.grade?.grade !== undefined
+                        && state.grade.grade >= 0;
+                }
+            }
             // Still render feedback content and expand the section.
             this._renderFeedbackAndSnapshot(state, true);
             return;
+        }
+        // Hide the toggle when grading is enabled.
+        if (markGradedSection) {
+            markGradedSection.classList.add('d-none');
         }
         if (gradeSection) {
             gradeSection.classList.remove('d-none');
@@ -1545,7 +1571,13 @@ export default class extends BaseComponent {
 
         // Read grade from the appropriate input (scale dropdown or numeric input).
         let grade = '';
-        if (state.activity?.usescale) {
+        const gradingDisabled = state.activity?.gradingdisabled || false;
+        if (gradingDisabled) {
+            // For feedback-only activities, the "Mark as graded" toggle determines
+            // whether we save grade=0 (graded) or grade='' (becomes -1 = not graded).
+            const toggle = this.getElement(this.selectors.MARK_GRADED_TOGGLE);
+            grade = (toggle && toggle.checked) ? '0' : '';
+        } else if (state.activity?.usescale) {
             const scaleInput = this.getElement(this.selectors.SCALE_INPUT);
             grade = scaleInput ? scaleInput.value : '';
         } else {

@@ -22,7 +22,7 @@
  * cache invalidation and real-time update logic.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -34,7 +34,7 @@ defined('MOODLE_INTERNAL') || die();
  * Event observer callbacks for keeping the plugin in sync with native activity UIs.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class observer {

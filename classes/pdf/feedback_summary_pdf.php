@@ -28,7 +28,7 @@ require_once($CFG->libdir . '/pdflib.php');
  * overall feedback, rubric/marking guide with teacher comments, and penalties.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary (https://www.sats.ac.za)
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za) (https://www.sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class feedback_summary_pdf extends \pdf {

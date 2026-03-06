@@ -41,6 +41,22 @@
         <div class="card-body py-2" data-region="plagiarism-body"></div>
     </div>
 
+    {{! Mark-as-graded toggle (shown by JS when grading is disabled, e.g. grade type "None") }}
+    <div data-region="mark-graded-section" class="d-none mb-3">
+        <div class="card">
+            <div class="card-body py-2 d-flex align-items-center justify-content-between">
+                <label class="form-check-label fw-bold mb-0" for="mark-graded-toggle-{{uniqid}}">
+                    {{#str}} mark_as_graded, local_unifiedgrader {{/str}}
+                </label>
+                <div class="form-check form-switch mb-0">
+                    <input type="checkbox" class="form-check-input" role="switch"
+                           id="mark-graded-toggle-{{uniqid}}"
+                           data-action="mark-graded-toggle">
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{! Grade section (hidden by JS when forum grading is disabled) }}
     <div data-region="grade-section" class="card mb-3">
         <div class="card-header py-2">

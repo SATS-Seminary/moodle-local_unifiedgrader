@@ -18,7 +18,7 @@
  * External function: delete note.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

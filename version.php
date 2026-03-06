@@ -18,14 +18,14 @@
  * Plugin version and other metadata.
  *
  * @package    local_unifiedgrader
- * @copyright  2026 South African Theological Seminary
+ * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_unifiedgrader';
-$plugin->version   = 2026030306; // YYYYMMDDXX format.
+$plugin->version   = 2026030601; // YYYYMMDDXX format.
 $plugin->release   = '2.0.1';
 $plugin->requires  = 2024110400; // Moodle 5.0+.
 $plugin->maturity  = MATURITY_BETA;
