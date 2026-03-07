@@ -427,6 +427,10 @@ export default class PenaltyPopout {
                 ? 'badge bg-danger penalty-active-item local-unifiedgrader-penalty-badge'
                 : 'badge bg-warning text-dark penalty-active-item local-unifiedgrader-penalty-badge';
 
+            // Use a text node so async getString updates don't wipe child elements.
+            const labelNode = document.createTextNode('');
+            badge.appendChild(labelNode);
+
             // Late penalties are auto-managed — no delete button.
             if (!isLate) {
                 const removeBtn = document.createElement('button');
@@ -438,11 +442,27 @@ export default class PenaltyPopout {
                     e.stopPropagation();
                     this._onDelete(p.id);
                 });
-                const displayLabel = p.category === 'wordcount' ? 'Word count' : (p.label || 'Other');
-                badge.textContent = '-' + p.percentage + '% ' + displayLabel;
                 badge.appendChild(removeBtn);
+
+                if (p.category === 'wordcount') {
+                    labelNode.textContent = '-' + p.percentage + '% …';
+                    getString('penalty_wordcount', 'local_unifiedgrader').then((s) => {
+                        labelNode.textContent = '-' + p.percentage + '% ' + s;
+                    });
+                } else {
+                    const fallback = p.label || 'Other';
+                    labelNode.textContent = '-' + p.percentage + '% ' + fallback;
+                    if (!p.label) {
+                        getString('penalty_other', 'local_unifiedgrader').then((s) => {
+                            labelNode.textContent = '-' + p.percentage + '% ' + s;
+                        });
+                    }
+                }
             } else {
-                badge.textContent = '-' + p.percentage + '% ' + (p.label || 'Late');
+                labelNode.textContent = '-' + p.percentage + '% ' + (p.label || 'Late');
+                getString('penalty_late_label', 'local_unifiedgrader').then((s) => {
+                    labelNode.textContent = '-' + p.percentage + '% ' + (p.label || s);
+                });
                 badge.title = 'Automatically calculated based on penalty rules';
                 getString('penalty_late_auto', 'local_unifiedgrader').then((s) => {
                     badge.title = s;

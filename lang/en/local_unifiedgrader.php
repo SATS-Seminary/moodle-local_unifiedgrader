@@ -388,6 +388,15 @@ $string['penalty_custom'] = 'Custom';
 $string['penalty_label_placeholder'] = 'Label (max 15 chars)';
 $string['penalty_active'] = 'Active penalties';
 $string['penalty_badge'] = '-{$a->percentage}% {$a->label}';
+$string['penalty_late_label'] = 'Late';
+$string['penalty_late_applied'] = 'Late penalty of {$a}% applied';
+$string['late_days'] = '{$a} days';
+$string['late_day'] = '{$a} day';
+$string['late_hours'] = '{$a} hours';
+$string['late_hour'] = '{$a} hour';
+$string['late_mins'] = '{$a} mins';
+$string['late_min'] = '{$a} min';
+$string['late_lessthanmin'] = '< 1 min';
 $string['finalgradeafterpenalties'] = 'Final grade after penalties:';
 $string['cannotdeleteautopenalty'] = 'Late penalties are automatically calculated and cannot be deleted.';
 

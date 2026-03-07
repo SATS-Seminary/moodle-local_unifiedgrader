@@ -977,10 +977,24 @@ export default class extends BaseComponent {
                 // Late penalties get a red badge — they are auto-managed and not editable.
                 badge.className = 'badge bg-danger local-unifiedgrader-penalty-badge';
                 badge.textContent = '-' + p.percentage + '% ' + (p.label || 'Late');
+                getString('penalty_late_label', 'local_unifiedgrader').then((s) => {
+                    badge.textContent = '-' + p.percentage + '% ' + (p.label || s);
+                });
             } else {
                 badge.className = 'badge bg-warning text-dark local-unifiedgrader-penalty-badge';
-                const displayLabel = p.category === 'wordcount' ? 'Word count' : (p.label || 'Other');
-                badge.textContent = '-' + p.percentage + '% ' + displayLabel;
+                if (p.category === 'wordcount') {
+                    badge.textContent = '-' + p.percentage + '% …';
+                    getString('penalty_wordcount', 'local_unifiedgrader').then((s) => {
+                        badge.textContent = '-' + p.percentage + '% ' + s;
+                    });
+                } else {
+                    badge.textContent = '-' + p.percentage + '% ' + (p.label || 'Other');
+                    if (!p.label) {
+                        getString('penalty_other', 'local_unifiedgrader').then((s) => {
+                            badge.textContent = '-' + p.percentage + '% ' + s;
+                        });
+                    }
+                }
             }
             badgesEl.appendChild(badge);
         });
@@ -1045,7 +1059,13 @@ export default class extends BaseComponent {
         badge.className = 'badge bg-danger local-unifiedgrader-penalty-badge';
         badge.dataset.penalty = 'late';
         badge.textContent = '-' + penaltyPct + '% Late';
-        badge.title = 'Late penalty of ' + penaltyPct + '% applied';
+        badge.title = '';
+        getString('penalty_late_label', 'local_unifiedgrader').then((s) => {
+            badge.textContent = '-' + penaltyPct + '% ' + s;
+        });
+        getString('penalty_late_applied', 'local_unifiedgrader', penaltyPct).then((s) => {
+            badge.title = s;
+        });
         badgesEl.appendChild(badge);
     }
 
@@ -1750,22 +1770,41 @@ export default class extends BaseComponent {
         const hours = Math.floor((diffSeconds % 86400) / 3600);
         const minutes = Math.floor((diffSeconds % 3600) / 60);
 
-        let parts = [];
+        // Build duration string from translated parts.
+        const textEl = this.getElement(this.selectors.LATE_TEXT);
+        if (!textEl) {
+            indicator.classList.remove('d-none');
+            return;
+        }
+
+        const stringPromises = [];
         if (days > 0) {
-            parts.push(days + (days === 1 ? ' day' : ' days'));
+            const key = days === 1 ? 'late_day' : 'late_days';
+            stringPromises.push(getString(key, 'local_unifiedgrader', days));
         }
         if (hours > 0) {
-            parts.push(hours + (hours === 1 ? ' hour' : ' hours'));
+            const key = hours === 1 ? 'late_hour' : 'late_hours';
+            stringPromises.push(getString(key, 'local_unifiedgrader', hours));
         }
         // Show minutes only when less than 1 day late.
         if (days === 0 && minutes > 0) {
-            parts.push(minutes + (minutes === 1 ? ' min' : ' mins'));
+            const key = minutes === 1 ? 'late_min' : 'late_mins';
+            stringPromises.push(getString(key, 'local_unifiedgrader', minutes));
         }
-        const durationText = parts.join(' ') || '< 1 min';
 
-        const textEl = this.getElement(this.selectors.LATE_TEXT);
-        if (textEl) {
-            textEl.textContent = 'Late: ' + durationText;
+        if (stringPromises.length === 0) {
+            getString('late_lessthanmin', 'local_unifiedgrader').then((lessThan) => {
+                getString('status_late', 'local_unifiedgrader', lessThan).then((s) => {
+                    textEl.textContent = s;
+                });
+            });
+        } else {
+            Promise.all(stringPromises).then((parts) => {
+                const durationText = parts.join(' ');
+                getString('status_late', 'local_unifiedgrader', durationText).then((s) => {
+                    textEl.textContent = s;
+                });
+            });
         }
         indicator.classList.remove('d-none');
     }
