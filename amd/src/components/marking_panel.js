@@ -1082,6 +1082,15 @@ export default class extends BaseComponent {
      */
     _getLatePenaltyPct() {
         const state = this.reactive.state;
+
+        // If the submission is no longer late (e.g. extension granted after submission),
+        // suppress the penalty badge even if assign_grades.penalty is still set.
+        const duedate = state.submission?.effectiveduedate || state.activity?.duedate || 0;
+        const submitted = state.submission?.timecreated || state.submission?.timemodified || 0;
+        if (duedate && submitted && submitted <= duedate) {
+            return 0;
+        }
+
         let pct = parseInt(state.grade?.latepenaltypct, 10) || 0;
         if (!pct) {
             const feedback = state.grade?.feedback || '';

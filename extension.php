@@ -94,6 +94,13 @@ if ($fromform) {
     $result = $assign->save_user_extension($userid, $extensionduedate);
 
     if ($result) {
+        // Recalculate the late penalty now that the effective due date has changed.
+        // If the extension covers the submission time, Moodle core will clear the
+        // penalty from assign_grades and update the gradebook grade accordingly.
+        if (class_exists('\mod_assign\penalty\helper')) {
+            \mod_assign\penalty\helper::apply_penalty_to_user($cm->instance, $userid);
+        }
+
         echo $OUTPUT->header();
         echo '<script>window.parent.postMessage({type: "extension_saved"}, "*");</script>';
         echo $OUTPUT->footer();

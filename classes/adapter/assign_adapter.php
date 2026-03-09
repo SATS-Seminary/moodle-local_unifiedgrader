@@ -409,12 +409,25 @@ class assign_adapter extends base_adapter {
         // Moodle stores assign_grades.penalty as a percentage of the student's
         // grade (deducted_points / grade * 100), not the max grade. Convert it
         // to a percentage of max grade so it matches the configured penalty rules.
+        //
+        // Suppress the penalty if the submission is no longer late (e.g. an
+        // extension was granted after the student submitted). The penalty field
+        // in assign_grades is not recalculated by Moodle core when extensions
+        // change, so we must cross-check against the effective due date.
         $latepenaltypct = null;
         if ($grade && isset($grade->penalty) && $grade->penalty > 0 && $grade->grade > 0) {
-            $maxgrade = (float) $instance->grade;
-            if ($maxgrade > 0) {
-                $deductedmark = $grade->grade * $grade->penalty / 100;
-                $latepenaltypct = (int) round($deductedmark / $maxgrade * 100);
+            $effectiveduedate = $this->get_effective_duedate($userid);
+            $submission = $this->assign->get_user_submission($userid, false);
+            $submittedat = $submission ? (int) $submission->timecreated : 0;
+
+            // Only report the penalty if the submission is actually late.
+            $stilllate = $effectiveduedate > 0 && $submittedat > 0 && $submittedat > $effectiveduedate;
+            if ($stilllate) {
+                $maxgrade = (float) $instance->grade;
+                if ($maxgrade > 0) {
+                    $deductedmark = $grade->grade * $grade->penalty / 100;
+                    $latepenaltypct = (int) round($deductedmark / $maxgrade * 100);
+                }
             }
         }
 
