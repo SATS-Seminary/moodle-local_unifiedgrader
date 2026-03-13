@@ -188,17 +188,44 @@ export default class extends BaseComponent {
         // Group filter is handled by _initGroupSelector (checkbox dropdown).
 
         // Keyboard navigation.
+        const SCROLL_STEP = 80;
         document.addEventListener('keydown', (e) => {
             // Only handle if no input is focused.
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
                 return;
             }
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            if (e.key === 'ArrowLeft') {
                 e.preventDefault();
                 this._navigateStudent(-1);
-            } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 this._navigateStudent(1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                // Scroll the preview pane content.
+                const root = this._container?.closest('.local-unifiedgrader-container');
+                if (!root) {
+                    return;
+                }
+                // PDF viewer scroll container.
+                const pdfContainer = root.querySelector('[data-region="pdf-page-container"]');
+                if (pdfContainer && pdfContainer.offsetParent !== null) {
+                    e.preventDefault();
+                    pdfContainer.scrollBy({top: e.key === 'ArrowDown' ? SCROLL_STEP : -SCROLL_STEP});
+                    return;
+                }
+                // Iframe preview (non-PDF submissions, forum, quiz).
+                const iframe = root.querySelector('[data-region="preview-iframe"]');
+                if (iframe && iframe.offsetParent !== null && iframe.contentDocument) {
+                    e.preventDefault();
+                    try {
+                        iframe.contentDocument.documentElement.scrollBy(
+                            {top: e.key === 'ArrowDown' ? SCROLL_STEP : -SCROLL_STEP}
+                        );
+                    } catch (_err) {
+                        // Cross-origin iframe — cannot scroll programmatically.
+                    }
+                    return;
+                }
             }
         });
 

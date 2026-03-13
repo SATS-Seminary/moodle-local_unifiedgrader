@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.2 (2026-03-13)
+- Add multilingual support with 12 languages (Afrikaans, German, Greek, Spanish, French, Hebrew, Italian, Portuguese, Russian, Swahili, Xhosa, Zulu)
+- Add multi-group filtering with "All my groups" pseudo-group and multi-select checkbox dropdown
+- Add comment library autocomplete suggestions in marking guide remark textareas and annotation comment picker
+- Fix late penalty not recalculating after a due date extension is granted
+- Fix hardcoded penalty strings to use language strings
+- Fix feedback video clipping in student feedback view
+- Remap up/down arrow keys to scroll the preview pane instead of navigating between students
+
 ## v2.0.1 (2026-03-06)
 - Add "Mark as graded" toggle for feedback-only activities (assignments and forums with no grade type)
 - Fix multi-attempt grade sync to ensure gradebook reflects the graded attempt

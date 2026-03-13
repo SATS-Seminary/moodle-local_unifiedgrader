@@ -975,8 +975,130 @@ export default class AnnotationLayer {
         saveBtn.addEventListener('click', () => finish(textarea.value));
         cancelBtn.addEventListener('click', () => finish(null));
 
+        // Autocomplete dropdown for library suggestions.
+        const acDropdown = document.createElement('div');
+        acDropdown.className = 'picker-autocomplete';
+        freetextSection.insertBefore(acDropdown, btnRow);
+
+        let acIndex = -1;
+        let acVisible = false;
+
+        const closeAutocomplete = () => {
+            acDropdown.innerHTML = '';
+            acDropdown.style.display = 'none';
+            acIndex = -1;
+            acVisible = false;
+        };
+
+        const showAutocomplete = (query) => {
+            if (!query || query.length < 2 || !this._libraryLoaded) {
+                closeAutocomplete();
+                return;
+            }
+            const lower = query.toLowerCase();
+            const matches = this._libraryComments.filter(
+                (c) => c.content.toLowerCase().includes(lower)
+            ).slice(0, 6);
+
+            if (matches.length === 0) {
+                closeAutocomplete();
+                return;
+            }
+
+            acDropdown.innerHTML = '';
+            acIndex = -1;
+            acVisible = true;
+            acDropdown.style.display = 'block';
+
+            matches.forEach((comment, idx) => {
+                const item = document.createElement('div');
+                item.className = 'picker-ac-item';
+                item.dataset.index = idx;
+
+                // Highlight the matched portion.
+                const contentLower = comment.content.toLowerCase();
+                const matchStart = contentLower.indexOf(lower);
+                const displayText = comment.content.length > 100
+                    ? comment.content.substring(0, 100) + '...' : comment.content;
+                if (matchStart >= 0 && matchStart < displayText.length) {
+                    const matchEnd = Math.min(matchStart + query.length, displayText.length);
+                    const before = displayText.substring(0, matchStart);
+                    const matched = displayText.substring(matchStart, matchEnd);
+                    const after = displayText.substring(matchEnd);
+                    item.innerHTML = '';
+                    item.appendChild(document.createTextNode(before));
+                    const strong = document.createElement('strong');
+                    strong.textContent = matched;
+                    item.appendChild(strong);
+                    item.appendChild(document.createTextNode(after));
+                } else {
+                    item.textContent = displayText;
+                }
+
+                item.addEventListener('mousedown', (ev) => {
+                    ev.preventDefault();
+                    textarea.value = comment.content;
+                    closeAutocomplete();
+                    textarea.focus();
+                });
+                item.addEventListener('mouseenter', () => {
+                    acIndex = idx;
+                    acDropdown.querySelectorAll('.picker-ac-item').forEach((el, i) => {
+                        el.classList.toggle('active', i === idx);
+                    });
+                });
+                acDropdown.appendChild(item);
+            });
+        };
+
+        textarea.addEventListener('input', () => {
+            showAutocomplete(textarea.value.trim());
+        });
+
+        textarea.addEventListener('blur', () => {
+            // Delay close so mousedown on item fires first.
+            setTimeout(closeAutocomplete, 150);
+        });
+
         // Keyboard shortcuts on the textarea.
         textarea.addEventListener('keydown', (e) => {
+            // Autocomplete navigation.
+            if (acVisible) {
+                const items = acDropdown.querySelectorAll('.picker-ac-item');
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    acIndex = Math.min(acIndex + 1, items.length - 1);
+                    items.forEach((el, i) => el.classList.toggle('active', i === acIndex));
+                    e.stopPropagation();
+                    return;
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    acIndex = Math.max(acIndex - 1, 0);
+                    items.forEach((el, i) => el.classList.toggle('active', i === acIndex));
+                    e.stopPropagation();
+                    return;
+                }
+                if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && acIndex >= 0) {
+                    e.preventDefault();
+                    const lower = textarea.value.trim().toLowerCase();
+                    const matches = this._libraryComments.filter(
+                        (c) => c.content.toLowerCase().includes(lower)
+                    ).slice(0, 6);
+                    if (matches[acIndex]) {
+                        textarea.value = matches[acIndex].content;
+                    }
+                    closeAutocomplete();
+                    e.stopPropagation();
+                    return;
+                }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeAutocomplete();
+                    e.stopPropagation();
+                    return;
+                }
+            }
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 finish(textarea.value);

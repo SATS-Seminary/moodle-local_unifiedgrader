@@ -93,6 +93,19 @@ export default class CommentLibraryPopout {
     }
 
     /**
+     * Return the cached comment list, loading from AJAX/cache if needed.
+     *
+     * @return {Promise<Array>} Array of comment objects with `content` and `tagids`.
+     */
+    async getComments() {
+        if (this._comments.length > 0) {
+            return this._comments;
+        }
+        await this._loadData();
+        return this._comments;
+    }
+
+    /**
      * Toggle the popout, positioning it relative to the given anchor button.
      *
      * @param {HTMLElement} anchor The toggle button that was clicked.

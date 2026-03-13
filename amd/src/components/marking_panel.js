@@ -1454,6 +1454,10 @@ export default class extends BaseComponent {
             controls.appendChild(remarkInput);
             controls.appendChild(clibBtn);
             row.appendChild(controls);
+
+            // Attach autocomplete from comment library to the remark textarea.
+            this._attachAutocomplete(remarkInput);
+
             body.appendChild(row);
         });
 
@@ -1511,6 +1515,145 @@ export default class extends BaseComponent {
             }
         }
         this._updatePercentage();
+    }
+
+    /**
+     * Attach autocomplete from the comment library to a plain textarea.
+     *
+     * Shows a dropdown of matching library comments as the user types (min 2 chars).
+     * Supports keyboard navigation (ArrowUp/Down, Enter, Escape) and mouse selection.
+     *
+     * @param {HTMLTextAreaElement} textarea The textarea element.
+     */
+    _attachAutocomplete(textarea) {
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+        // Transfer flex-grow from textarea to wrapper so it fills the available space.
+        if (textarea.classList.contains('flex-grow-1')) {
+            textarea.classList.remove('flex-grow-1');
+            wrapper.classList.add('flex-grow-1');
+        }
+        textarea.parentNode.insertBefore(wrapper, textarea);
+        wrapper.appendChild(textarea);
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'ug-autocomplete-dropdown';
+        wrapper.appendChild(dropdown);
+
+        let acIndex = -1;
+        let acVisible = false;
+        let currentMatches = [];
+
+        const close = () => {
+            dropdown.innerHTML = '';
+            dropdown.style.display = 'none';
+            acIndex = -1;
+            acVisible = false;
+            currentMatches = [];
+        };
+
+        const show = async(query) => {
+            if (!query || query.length < 2) {
+                close();
+                return;
+            }
+            const comments = await this._clibPopout.getComments();
+            const lower = query.toLowerCase();
+            const matches = comments.filter(
+                (c) => c.content.toLowerCase().includes(lower)
+            ).slice(0, 6);
+
+            if (matches.length === 0) {
+                close();
+                return;
+            }
+
+            currentMatches = matches;
+            dropdown.innerHTML = '';
+            acIndex = -1;
+            acVisible = true;
+            dropdown.style.display = 'block';
+
+            matches.forEach((comment, idx) => {
+                const item = document.createElement('div');
+                item.className = 'ug-ac-item';
+                item.dataset.index = idx;
+
+                const contentLower = comment.content.toLowerCase();
+                const matchStart = contentLower.indexOf(lower);
+                const displayText = comment.content.length > 100
+                    ? comment.content.substring(0, 100) + '...' : comment.content;
+                if (matchStart >= 0 && matchStart < displayText.length) {
+                    const matchEnd = Math.min(matchStart + query.length, displayText.length);
+                    item.appendChild(document.createTextNode(displayText.substring(0, matchStart)));
+                    const strong = document.createElement('strong');
+                    strong.textContent = displayText.substring(matchStart, matchEnd);
+                    item.appendChild(strong);
+                    item.appendChild(document.createTextNode(displayText.substring(matchEnd)));
+                } else {
+                    item.textContent = displayText;
+                }
+
+                item.addEventListener('mousedown', (ev) => {
+                    ev.preventDefault();
+                    textarea.value = comment.content;
+                    textarea.dispatchEvent(new Event('input', {bubbles: true}));
+                    close();
+                    textarea.focus();
+                });
+                item.addEventListener('mouseenter', () => {
+                    acIndex = idx;
+                    dropdown.querySelectorAll('.ug-ac-item').forEach((el, i) => {
+                        el.classList.toggle('active', i === idx);
+                    });
+                });
+                dropdown.appendChild(item);
+            });
+        };
+
+        textarea.addEventListener('input', () => {
+            show(textarea.value.trim());
+        });
+
+        textarea.addEventListener('blur', () => {
+            setTimeout(close, 150);
+        });
+
+        textarea.addEventListener('keydown', (e) => {
+            if (!acVisible) {
+                return;
+            }
+            const items = dropdown.querySelectorAll('.ug-ac-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                e.stopPropagation();
+                acIndex = Math.min(acIndex + 1, items.length - 1);
+                items.forEach((el, i) => el.classList.toggle('active', i === acIndex));
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                e.stopPropagation();
+                acIndex = Math.max(acIndex - 1, 0);
+                items.forEach((el, i) => el.classList.toggle('active', i === acIndex));
+                return;
+            }
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && acIndex >= 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentMatches[acIndex]) {
+                    textarea.value = currentMatches[acIndex].content;
+                    textarea.dispatchEvent(new Event('input', {bubbles: true}));
+                }
+                close();
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                close();
+            }
+        });
     }
 
     /**
