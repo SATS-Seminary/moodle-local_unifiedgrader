@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.0.3 (2026-03-17)
+- Fix forum preview not displaying uploaded videos and media (missing pluginfile URL rewrite)
+
 ## v2.0.2 (2026-03-13)
 - Add multilingual support with 12 languages (Afrikaans, German, Greek, Spanish, French, Hebrew, Italian, Portuguese, Russian, Swahili, Xhosa, Zulu)
 - Add multi-group filtering with "All my groups" pseudo-group and multi-select checkbox dropdown

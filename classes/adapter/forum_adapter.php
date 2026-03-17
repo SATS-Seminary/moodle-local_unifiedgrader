@@ -948,8 +948,19 @@ class forum_adapter extends base_adapter {
             $html .= '<h5 class="border-bottom pb-2 mb-3">' . $discussionname . '</h5>';
 
             foreach ($discussionposts as $post) {
-                $formattedmessage = format_text(
+                // Rewrite @@PLUGINFILE@@ URLs to actual pluginfile.php URLs
+                // before formatting. Without this, embedded media (video, audio,
+                // images) stored via the editor would have broken source URLs.
+                $message = file_rewrite_pluginfile_urls(
                     $post->message,
+                    'pluginfile.php',
+                    $this->context->id,
+                    'mod_forum',
+                    'post',
+                    $post->id,
+                );
+                $formattedmessage = format_text(
+                    $message,
                     $post->messageformat,
                     ['context' => $this->context],
                 );
