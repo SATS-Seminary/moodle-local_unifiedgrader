@@ -14,20 +14,21 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Standalone submission comments widget for the student feedback view.
+ * Non-intrusive submission comments chat bubble for activity overview pages.
  *
- * Displays a chat icon in the header bar with a messenger-style popout panel
- * for viewing, posting, and deleting submission comments. Uses the same web
- * services as the teacher grading interface but does not depend on the
- * Moodle reactive framework.
+ * Injected via PSR-14 hook on quiz and forum view pages when the admin
+ * setting enable_submission_comments is ON. Places a small chat icon with
+ * badge inside the activity-information region. Clicking it opens a
+ * messenger-style popout panel.
  *
- * @module     local_unifiedgrader/feedback_comments
+ * @module     local_unifiedgrader/activity_comments
  * @copyright  2026 South African Theological Seminary
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 import Ajax from 'core/ajax';
 import Notification from 'core/notification';
+import {get_string as getString} from 'core/str';
 
 /** @type {number} Current logged-in user ID. */
 let currentUserId = 0;
@@ -45,27 +46,83 @@ let commentsLoaded = false;
 let containerEl = null;
 
 /**
- * Initialise the feedback comments widget.
+ * Initialise: inject chat bubble into the activity-information region.
  *
  * @param {number} cmid Course module ID.
  * @param {number} userid Student user ID.
  */
-export const init = (cmid, userid) => {
-    containerEl = document.querySelector('[data-region="feedback-comments"]');
-    if (!containerEl) {
+export const init = async(cmid, userid) => {
+    currentUserId = parseInt(M.cfg.userId, 10);
+
+    const label = await getString('submissioncomments', 'local_unifiedgrader');
+
+    // Find the activity-dates region (preferred) or fall back to activity-information.
+    const activityDates = document.querySelector('[data-region="activity-dates"]');
+    const activityInfo = activityDates || document.querySelector('[data-region="activity-information"]');
+    if (!activityInfo) {
         return;
     }
 
-    currentUserId = parseInt(M.cfg.userId, 10);
-
-    // Wire toggle button.
-    const toggleBtn = containerEl.querySelector('[data-action="toggle-comments"]');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            togglePopout(cmid, userid);
-        });
+    // Make the target a flex row so our icon sits to the right of the dates.
+    if (activityDates) {
+        activityDates.style.display = 'flex';
+        activityDates.style.alignItems = 'center';
+        activityDates.style.justifyContent = 'space-between';
     }
+
+    // Load initial comment count.
+    let initialCount = 0;
+    try {
+        const result = await Ajax.call([{
+            methodname: 'local_unifiedgrader_get_submission_comments',
+            args: {cmid, userid},
+        }])[0];
+        initialCount = result.count || 0;
+    } catch {
+        // Silently continue — badge will show 0.
+    }
+
+    // Build the chat bubble container.
+    containerEl = document.createElement('div');
+    containerEl.setAttribute('data-region', 'activity-comments');
+    containerEl.className = 'local-unifiedgrader-activity-comments position-relative d-inline-flex align-items-center';
+
+    // Chat icon button with badge.
+    const iconWrapper = document.createElement('span');
+    iconWrapper.className = 'position-relative d-inline-block';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'btn btn-link btn-sm p-0 text-muted';
+    toggleBtn.title = label;
+    toggleBtn.innerHTML = '<i class="fa fa-comments" style="font-size: 1.1rem;"></i>';
+
+    const badge = document.createElement('span');
+    badge.setAttribute('data-region', 'comment-count-badge');
+    badge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger'
+        + (initialCount > 0 ? '' : ' d-none');
+    badge.style.fontSize = '0.55rem';
+    badge.textContent = initialCount > 0 ? String(initialCount) : '';
+
+    iconWrapper.appendChild(toggleBtn);
+    iconWrapper.appendChild(badge);
+
+    // Popout container.
+    const popout = document.createElement('div');
+    popout.setAttribute('data-region', 'comments-popout');
+    popout.className = 'd-none local-unifiedgrader-comments-popout';
+
+    containerEl.appendChild(iconWrapper);
+    containerEl.appendChild(popout);
+
+    // Insert into the target region.
+    activityInfo.appendChild(containerEl);
+
+    // Wire toggle.
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePopout(cmid, userid);
+    });
 };
 
 /**

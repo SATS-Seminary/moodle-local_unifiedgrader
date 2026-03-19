@@ -241,4 +241,10 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_clear_all_overrides' => [
+        'classname' => 'local_unifiedgrader\external\clear_all_overrides',
+        'description' => 'Clear all user-level overrides and extensions for an activity.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
 ];

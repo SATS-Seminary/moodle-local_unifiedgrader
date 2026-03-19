@@ -674,6 +674,12 @@
     right: 0;
 }
 
+/* Activity overview — popout anchored to right (icon sits at far right of dates row). */
+.local-unifiedgrader-activity-comments .local-unifiedgrader-comments-popout {
+    left: auto;
+    right: 0;
+}
+
 /* Collapsible card sections — chevron rotation. */
 .local-unifiedgrader-container [data-bs-toggle="collapse"] .collapse-icon {
     transition: transform 0.2s ease;

@@ -120,6 +120,9 @@ export default class extends BaseComponent {
             'confirm_delete_override',
             'action_delete_extension',
             'confirm_delete_extension',
+            'overrides_extensions',
+            'action_clear_overrides',
+            'confirm_clear_overrides',
         ];
         try {
             const values = await getStrings(keys.map(key => ({key, component: 'local_unifiedgrader'})));
@@ -1036,61 +1039,34 @@ export default class extends BaseComponent {
         const state = this.reactive.state;
         const actType = state.activity.type;
 
-        // Override actions (available for assign and quiz when teacher has capability).
-        const overrideActions = [];
-        if (state.activity.canmanageoverrides && (actType === 'assign' || actType === 'quiz')) {
-            if (hasOverride) {
-                overrideActions.push({
-                    id: 'edit_override', label: s.action_edit_override,
-                    icon: 'fa-clock-o', type: 'modal',
-                });
-                overrideActions.push({
-                    id: 'delete_override', label: s.action_delete_override,
-                    icon: 'fa-trash', type: 'ajax', confirm: s.confirm_delete_override,
-                });
-            } else {
-                overrideActions.push({
-                    id: 'add_override', label: s.action_add_override,
-                    icon: 'fa-clock-o', type: 'modal',
+        // Unified "Overrides and Extensions" action — available for all activity types.
+        const overridesExtensionsActions = [];
+        const canManage = state.activity.canmanageoverrides || state.activity.canmanageextensions;
+        if (canManage) {
+            overridesExtensionsActions.push({
+                id: 'overrides_extensions',
+                label: s.overrides_extensions,
+                icon: 'fa-clock-o', type: 'modal',
+            });
+            if (hasOverride || hasExtension) {
+                overridesExtensionsActions.push({
+                    id: 'clear_overrides',
+                    label: s.action_clear_overrides,
+                    icon: 'fa-trash', type: 'ajax', confirm: s.confirm_clear_overrides,
                 });
             }
         }
 
-        // For quiz and forum: extension actions + override actions.
+        // For quiz and forum: only overrides/extensions actions (no submission actions).
         if (actType === 'quiz' || actType === 'forum') {
-            const extensionActions = [];
-            if (state.activity.canmanageextensions) {
-                if (hasExtension) {
-                    extensionActions.push({
-                        id: 'grant_extension',
-                        label: s.action_edit_extension,
-                        icon: 'fa-calendar-plus-o', type: 'modal',
-                    });
-                    extensionActions.push({
-                        id: 'delete_extension',
-                        label: s.action_delete_extension,
-                        icon: 'fa-trash', type: 'ajax', confirm: s.confirm_delete_extension,
-                    });
-                } else {
-                    extensionActions.push({
-                        id: 'grant_extension',
-                        label: s.action_grant_extension,
-                        icon: 'fa-calendar-plus-o', type: 'modal',
-                    });
-                }
-            }
-            return [...extensionActions, ...overrideActions];
+            return overridesExtensionsActions;
         }
 
+        // Assignment-specific submission actions.
         const defs = {
             edit_submission: {
                 id: 'edit_submission', label: s.action_edit_submission,
                 icon: 'fa-pencil', type: 'redirect',
-            },
-            grant_extension: {
-                id: 'grant_extension',
-                label: hasExtension ? s.action_edit_extension : s.action_grant_extension,
-                icon: 'fa-calendar-plus-o', type: 'modal',
             },
             submit_for_grading: {
                 id: 'submit', label: s.action_submit_for_grading,
@@ -1117,31 +1093,31 @@ export default class extends BaseComponent {
         let actions;
         switch (status) {
             case 'submitted':
-                actions = [defs.grant_extension, defs.revert_to_draft, defs.remove];
+                actions = [defs.revert_to_draft, defs.remove];
                 break;
             case 'draft':
                 if (locked) {
-                    actions = [defs.unlock, defs.grant_extension, defs.remove];
+                    actions = [defs.unlock, defs.remove];
                 } else {
                     actions = [
-                        defs.edit_submission, defs.lock, defs.grant_extension,
+                        defs.edit_submission, defs.lock,
                         defs.submit_for_grading, defs.remove,
                     ];
                 }
                 break;
             case 'nosubmission':
             case 'new':
-                actions = [defs.edit_submission, defs.grant_extension];
+                actions = [defs.edit_submission];
                 break;
             case 'graded':
-                actions = [defs.revert_to_draft, defs.grant_extension, defs.remove];
+                actions = [defs.revert_to_draft, defs.remove];
                 break;
             default:
                 actions = [];
         }
 
-        // Append override actions after assignment-specific actions.
-        return actions.concat(overrideActions);
+        // Append overrides & extensions after assignment-specific actions.
+        return actions.concat(overridesExtensionsActions);
     }
 
     /**
@@ -1168,19 +1144,9 @@ export default class extends BaseComponent {
 
         const state = this.reactive.state;
 
-        // Delete override uses its own mutation.
-        if (action.id === 'delete_override') {
-            this.reactive.dispatch('deleteUserOverride', state.activity.cmid, student.id);
-            return;
-        }
-
-        // Delete extension uses activity-specific mutations.
-        if (action.id === 'delete_extension') {
-            if (state.activity.type === 'forum') {
-                this.reactive.dispatch('deleteForumExtension', state.activity.cmid, student.id);
-            } else {
-                this.reactive.dispatch('deleteDuedateExtension', state.activity.cmid, student.id);
-            }
+        // Clear all overrides and extensions.
+        if (action.id === 'clear_overrides') {
+            this.reactive.dispatch('clearAllOverrides', state.activity.cmid, student.id);
             return;
         }
 
@@ -1196,17 +1162,10 @@ export default class extends BaseComponent {
     async _handleModalAction(actionId, student) {
         const state = this.reactive.state;
         const cmid = state.activity.cmid;
-        let saved = false;
 
-        if (actionId === 'grant_extension') {
-            const {openExtensionModal} = await import('local_unifiedgrader/extension_modal');
-            saved = await openExtensionModal(cmid, student.id, !!student.hasextension, state.activity.type);
-        } else {
-            // Override modal (add/edit).
-            const overrideid = state.submission?.overrideid || 0;
-            const {openOverrideModal} = await import('local_unifiedgrader/override_modal');
-            saved = await openOverrideModal(cmid, student.id, overrideid);
-        }
+        const {openOverridesExtensionsModal} =
+            await import('local_unifiedgrader/overrides_extensions_modal');
+        const saved = await openOverridesExtensionsModal(cmid, student.id);
 
         if (saved) {
             // Refresh the student data and participant list to pick up changes.

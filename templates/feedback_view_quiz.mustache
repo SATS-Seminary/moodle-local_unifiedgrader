@@ -22,6 +22,8 @@
     - hasmultipleattempts: Whether there are multiple finished attempts
     - attempts: Array of attempt objects with attemptnumber, label, date, selected, url
     - selectedattempt: Currently selected attempt number
+    - hascommentsfeature: Whether submission comments are enabled
+    - commentcount: Number of existing submission comments
 }}
 <div class="local-unifiedgrader-feedback" data-region="feedback-viewer"
      data-cmid="{{cmid}}">
@@ -63,7 +65,26 @@
                 </a>
             {{/hasfeedback}}
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3">
+            {{#hascommentsfeature}}
+                <span data-region="feedback-comments" data-cmid="{{cmid}}" data-userid="{{userid}}"
+                      class="position-relative d-inline-block">
+                    <button type="button"
+                            class="btn btn-link btn-sm p-0 text-muted"
+                            data-action="toggle-comments"
+                            title="{{#str}} submissioncomments, local_unifiedgrader {{/str}}">
+                        <i class="fa fa-comments" style="font-size: 1.25rem;"></i>
+                    </button>
+                    <span data-region="comment-count-badge"
+                          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger {{^commentcount}}d-none{{/commentcount}}"
+                          style="font-size: 0.6rem;">
+                        {{commentcount}}
+                    </span>
+                    <div data-region="comments-popout"
+                         class="d-none local-unifiedgrader-comments-popout">
+                    </div>
+                </span>
+            {{/hascommentsfeature}}
             {{#haspenalties}}
                 {{#penalties}}
                     <span class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
@@ -122,3 +143,10 @@
         {{/showrightcolumn}}
     </div>
 </div>
+{{#js}}
+    {{#hascommentsfeature}}
+    require(['local_unifiedgrader/feedback_comments'], function(FeedbackComments) {
+        FeedbackComments.init({{cmid}}, {{userid}});
+    });
+    {{/hascommentsfeature}}
+{{/js}}

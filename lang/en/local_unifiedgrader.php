@@ -306,6 +306,19 @@ $string['action_delete_override'] = 'Delete override';
 $string['confirm_delete_override'] = 'Are you sure you want to delete this user override?';
 $string['override_saved'] = 'Override saved successfully.';
 
+// Unified overrides and extensions.
+$string['overrides_extensions'] = 'Overrides and Extensions';
+$string['overrides_section_extension'] = 'Extension';
+$string['overrides_section_defaults'] = 'Activity defaults';
+$string['overrides_section_overrides_only'] = 'Overrides';
+$string['overrides_ext_duedate'] = 'Extension: Due date';
+$string['override_enable'] = 'Enable';
+$string['action_clear_overrides'] = 'Clear all overrides';
+$string['confirm_clear_overrides'] = 'Are you sure you want to clear all overrides and extensions for this student?';
+$string['extension_cutoff_auto_adjust'] = 'If the extension date is after the cut-off date ({$a}), the cut-off date override will be automatically adjusted to match.';
+$string['extension_close_auto_adjust'] = 'If the extension date is after the quiz close date ({$a}), the close date override will be automatically adjusted to match.';
+$string['extension_cutoff_forum_warning'] = 'Note: The forum cut-off date is {$a}. If the extension is set after this date, students may still be unable to post. Adjust the forum settings if needed.';
+
 // Quiz duedate extensions.
 $string['action_delete_extension'] = 'Delete extension';
 $string['confirm_delete_extension'] = 'Are you sure you want to delete this due date extension?';

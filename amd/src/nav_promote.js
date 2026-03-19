@@ -198,6 +198,13 @@ const inject = (navKey, url, label) => {
 export const init = (key, fallbackUrl, fallbackLabel) => {
     const navKey = key || 'local_unifiedgrader_grade';
 
+    // Skip on format_simple — its cognav.js extracts secondary nav items into
+    // a cog popover. If we promote (remove + recreate) the item first, cognav
+    // can't find it because our replacement uses .btn instead of .nav-link.
+    if (document.body.classList.contains('format-simple')) {
+        return;
+    }
+
     // Don't create duplicate buttons.
     if (document.querySelector('li[data-key="' + navKey + '"][data-forceintomoremenu]')) {
         const existing = document.querySelector('li[data-key="' + navKey + '"][data-forceintomoremenu] .btn');

@@ -276,6 +276,12 @@ if ($cm->modname === 'quiz') {
         ];
     }
 
+    // Submission comments.
+    $hascommentsfeature = (bool) get_config('local_unifiedgrader', 'enable_submission_comments');
+    $commentcount = $hascommentsfeature
+        ? \local_unifiedgrader\submission_comment_manager::count_comments($cmid, $userid)
+        : 0;
+
     // Prepare template context.
     $templatedata = [
         'cmid' => $cmid,
@@ -295,6 +301,8 @@ if ($cm->modname === 'quiz') {
         'hasmultipleattempts' => $hasmultipleattempts,
         'attempts' => $attemptlist,
         'selectedattempt' => $selectedattempt,
+        'hascommentsfeature' => $hascommentsfeature,
+        'commentcount' => $commentcount,
     ];
 
     echo $OUTPUT->header();

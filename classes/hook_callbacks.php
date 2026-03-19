@@ -87,14 +87,14 @@ class hook_callbacks {
             return;
         }
 
-        // For quizzes, only act on the overview page — not attempt/review/summary pages.
-        if ($modname === 'quiz') {
+        // For quizzes and forums, only act on the overview page — not subpages.
+        if ($modname === 'quiz' || $modname === 'forum') {
             try {
                 $pagepath = $PAGE->url->get_path();
             } catch (\Throwable $e) {
                 return;
             }
-            if (strpos($pagepath, '/mod/quiz/view.php') === false) {
+            if (strpos($pagepath, '/mod/' . $modname . '/view.php') === false) {
                 return;
             }
         }
@@ -124,13 +124,23 @@ class hook_callbacks {
             return;
         }
 
-        // Replace core submission comments with our widget (assignment only, pre- and post-grading).
-        if ($modname === 'assign' && get_config('local_unifiedgrader', 'enable_submission_comments')) {
-            $PAGE->requires->js_call_amd(
-                'local_unifiedgrader/assignment_comments',
-                'init',
-                [$cm->id, (int) $USER->id],
-            );
+        // Inject submission comments widget (pre- and post-grading).
+        if (get_config('local_unifiedgrader', 'enable_submission_comments')) {
+            if ($modname === 'assign') {
+                // Assignment: replace core comments with inline widget.
+                $PAGE->requires->js_call_amd(
+                    'local_unifiedgrader/assignment_comments',
+                    'init',
+                    [$cm->id, (int) $USER->id],
+                );
+            } else if ($modname === 'quiz' || $modname === 'forum') {
+                // Quiz/forum: non-intrusive chat bubble in activity-information region.
+                $PAGE->requires->js_call_amd(
+                    'local_unifiedgrader/activity_comments',
+                    'init',
+                    [$cm->id, (int) $USER->id],
+                );
+            }
         }
 
         try {

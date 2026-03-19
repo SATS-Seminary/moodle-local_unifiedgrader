@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.0 (2026-03-20)
+- Add student submission comments for quiz and forum activities (popout chat bubble)
+- Add submission comment popout to quiz feedback viewer
+- Fix SATS Mail bridge hardcoded assign URL to support all activity types
+- Fix unified grader link missing from format_simple cog menu
+- Add GitHub Actions CI workflow (moodle-plugin-ci)
+- Consolidate overrides and extensions into a single unified modal for all activity types
+- Auto-adjust cut-off/close date override when extension exceeds it (assign and quiz)
+
 ## v2.0.3 (2026-03-17)
 - Fix forum preview not displaying uploaded videos and media (missing pluginfile URL rewrite)
 
