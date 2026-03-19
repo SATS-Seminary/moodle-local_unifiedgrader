@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'Jonga impendulo enobhalo kuMklasisi Oma
 // Settings.
 $string['setting_enable_assign'] = 'Vumela kwiiAkhawunti zokuNikwa uMsebenzi';
 $string['setting_enable_assign_desc'] = 'Vumela uMklasisi Omanyeneyo ukuba asetyenziswe kwimisebenzi yokunikwa umsebenzi.';
+$string['setting_enable_submission_comments'] = 'Tshintsha izimvo zokufakwa komsebenzi';
+$string['setting_enable_submission_comments_desc'] = 'Tshintsha izimvo zokufakwa komsebenzi ezisisiseko zeMoodle kwimboniso yomsebenzi womfundi ngezimvo zohlobo lomyalezo zoMklasisi Omanyeneyo (kunye nenkxaso yezaziso). Abafundi bangathumela imiyalezo kubahlohli ngaphambi nangemva kokuklasisa.';
 $string['setting_enable_forum'] = 'Vumela kwiiForamu';
 $string['setting_enable_forum_desc'] = 'Vumela uMklasisi Omanyeneyo ukuba asetyenziswe kwimisebenzi yeeforamu.';
 $string['setting_enable_quiz'] = 'Vumela kwiiQuiz';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'Umfundi impendulo eyeyakhe.';
 $string['privacy:metadata:qfb:grader'] = 'Utitshala onikezele impendulo.';
 $string['privacy:metadata:qfb:feedback'] = 'Umbhalo wempendulo.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'Inombolo yomzamo wequiz.';
+$string['privacy:metadata:scomm'] = 'Izimvo zokufakwa ezigcinwe yi-Unified Grader.';
+$string['privacy:metadata:scomm:cmid'] = 'Imodyuli yekosi esimvo sinaso.';
+$string['privacy:metadata:scomm:userid'] = 'Umfundi osimvo sithetha ngaye.';
+$string['privacy:metadata:scomm:authorid'] = 'Umsebenzisi obhale isimvo.';
+$string['privacy:metadata:scomm:content'] = 'Umxholo wesimvo.';
 $string['privacy_forum_extensions'] = 'Amaxesha ongezelelweyo eforamu';
 $string['privacy_quiz_feedback'] = 'Impendulo yequiz';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Izaziso zezimvo zokufakwa';
+$string['notification_comment_subject'] = 'Isimvo esitsha kwi-{$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> ufake isimvo kwi-<a href="{$a->activityurl}">{$a->activityname}</a> kwi-{$a->coursename} ({$a->timecreated}):</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} uphawule kwi-{$a->activityname}';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'Zonke iinguqu zigciniwe';

@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'Visualizzare il feedback annotato dal v
 // Settings.
 $string['setting_enable_assign'] = 'Abilita per i compiti';
 $string['setting_enable_assign_desc'] = 'Consenti l\'utilizzo del valutatore unificato per le attività di tipo compito.';
+$string['setting_enable_submission_comments'] = 'Sostituisci commenti di consegna';
+$string['setting_enable_submission_comments_desc'] = 'Sostituisce i commenti di consegna nativi di Moodle nella vista compito dello studente con i commenti stile messaggistica del valutatore unificato (con supporto notifiche). Gli studenti possono inviare messaggi ai docenti prima e dopo la valutazione.';
 $string['setting_enable_forum'] = 'Abilita per i forum';
 $string['setting_enable_forum_desc'] = 'Consenti l\'utilizzo del valutatore unificato per le attività di tipo forum.';
 $string['setting_enable_quiz'] = 'Abilita per i quiz';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'Lo studente a cui si riferisce il feed
 $string['privacy:metadata:qfb:grader'] = 'Il docente che ha fornito il feedback.';
 $string['privacy:metadata:qfb:feedback'] = 'Il testo del feedback.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'Il numero del tentativo di quiz.';
+$string['privacy:metadata:scomm'] = 'Commenti alla consegna memorizzati dall\'Unified Grader.';
+$string['privacy:metadata:scomm:cmid'] = 'Il modulo del corso a cui appartiene il commento.';
+$string['privacy:metadata:scomm:userid'] = 'Lo studente a cui si riferisce il thread di commenti.';
+$string['privacy:metadata:scomm:authorid'] = 'L\'utente che ha scritto il commento.';
+$string['privacy:metadata:scomm:content'] = 'Il contenuto del commento.';
 $string['privacy_forum_extensions'] = 'Proroghe del forum';
 $string['privacy_quiz_feedback'] = 'Feedback del quiz';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Notifiche dei commenti alla consegna';
+$string['notification_comment_subject'] = 'Nuovo commento su {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> ha pubblicato un commento su <a href="{$a->activityurl}">{$a->activityname}</a> in {$a->coursename} ({$a->timecreated}):</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} ha commentato su {$a->activityname}';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'Tutte le modifiche sono state salvate';

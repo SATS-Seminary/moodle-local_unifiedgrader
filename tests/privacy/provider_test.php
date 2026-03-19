@@ -823,4 +823,200 @@ final class provider_test extends provider_testcase {
         $this->assertEquals(0, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student2->id]));
         $this->assertEquals(1, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student3->id]));
     }
+
+    // -------------------------------------------------------------------------
+    // Submission comment (scomm) privacy tests.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Helper: create a submission comment record.
+     *
+     * @param int $cmid Course module ID.
+     * @param int $userid Student user ID.
+     * @param int $authorid Author user ID.
+     * @param string $content Comment content.
+     * @return \stdClass The created record.
+     */
+    private function create_scomm(int $cmid, int $userid, int $authorid, string $content = 'Test comment'): \stdClass {
+        global $DB;
+        $now = time();
+        $record = (object) [
+            'cmid' => $cmid,
+            'userid' => $userid,
+            'authorid' => $authorid,
+            'content' => $content,
+            'timecreated' => $now,
+            'timemodified' => $now,
+        ];
+        $record->id = $DB->insert_record('local_unifiedgrader_scomm', $record);
+        return $record;
+    }
+
+    /**
+     * Test get_contexts_for_userid returns contexts for scomm subjects.
+     */
+    public function test_get_contexts_for_userid_scomm_subject(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_scomm($cm->id, $student->id, $teacher->id);
+
+        $contextlist = provider::get_contexts_for_userid($student->id);
+        $contextids = array_map('intval', $contextlist->get_contextids());
+        $this->assertContains($context->id, $contextids);
+    }
+
+    /**
+     * Test get_contexts_for_userid returns contexts for scomm authors.
+     */
+    public function test_get_contexts_for_userid_scomm_author(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_scomm($cm->id, $student->id, $teacher->id);
+
+        $contextlist = provider::get_contexts_for_userid($teacher->id);
+        $contextids = array_map('intval', $contextlist->get_contextids());
+        $this->assertContains($context->id, $contextids);
+    }
+
+    /**
+     * Test export_user_data exports submission comments.
+     */
+    public function test_export_user_data_scomm(): void {
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_scomm($cm->id, $student->id, $teacher->id, 'Teacher comment');
+
+        $contextlist = new \core_privacy\local\request\approved_contextlist(
+            $student,
+            'local_unifiedgrader',
+            [$context->id],
+        );
+
+        provider::export_user_data($contextlist);
+
+        $writer = \core_privacy\local\request\writer::with_context($context);
+        $data = $writer->get_data([get_string('submissioncomments', 'local_unifiedgrader')]);
+        $this->assertNotEmpty($data);
+        $this->assertNotEmpty($data->submission_comments);
+        $this->assertEquals('Teacher comment', $data->submission_comments[0]['content']);
+    }
+
+    /**
+     * Test delete_data_for_all_users_in_context deletes scomm records.
+     */
+    public function test_delete_data_for_all_users_in_context_scomm(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student = $gen->create_user();
+
+        $this->create_scomm($cm->id, $student->id, $teacher->id);
+
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_scomm', ['cmid' => $cm->id]));
+
+        provider::delete_data_for_all_users_in_context($context);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_scomm', ['cmid' => $cm->id]));
+    }
+
+    /**
+     * Test delete_data_for_user deletes scomm records.
+     */
+    public function test_delete_data_for_user_scomm(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+
+        $this->create_scomm($cm->id, $student1->id, $teacher->id);
+        $this->create_scomm($cm->id, $student2->id, $teacher->id);
+
+        $contextlist = new \core_privacy\local\request\approved_contextlist(
+            $student1,
+            'local_unifiedgrader',
+            [$context->id],
+        );
+
+        provider::delete_data_for_user($contextlist);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_scomm', ['userid' => $student1->id]));
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_scomm', ['userid' => $student2->id]));
+    }
+
+    /**
+     * Test delete_data_for_users deletes scomm records for specified users.
+     */
+    public function test_delete_data_for_users_scomm(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $assign = $gen->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $assign->id);
+        $context = \context_module::instance($cm->id);
+
+        $teacher = $gen->create_user();
+        $student1 = $gen->create_user();
+        $student2 = $gen->create_user();
+        $student3 = $gen->create_user();
+
+        $this->create_scomm($cm->id, $student1->id, $teacher->id);
+        $this->create_scomm($cm->id, $student2->id, $teacher->id);
+        $this->create_scomm($cm->id, $student3->id, $teacher->id);
+
+        $userlist = new \core_privacy\local\request\approved_userlist(
+            $context,
+            'local_unifiedgrader',
+            [$student1->id, $student2->id],
+        );
+
+        provider::delete_data_for_users($userlist);
+
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_scomm', ['userid' => $student1->id]));
+        $this->assertEquals(0, $DB->count_records('local_unifiedgrader_scomm', ['userid' => $student2->id]));
+        $this->assertEquals(1, $DB->count_records('local_unifiedgrader_scomm', ['userid' => $student3->id]));
+    }
 }

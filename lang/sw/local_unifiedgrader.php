@@ -39,6 +39,8 @@ $string['unifiedgrader:managenotes'] = 'Unda na uhariri vidokezo vya faragha vya
 $string['unifiedgrader:viewfeedback'] = 'Tazama maoni yaliyoandikwa kutoka Mkaguzi Jumuishi';
 $string['setting_enable_assign'] = 'Washa kwa Kazi';
 $string['setting_enable_assign_desc'] = 'Ruhusu Mkaguzi Jumuishi kutumika kwa shughuli za kazi.';
+$string['setting_enable_submission_comments'] = 'Badilisha maoni ya uwasilishaji';
+$string['setting_enable_submission_comments_desc'] = 'Badilisha maoni ya msingi ya uwasilishaji ya Moodle kwenye mtazamo wa kazi ya mwanafunzi na maoni ya mtindo wa ujumbe ya Mkaguzi Jumuishi (na msaada wa arifa). Wanafunzi wanaweza kutuma ujumbe kwa wahadhiri kabla na baada ya ukaguzi.';
 $string['setting_enable_forum'] = 'Washa kwa Majadiliano';
 $string['setting_enable_forum_desc'] = 'Ruhusu Mkaguzi Jumuishi kutumika kwa shughuli za majadiliano.';
 $string['setting_enable_quiz'] = 'Washa kwa Majaribio';
@@ -364,8 +366,20 @@ $string['privacy:metadata:qfb:userid'] = 'Mwanafunzi ambaye maoni ni yake.';
 $string['privacy:metadata:qfb:grader'] = 'Mwalimu aliyetoa maoni.';
 $string['privacy:metadata:qfb:feedback'] = 'Maandishi ya maoni.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'Nambari ya jaribio la jaribio.';
+$string['privacy:metadata:scomm'] = 'Maoni ya uwasilishaji yaliyohifadhiwa na Unified Grader.';
+$string['privacy:metadata:scomm:cmid'] = 'Moduli ya kozi ambayo maoni yanamilikiwa nayo.';
+$string['privacy:metadata:scomm:userid'] = 'Mwanafunzi ambaye mada ya maoni inahusu.';
+$string['privacy:metadata:scomm:authorid'] = 'Mtumiaji aliyeandika maoni.';
+$string['privacy:metadata:scomm:content'] = 'Maudhui ya maoni.';
 $string['privacy_forum_extensions'] = 'Nyongeza za majadiliano';
 $string['privacy_quiz_feedback'] = 'Maoni ya jaribio';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Arifa za maoni ya uwasilishaji';
+$string['notification_comment_subject'] = 'Maoni mapya kwenye {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> ametuma maoni kwenye <a href="{$a->activityurl}">{$a->activityname}</a> katika {$a->coursename} ({$a->timecreated}):</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} ametoa maoni kwenye {$a->activityname}';
+
 $string['allchangessaved'] = 'Mabadiliko yote yamehifadhiwa';
 $string['editing'] = 'Inahariri...';
 $string['offlinesavedlocally'] = 'Nje ya mtandao — imehifadhiwa ndani';

@@ -513,11 +513,11 @@ export default class {
      * @param {number} userid Student user ID.
      * @param {number} attemptnumber Attempt number (0-based), -1 for latest.
      */
-    async loadSubmissionComments(stateManager, cmid, userid, attemptnumber = -1) {
+    async loadSubmissionComments(stateManager, cmid, userid) {
         try {
             const result = await Ajax.call([{
                 methodname: 'local_unifiedgrader_get_submission_comments',
-                args: {cmid, userid, attemptnumber},
+                args: {cmid, userid},
             }])[0];
 
             stateManager.setReadOnly(false);
@@ -539,19 +539,18 @@ export default class {
      * @param {number} cmid Course module ID.
      * @param {number} userid Student user ID.
      * @param {string} content Comment content.
-     * @param {number} attemptnumber Attempt number (0-based), -1 for latest.
      */
-    async addSubmissionComment(stateManager, cmid, userid, content, attemptnumber = -1) {
+    async addSubmissionComment(stateManager, cmid, userid, content) {
         try {
             await Ajax.call([{
                 methodname: 'local_unifiedgrader_add_submission_comment',
-                args: {cmid, userid, content, attemptnumber},
+                args: {cmid, userid, content},
             }])[0];
 
             // Refresh the full comment list to get consistent data.
             const commentsResult = await Ajax.call([{
                 methodname: 'local_unifiedgrader_get_submission_comments',
-                args: {cmid, userid, attemptnumber},
+                args: {cmid, userid},
             }])[0];
 
             stateManager.setReadOnly(false);
@@ -572,9 +571,8 @@ export default class {
      * @param {number} cmid Course module ID.
      * @param {number} userid Student user ID.
      * @param {number} commentid Comment ID to delete.
-     * @param {number} attemptnumber Attempt number (0-based), -1 for latest.
      */
-    async deleteSubmissionComment(stateManager, cmid, userid, commentid, attemptnumber = -1) {
+    async deleteSubmissionComment(stateManager, cmid, userid, commentid) {
         try {
             await Ajax.call([{
                 methodname: 'local_unifiedgrader_delete_submission_comment',
@@ -584,7 +582,7 @@ export default class {
             // Refresh the full comment list.
             const commentsResult = await Ajax.call([{
                 methodname: 'local_unifiedgrader_get_submission_comments',
-                args: {cmid, userid, attemptnumber},
+                args: {cmid, userid},
             }])[0];
 
             stateManager.setReadOnly(false);

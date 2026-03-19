@@ -215,5 +215,44 @@ function xmldb_local_unifiedgrader_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026022702, 'local', 'unifiedgrader');
     }
 
+    if ($oldversion < 2026031800) {
+
+        // Create local_unifiedgrader_scomm table for submission comments.
+        $table = new xmldb_table('local_unifiedgrader_scomm');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('authorid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('content', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_index('ix_cmid_userid', XMLDB_INDEX_NOTUNIQUE, ['cmid', 'userid']);
+        $table->add_index('ix_authorid', XMLDB_INDEX_NOTUNIQUE, ['authorid']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Migrate existing assignment submission comments from Moodle's core comments table.
+        $sql = "INSERT INTO {local_unifiedgrader_scomm} (cmid, userid, authorid, content, timecreated, timemodified)
+                SELECT cm.id AS cmid,
+                       s.userid AS userid,
+                       c.userid AS authorid,
+                       c.content,
+                       c.timecreated,
+                       c.timecreated AS timemodified
+                  FROM {comments} c
+                  JOIN {assign_submission} s ON s.id = c.itemid
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course_modules} cm ON cm.instance = a.id
+                  JOIN {modules} m ON m.id = cm.module AND m.name = 'assign'
+                 WHERE c.component = 'assignsubmission_comments'
+                   AND c.commentarea = 'submission_comments'";
+        $DB->execute($sql);
+
+        upgrade_plugin_savepoint(true, 2026031800, 'local', 'unifiedgrader');
+    }
+
     return true;
 }

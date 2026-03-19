@@ -29,6 +29,8 @@ namespace local_unifiedgrader\adapter;
 
 defined('MOODLE_INTERNAL') || die();
 
+use local_unifiedgrader\submission_comment_manager;
+
 global $CFG;
 require_once($CFG->dirroot . '/grade/grading/lib.php');
 require_once($CFG->dirroot . '/mod/forum/lib.php');
@@ -319,6 +321,7 @@ class forum_adapter extends base_adapter {
             'timecreated' => $timecreated,
             'timemodified' => $timemodified,
             'attemptnumber' => 0,
+            'commentcount' => submission_comment_manager::count_comments($this->cm->id, $userid),
         ];
     }
 
@@ -899,6 +902,7 @@ class forum_adapter extends base_adapter {
             'timecreated' => 0,
             'timemodified' => 0,
             'attemptnumber' => 0,
+            'commentcount' => submission_comment_manager::count_comments($this->cm->id, $userid),
         ];
     }
 

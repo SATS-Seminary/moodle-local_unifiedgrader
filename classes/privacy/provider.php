@@ -104,6 +104,13 @@ class provider implements
             'attemptnumber' => 'privacy:metadata:qfb:attemptnumber',
         ], 'privacy:metadata:qfb');
 
+        $collection->add_database_table('local_unifiedgrader_scomm', [
+            'cmid' => 'privacy:metadata:scomm:cmid',
+            'userid' => 'privacy:metadata:scomm:userid',
+            'authorid' => 'privacy:metadata:scomm:authorid',
+            'content' => 'privacy:metadata:scomm:content',
+        ], 'privacy:metadata:scomm');
+
         return $collection;
     }
 
@@ -174,6 +181,19 @@ class provider implements
                   JOIN {course_modules} cm ON cm.id = qfb.cmid
                   JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
                  WHERE qfb.userid = :userid1 OR qfb.grader = :userid2";
+
+        $contextlist->add_from_sql($sql, [
+            'contextlevel' => CONTEXT_MODULE,
+            'userid1' => $userid,
+            'userid2' => $userid,
+        ]);
+
+        // Submission comments where user is the subject or the author.
+        $sql = "SELECT DISTINCT ctx.id
+                  FROM {local_unifiedgrader_scomm} sc
+                  JOIN {course_modules} cm ON cm.id = sc.cmid
+                  JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
+                 WHERE sc.userid = :userid1 OR sc.authorid = :userid2";
 
         $contextlist->add_from_sql($sql, [
             'contextlevel' => CONTEXT_MODULE,
@@ -259,6 +279,19 @@ class provider implements
                   JOIN {course_modules} cm ON cm.id = qfb.cmid
                  WHERE cm.id = :cmid AND qfb.grader > 0";
         $userlist->add_from_sql('grader', $sql, ['cmid' => $context->instanceid]);
+
+        // Submission comments: subjects and authors.
+        $sql = "SELECT DISTINCT sc.userid
+                  FROM {local_unifiedgrader_scomm} sc
+                  JOIN {course_modules} cm ON cm.id = sc.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('userid', $sql, ['cmid' => $context->instanceid]);
+
+        $sql = "SELECT DISTINCT sc.authorid
+                  FROM {local_unifiedgrader_scomm} sc
+                  JOIN {course_modules} cm ON cm.id = sc.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('authorid', $sql, ['cmid' => $context->instanceid]);
     }
 
     /**
@@ -408,6 +441,48 @@ class provider implements
                     (object) ['quiz_feedback' => array_values($exportdata)],
                 );
             }
+
+            // Export submission comments about this user.
+            $scomments = $DB->get_records('local_unifiedgrader_scomm', [
+                'cmid' => $cm->id,
+                'userid' => $userid,
+            ]);
+
+            if ($scomments) {
+                $exportdata = array_map(function($sc) {
+                    return [
+                        'content' => $sc->content,
+                        'authorid' => (int) $sc->authorid,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($sc->timecreated),
+                    ];
+                }, $scomments);
+
+                writer::with_context($context)->export_data(
+                    [get_string('submissioncomments', 'local_unifiedgrader')],
+                    (object) ['submission_comments' => array_values($exportdata)],
+                );
+            }
+
+            // Export submission comments authored by this user.
+            $authoredsc = $DB->get_records('local_unifiedgrader_scomm', [
+                'cmid' => $cm->id,
+                'authorid' => $userid,
+            ]);
+
+            if ($authoredsc) {
+                $exportdata = array_map(function($sc) {
+                    return [
+                        'content' => $sc->content,
+                        'userid' => (int) $sc->userid,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($sc->timecreated),
+                    ];
+                }, $authoredsc);
+
+                writer::with_context($context)->export_data(
+                    [get_string('submissioncomments', 'local_unifiedgrader'), 'authored'],
+                    (object) ['authored_submission_comments' => array_values($exportdata)],
+                );
+            }
         }
 
         // Export comment library (user-level, not context-specific).
@@ -487,6 +562,7 @@ class provider implements
         $DB->delete_records('local_unifiedgrader_penalty', ['cmid' => $context->instanceid]);
         $DB->delete_records('local_unifiedgrader_fext', ['cmid' => $context->instanceid]);
         $DB->delete_records('local_unifiedgrader_qfb', ['cmid' => $context->instanceid]);
+        $DB->delete_records('local_unifiedgrader_scomm', ['cmid' => $context->instanceid]);
     }
 
     /**
@@ -535,6 +611,14 @@ class provider implements
             $DB->delete_records('local_unifiedgrader_qfb', [
                 'cmid' => $context->instanceid,
                 'userid' => $userid,
+            ]);
+            $DB->delete_records('local_unifiedgrader_scomm', [
+                'cmid' => $context->instanceid,
+                'userid' => $userid,
+            ]);
+            $DB->delete_records('local_unifiedgrader_scomm', [
+                'cmid' => $context->instanceid,
+                'authorid' => $userid,
             ]);
         }
 
@@ -602,6 +686,13 @@ class provider implements
         $DB->delete_records_select('local_unifiedgrader_qfb',
             "cmid = :cmid5 AND userid {$insql8}",
             array_merge(['cmid5' => $context->instanceid], $inparams8),
+        );
+
+        [$insql9, $inparams9] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid9');
+        [$insql10, $inparams10] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid10');
+        $DB->delete_records_select('local_unifiedgrader_scomm',
+            "cmid = :cmid6 AND (userid {$insql9} OR authorid {$insql10})",
+            array_merge(['cmid6' => $context->instanceid], $inparams9, $inparams10),
         );
 
         // Delete user-level data.

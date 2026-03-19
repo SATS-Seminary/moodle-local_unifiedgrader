@@ -219,4 +219,64 @@ final class hook_callbacks_test extends \advanced_testcase {
         // Should NOT contain the feedback banner since grade is not released.
         $this->assertStringNotContainsString('local_unifiedgrader/feedback_banner', $jscalls);
     }
+
+    /**
+     * Test that student on assignment view gets assignment_comments JS when setting is enabled.
+     */
+    public function test_student_assignment_gets_submission_comments_js(): void {
+        global $PAGE;
+        $this->resetAfterTest();
+
+        set_config('enable_assign', 1, 'local_unifiedgrader');
+        set_config('enable_submission_comments', 1, 'local_unifiedgrader');
+
+        $gen = $this->getDataGenerator();
+        $plugingen = $gen->get_plugin_generator('local_unifiedgrader');
+        $scenario = $plugingen->create_grading_scenario('assign', ['studentcount' => 1]);
+
+        $this->setUser($scenario->students[0]);
+
+        // Reset $PAGE after course creation to avoid boost_union theme init conflict.
+        $PAGE = new \moodle_page();
+
+        $PAGE->set_cm($scenario->cm);
+        $PAGE->set_context($scenario->context);
+        $PAGE->set_url(new \moodle_url('/mod/assign/view.php', ['id' => $scenario->cm->id]));
+
+        $hook = $this->create_hook();
+        hook_callbacks::before_standard_top_of_body_html($hook);
+
+        $jscalls = $PAGE->requires->get_end_code();
+        $this->assertStringContainsString('local_unifiedgrader/assignment_comments', $jscalls);
+    }
+
+    /**
+     * Test that assignment_comments JS is NOT injected when setting is disabled.
+     */
+    public function test_student_assignment_no_comments_when_disabled(): void {
+        global $PAGE;
+        $this->resetAfterTest();
+
+        set_config('enable_assign', 1, 'local_unifiedgrader');
+        set_config('enable_submission_comments', 0, 'local_unifiedgrader');
+
+        $gen = $this->getDataGenerator();
+        $plugingen = $gen->get_plugin_generator('local_unifiedgrader');
+        $scenario = $plugingen->create_grading_scenario('assign', ['studentcount' => 1]);
+
+        $this->setUser($scenario->students[0]);
+
+        // Reset $PAGE after course creation to avoid boost_union theme init conflict.
+        $PAGE = new \moodle_page();
+
+        $PAGE->set_cm($scenario->cm);
+        $PAGE->set_context($scenario->context);
+        $PAGE->set_url(new \moodle_url('/mod/assign/view.php', ['id' => $scenario->cm->id]));
+
+        $hook = $this->create_hook();
+        hook_callbacks::before_standard_top_of_body_html($hook);
+
+        $jscalls = $PAGE->requires->get_end_code();
+        $this->assertStringNotContainsString('local_unifiedgrader/assignment_comments', $jscalls);
+    }
 }

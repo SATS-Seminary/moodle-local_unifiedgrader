@@ -26,18 +26,15 @@ namespace local_unifiedgrader\external;
 
 defined('MOODLE_INTERNAL') || die();
 
-global $CFG;
-require_once($CFG->dirroot . '/comment/lib.php');
-require_once($CFG->dirroot . '/mod/assign/locallib.php');
-
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_unifiedgrader\submission_comment_manager;
 
 /**
- * Returns submission comments for a student's assignment submission.
+ * Returns submission comments for a student in an activity.
  */
 class get_submission_comments extends external_api {
 
@@ -49,10 +46,6 @@ class get_submission_comments extends external_api {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'userid' => new external_value(PARAM_INT, 'Student user ID'),
-            'page' => new external_value(PARAM_INT, 'Page number (0-based)', VALUE_DEFAULT, 0),
-            'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
-            ),
         ]);
     }
 
@@ -61,18 +54,15 @@ class get_submission_comments extends external_api {
      *
      * @param int $cmid
      * @param int $userid
-     * @param int $page
      * @return array
      */
-    public static function execute(int $cmid, int $userid, int $page = 0, int $attemptnumber = -1): array {
+    public static function execute(int $cmid, int $userid): array {
+        global $USER, $OUTPUT, $PAGE;
+
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'userid' => $userid,
-            'page' => $page,
-            'attemptnumber' => $attemptnumber,
         ]);
-
-        global $USER;
 
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
@@ -88,60 +78,42 @@ class get_submission_comments extends external_api {
             throw new \moodle_exception('nopermission', 'local_unifiedgrader');
         }
 
-        [$course, $cm] = get_course_and_cm_from_cmid($params['cmid']);
+        $comments = submission_comment_manager::get_comments($params['cmid'], $params['userid']);
 
-        // Submission comments are only supported for assignments.
-        if ($cm->modname !== 'assign') {
-            return [
-                'comments' => [],
-                'count' => 0,
-                'canpost' => false,
-            ];
+        // Ensure PAGE has a context set for user_picture rendering.
+        try {
+            $PAGE->context;
+        } catch (\Throwable $e) {
+            $PAGE->set_context($context);
         }
 
-        $assign = new \assign($context, $cm, $course);
-        $submission = $assign->get_user_submission($params['userid'], false, $params['attemptnumber']);
-
-        if (!$submission) {
-            return [
-                'comments' => [],
-                'count' => 0,
-                'canpost' => false,
-            ];
-        }
-
-        $options = new \stdClass();
-        $options->context = $context;
-        $options->component = 'assignsubmission_comments';
-        $options->itemid = $submission->id;
-        $options->area = 'submission_comments';
-        $options->course = $course;
-        $options->cm = $cm;
-
-        $commentobj = new \comment($options);
-        $comments = $commentobj->get_comments($params['page'], 'ASC');
-
-        // Format the comments for output.
         $result = [];
-        if ($comments !== false) {
-            foreach ($comments as $c) {
-                $result[] = [
-                    'id' => (int) $c->id,
-                    'content' => $c->content,
-                    'fullname' => $c->fullname ?? '',
-                    'avatar' => $c->avatar ?? '',
-                    'time' => $c->time ?? '',
-                    'timecreated' => (int) ($c->timecreated ?? 0),
-                    'userid' => (int) ($c->userid ?? 0),
-                    'candelete' => !empty($c->delete),
-                ];
+        foreach ($comments as $c) {
+            $author = \core_user::get_user($c->authorid);
+            $avatar = '';
+            if ($author) {
+                $avatar = $OUTPUT->user_picture($author, ['size' => 30, 'link' => false]);
             }
+            $candelete = $hasgrade || ((int) $c->authorid === (int) $USER->id);
+
+            $result[] = [
+                'id' => (int) $c->id,
+                'content' => $c->content,
+                'fullname' => $author ? fullname($author) : '',
+                'avatar' => $avatar,
+                'time' => userdate($c->timecreated),
+                'timecreated' => (int) $c->timecreated,
+                'userid' => (int) $c->authorid,
+                'candelete' => $candelete,
+            ];
         }
+
+        $canpost = $hasgrade || ($hasviewfeedback && (int) $params['userid'] === (int) $USER->id);
 
         return [
             'comments' => $result,
-            'count' => $commentobj->count(),
-            'canpost' => $commentobj->can_post(),
+            'count' => count($result),
+            'canpost' => $canpost,
         ];
     }
 

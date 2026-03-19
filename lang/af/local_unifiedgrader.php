@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'Bekyk geannoteerde terugvoer van die Ge
 // Settings.
 $string['setting_enable_assign'] = 'Aktiveer vir Opdragte';
 $string['setting_enable_assign_desc'] = 'Laat die Geïntegreerde Nasiener toe om vir opdragaktiwiteite gebruik te word.';
+$string['setting_enable_submission_comments'] = 'Vervang indieningsopmerkings';
+$string['setting_enable_submission_comments_desc'] = 'Vervang Moodle se kern-indieningsopmerkings op die student se opdragaansig met die Geïntegreerde Nasiener se boodskapperstyl-opmerkings (met kennisgewingondersteuning). Studente kan voor en na nasien boodskappe aan dosente stuur.';
 $string['setting_enable_forum'] = 'Aktiveer vir Forums';
 $string['setting_enable_forum_desc'] = 'Laat die Geïntegreerde Nasiener toe om vir forumaktiwiteite gebruik te word.';
 $string['setting_enable_quiz'] = 'Aktiveer vir Vasvrae';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'Die student vir wie die terugvoer is.'
 $string['privacy:metadata:qfb:grader'] = 'Die dosent wat die terugvoer verskaf het.';
 $string['privacy:metadata:qfb:feedback'] = 'Die terugvoerteks.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'Die vasvraapogingnommer.';
+$string['privacy:metadata:scomm'] = 'Indieningsopmerkings wat deur die Unified Grader gestoor word.';
+$string['privacy:metadata:scomm:cmid'] = 'Die kursusmodule waaraan die opmerking behoort.';
+$string['privacy:metadata:scomm:userid'] = 'Die student oor wie die opmerkingsdraad handel.';
+$string['privacy:metadata:scomm:authorid'] = 'Die gebruiker wat die opmerking geskryf het.';
+$string['privacy:metadata:scomm:content'] = 'Die opmerkingsinhoud.';
 $string['privacy_forum_extensions'] = 'Forumverlengings';
 $string['privacy_quiz_feedback'] = 'Vasvraterugvoer';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Kennisgewings oor indieningsopmerkings';
+$string['notification_comment_subject'] = 'Nuwe opmerking op {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> het \'n opmerking geplaas op <a href="{$a->activityurl}">{$a->activityname}</a> in {$a->coursename} ({$a->timecreated}):</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} het kommentaar gelewer op {$a->activityname}';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'Alle veranderings gestoor';

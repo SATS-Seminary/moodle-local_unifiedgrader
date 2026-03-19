@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'Kommentiertes Feedback aus der einheitl
 // Settings.
 $string['setting_enable_assign'] = 'F\u00fcr Aufgaben aktivieren';
 $string['setting_enable_assign_desc'] = 'Die einheitlichen Bewerter f\u00fcr Aufgabenaktivit\u00e4ten verwenden.';
+$string['setting_enable_submission_comments'] = 'Abgabekommentare ersetzen';
+$string['setting_enable_submission_comments_desc'] = 'Ersetzt Moodles Kern-Abgabekommentare in der Aufgabenansicht der Studierenden durch die Messenger-Kommentare des einheitlichen Bewerters (mit Benachrichtigungsunterst\u00fctzung). Studierende k\u00f6nnen Dozenten vor und nach der Bewertung Nachrichten senden.';
 $string['setting_enable_forum'] = 'F\u00fcr Foren aktivieren';
 $string['setting_enable_forum_desc'] = 'Die einheitlichen Bewerter f\u00fcr Forenaktivit\u00e4ten verwenden.';
 $string['setting_enable_quiz'] = 'F\u00fcr Tests aktivieren';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'Der/die Teilnehmer/in, f\u00fcr den/di
 $string['privacy:metadata:qfb:grader'] = 'Der Dozent, der das Feedback gegeben hat.';
 $string['privacy:metadata:qfb:feedback'] = 'Der Feedbacktext.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'Die Testversuchsnummer.';
+$string['privacy:metadata:scomm'] = 'Abgabekommentare, die vom Unified Grader gespeichert werden.';
+$string['privacy:metadata:scomm:cmid'] = 'Das Kursmodul, zu dem der Kommentar gehört.';
+$string['privacy:metadata:scomm:userid'] = 'Der Student, über den der Kommentarthread handelt.';
+$string['privacy:metadata:scomm:authorid'] = 'Der Benutzer, der den Kommentar geschrieben hat.';
+$string['privacy:metadata:scomm:content'] = 'Der Kommentarinhalt.';
 $string['privacy_forum_extensions'] = 'Foren-Verl\u00e4ngerungen';
 $string['privacy_quiz_feedback'] = 'Test-Feedback';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Benachrichtigungen über Abgabekommentare';
+$string['notification_comment_subject'] = 'Neuer Kommentar zu {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> hat einen Kommentar zu <a href="{$a->activityurl}">{$a->activityname}</a> in {$a->coursename} ({$a->timecreated}) gepostet:</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} hat {$a->activityname} kommentiert';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'Alle \u00c4nderungen gespeichert';

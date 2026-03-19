@@ -59,11 +59,6 @@ export default class extends BaseComponent {
      * @param {object} state Current state.
      */
     stateReady(state) {
-        // Submission comments are only supported for assignments.
-        if (state.activity.type !== 'assign') {
-            this.element.classList.add('d-none');
-            return;
-        }
         this._setupEventListeners();
         this._updateBadge(state.submissionComments.count);
     }
@@ -138,7 +133,6 @@ export default class extends BaseComponent {
         this._buildPopoutStructure(popout);
 
         const state = this.reactive.state;
-        const attemptnumber = state.submission?.attemptnumber ?? -1;
 
         // Load comments if not already loaded for this student.
         if (!state.submissionComments.loaded) {
@@ -146,7 +140,6 @@ export default class extends BaseComponent {
                 'loadSubmissionComments',
                 state.activity.cmid,
                 state.currentUser.id,
-                attemptnumber,
             );
         } else {
             this._renderComments(state);
@@ -262,7 +255,6 @@ export default class extends BaseComponent {
             return;
         }
         const state = this.reactive.state;
-        const attemptnumber = state.submission?.attemptnumber ?? -1;
         input.value = '';
         const postBtn = this.element.querySelector('[data-action="post-comment"]');
         if (postBtn) {
@@ -273,7 +265,6 @@ export default class extends BaseComponent {
             state.activity.cmid,
             state.currentUser.id,
             content,
-            attemptnumber,
         );
     }
 
@@ -362,7 +353,6 @@ export default class extends BaseComponent {
                     state.activity.cmid,
                     state.currentUser.id,
                     comment.id,
-                    state.submission?.attemptnumber ?? -1,
                 );
             });
             meta.appendChild(deleteBtn);

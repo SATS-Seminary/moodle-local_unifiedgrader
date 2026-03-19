@@ -459,30 +459,10 @@ if ($grade && $adapter->has_feedback_plugin('file')) {
     $hasfeedbackfiles = !empty($feedbackfiles);
 }
 
-// Check for submission comments feature.
-$hascommentsfeature = false;
-$commentcount = 0;
-$canpostcomments = false;
-$submission = $assign->get_user_submission($userid, false, $selectedattempt);
-if ($submission) {
-    foreach ($assign->get_submission_plugins() as $plugin) {
-        if ($plugin->get_type() === 'comments' && $plugin->is_enabled()) {
-            $hascommentsfeature = true;
-            require_once($CFG->dirroot . '/comment/lib.php');
-            $commentoptions = new \stdClass();
-            $commentoptions->context = $context;
-            $commentoptions->component = 'assignsubmission_comments';
-            $commentoptions->itemid = $submission->id;
-            $commentoptions->area = 'submission_comments';
-            $commentoptions->course = $course;
-            $commentoptions->cm = $cm;
-            $commentobj = new \comment($commentoptions);
-            $commentcount = $commentobj->count();
-            $canpostcomments = $commentobj->can_post();
-            break;
-        }
-    }
-}
+// Submission comments via our custom table (works for all activity types).
+$hascommentsfeature = true;
+$commentcount = \local_unifiedgrader\submission_comment_manager::count_comments($cmid, $userid);
+$canpostcomments = has_capability('local/unifiedgrader:viewfeedback', $context);
 
 $showrightcolumn = !empty($feedback) || $gradinginfo['hasadvancedgrading'];
 

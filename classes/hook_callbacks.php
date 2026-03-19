@@ -124,6 +124,15 @@ class hook_callbacks {
             return;
         }
 
+        // Replace core submission comments with our widget (assignment only, pre- and post-grading).
+        if ($modname === 'assign' && get_config('local_unifiedgrader', 'enable_submission_comments')) {
+            $PAGE->requires->js_call_amd(
+                'local_unifiedgrader/assignment_comments',
+                'init',
+                [$cm->id, (int) $USER->id],
+            );
+        }
+
         try {
             $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cm->id);
         } catch (\Throwable $e) {

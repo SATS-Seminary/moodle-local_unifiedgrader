@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'Voir les commentaires annot\u00e9s du c
 // Settings.
 $string['setting_enable_assign'] = 'Activer pour les devoirs';
 $string['setting_enable_assign_desc'] = 'Permettre l\'utilisation du correcteur unifié pour les activit\u00e9s de type devoir.';
+$string['setting_enable_submission_comments'] = 'Remplacer les commentaires de soumission';
+$string['setting_enable_submission_comments_desc'] = 'Remplace les commentaires de soumission natifs de Moodle dans la vue devoir de l\'\u00e9tudiant par les commentaires style messagerie du correcteur unifi\u00e9 (avec support des notifications). Les \u00e9tudiants peuvent envoyer des messages aux enseignants avant et apr\u00e8s la correction.';
 $string['setting_enable_forum'] = 'Activer pour les forums';
 $string['setting_enable_forum_desc'] = 'Permettre l\'utilisation du correcteur unifié pour les activit\u00e9s de type forum.';
 $string['setting_enable_quiz'] = 'Activer pour les tests';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'L\'\u00e9tudiant concern\u00e9 par le 
 $string['privacy:metadata:qfb:grader'] = 'L\'enseignant qui a fourni le commentaire.';
 $string['privacy:metadata:qfb:feedback'] = 'Le texte du commentaire.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'Le num\u00e9ro de tentative du test.';
+$string['privacy:metadata:scomm'] = 'Commentaires de soumission stockés par le Unified Grader.';
+$string['privacy:metadata:scomm:cmid'] = 'Le module de cours auquel appartient le commentaire.';
+$string['privacy:metadata:scomm:userid'] = 'L\'étudiant concerné par le fil de commentaires.';
+$string['privacy:metadata:scomm:authorid'] = 'L\'utilisateur qui a écrit le commentaire.';
+$string['privacy:metadata:scomm:content'] = 'Le contenu du commentaire.';
 $string['privacy_forum_extensions'] = 'Prolongations de forum';
 $string['privacy_quiz_feedback'] = 'Commentaires de test';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Notifications de commentaires de soumission';
+$string['notification_comment_subject'] = 'Nouveau commentaire sur {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> a publié un commentaire sur <a href="{$a->activityurl}">{$a->activityname}</a> dans {$a->coursename} ({$a->timecreated}) :</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} a commenté sur {$a->activityname}';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'Toutes les modifications sont enregistr\u00e9es';

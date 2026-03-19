@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'View annotated feedback from the Unifie
 // Settings.
 $string['setting_enable_assign'] = 'Enable for Assignments';
 $string['setting_enable_assign_desc'] = 'Allow the Unified Grader to be used for assignment activities.';
+$string['setting_enable_submission_comments'] = 'Replace submission comments';
+$string['setting_enable_submission_comments_desc'] = 'Replace Moodle\'s core submission comments on the student assignment view with the Unified Grader\'s messenger-style comments (with notification support). Students can message lecturers before and after grading.';
 $string['setting_enable_forum'] = 'Enable for Forums';
 $string['setting_enable_forum_desc'] = 'Allow the Unified Grader to be used for forum activities.';
 $string['setting_enable_quiz'] = 'Enable for Quizzes';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'The student the feedback is for.';
 $string['privacy:metadata:qfb:grader'] = 'The teacher who provided the feedback.';
 $string['privacy:metadata:qfb:feedback'] = 'The feedback text.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'The quiz attempt number.';
+$string['privacy:metadata:scomm'] = 'Submission comments stored by the Unified Grader.';
+$string['privacy:metadata:scomm:cmid'] = 'The course module the comment belongs to.';
+$string['privacy:metadata:scomm:userid'] = 'The student the comment thread is about.';
+$string['privacy:metadata:scomm:authorid'] = 'The user who wrote the comment.';
+$string['privacy:metadata:scomm:content'] = 'The comment content.';
 $string['privacy_forum_extensions'] = 'Forum extensions';
 $string['privacy_quiz_feedback'] = 'Quiz feedback';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Submission comment notifications';
+$string['notification_comment_subject'] = 'New comment on {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> posted a comment on <a href="{$a->activityurl}">{$a->activityname}</a> in {$a->coursename} ({$a->timecreated}):</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} commented on {$a->activityname}';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'All changes saved';

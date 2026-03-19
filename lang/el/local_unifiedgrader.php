@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'Προβολή σχολιασμένης
 // Settings.
 $string['setting_enable_assign'] = 'Ενεργοποίηση για εργασίες';
 $string['setting_enable_assign_desc'] = 'Επιτρέπει τη χρήση του ενοποιημένου βαθμολογητή για δραστηριότητες εργασιών.';
+$string['setting_enable_submission_comments'] = 'Αντικατάσταση σχολίων υποβολής';
+$string['setting_enable_submission_comments_desc'] = 'Αντικαθιστά τα βασικά σχόλια υποβολής του Moodle στην προβολή εργασίας του φοιτητή με τα σχόλια τύπου μηνυμάτων του ενοποιημένου βαθμολογητή (με υποστήριξη ειδοποιήσεων). Οι φοιτητές μπορούν να στέλνουν μηνύματα στους καθηγητές πριν και μετά τη βαθμολόγηση.';
 $string['setting_enable_forum'] = 'Ενεργοποίηση για φόρουμ';
 $string['setting_enable_forum_desc'] = 'Επιτρέπει τη χρήση του ενοποιημένου βαθμολογητή για δραστηριότητες φόρουμ.';
 $string['setting_enable_quiz'] = 'Ενεργοποίηση για κουίζ';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'Ο σπουδαστής για τον 
 $string['privacy:metadata:qfb:grader'] = 'Ο εκπαιδευτικός που παρείχε την ανατροφοδότηση.';
 $string['privacy:metadata:qfb:feedback'] = 'Το κείμενο ανατροφοδότησης.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'Ο αριθμός προσπάθειας κουίζ.';
+$string['privacy:metadata:scomm'] = 'Σχόλια υποβολής που αποθηκεύονται από τον Unified Grader.';
+$string['privacy:metadata:scomm:cmid'] = 'Η ενότητα μαθήματος στην οποία ανήκει το σχόλιο.';
+$string['privacy:metadata:scomm:userid'] = 'Ο μαθητής για τον οποίο αφορά το νήμα σχολίων.';
+$string['privacy:metadata:scomm:authorid'] = 'Ο χρήστης που έγραψε το σχόλιο.';
+$string['privacy:metadata:scomm:content'] = 'Το περιεχόμενο του σχολίου.';
 $string['privacy_forum_extensions'] = 'Παρατάσεις φόρουμ';
 $string['privacy_quiz_feedback'] = 'Ανατροφοδότηση κουίζ';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Ειδοποιήσεις σχολίων υποβολής';
+$string['notification_comment_subject'] = 'Νέο σχόλιο στο {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> δημοσίευσε ένα σχόλιο στο <a href="{$a->activityurl}">{$a->activityname}</a> στο {$a->coursename} ({$a->timecreated}):</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} σχολίασε στο {$a->activityname}';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'Όλες οι αλλαγές αποθηκεύτηκαν';

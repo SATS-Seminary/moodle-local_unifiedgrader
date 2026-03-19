@@ -26,17 +26,15 @@ namespace local_unifiedgrader\external;
 
 defined('MOODLE_INTERNAL') || die();
 
-global $CFG;
-require_once($CFG->dirroot . '/comment/lib.php');
-require_once($CFG->dirroot . '/mod/assign/locallib.php');
-
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_unifiedgrader\submission_comment_manager;
+use local_unifiedgrader\notification\submission_comment_notification;
 
 /**
- * Adds a comment to a student's assignment submission.
+ * Adds a comment to a student's submission.
  */
 class add_submission_comment extends external_api {
 
@@ -49,9 +47,6 @@ class add_submission_comment extends external_api {
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'userid' => new external_value(PARAM_INT, 'Student user ID'),
             'content' => new external_value(PARAM_RAW, 'Comment content'),
-            'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
-            ),
         ]);
     }
 
@@ -63,12 +58,11 @@ class add_submission_comment extends external_api {
      * @param string $content
      * @return array
      */
-    public static function execute(int $cmid, int $userid, string $content, int $attemptnumber = -1): array {
+    public static function execute(int $cmid, int $userid, string $content): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'userid' => $userid,
             'content' => $content,
-            'attemptnumber' => $attemptnumber,
         ]);
 
         global $USER;
@@ -87,42 +81,29 @@ class add_submission_comment extends external_api {
             throw new \moodle_exception('nopermission', 'local_unifiedgrader');
         }
 
-        [$course, $cm] = get_course_and_cm_from_cmid($params['cmid']);
+        $record = submission_comment_manager::add_comment(
+            $params['cmid'],
+            $params['userid'],
+            (int) $USER->id,
+            $params['content']
+        );
 
-        // Submission comments are only supported for assignments.
-        if ($cm->modname !== 'assign') {
-            throw new \moodle_exception('invalidactivitytype', 'local_unifiedgrader');
-        }
+        $count = submission_comment_manager::count_comments($params['cmid'], $params['userid']);
 
-        $assign = new \assign($context, $cm, $course);
-        $submission = $assign->get_user_submission($params['userid'], false, $params['attemptnumber']);
-
-        if (!$submission) {
-            throw new \moodle_exception('nosubmission', 'local_unifiedgrader');
-        }
-
-        $options = new \stdClass();
-        $options->context = $context;
-        $options->component = 'assignsubmission_comments';
-        $options->itemid = $submission->id;
-        $options->area = 'submission_comments';
-        $options->course = $course;
-        $options->cm = $cm;
-
-        $commentobj = new \comment($options);
-
-        if (!$commentobj->can_post()) {
-            throw new \moodle_exception('nopermissiontocomment', 'comment');
-        }
-
-        $newcomment = $commentobj->add($params['content']);
+        // Send notification asynchronously-safe (runs inline but is fast).
+        submission_comment_notification::send(
+            $params['cmid'],
+            $params['userid'],
+            (int) $USER->id,
+            $params['content']
+        );
 
         return [
-            'id' => (int) $newcomment->id,
-            'content' => $newcomment->content,
-            'fullname' => $newcomment->fullname ?? '',
-            'time' => $newcomment->time ?? '',
-            'count' => $commentobj->count(),
+            'id' => (int) $record->id,
+            'content' => $record->content,
+            'fullname' => fullname($USER),
+            'time' => userdate($record->timecreated),
+            'count' => $count,
         ];
     }
 

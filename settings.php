@@ -38,6 +38,13 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_configcheckbox(
+        'local_unifiedgrader/enable_submission_comments',
+        get_string('setting_enable_submission_comments', 'local_unifiedgrader'),
+        get_string('setting_enable_submission_comments_desc', 'local_unifiedgrader'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
         'local_unifiedgrader/enable_forum',
         get_string('setting_enable_forum', 'local_unifiedgrader'),
         get_string('setting_enable_forum_desc', 'local_unifiedgrader'),

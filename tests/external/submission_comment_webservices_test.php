@@ -22,6 +22,7 @@ use core_external\external_api;
  * Tests for submission comment web service external functions.
  *
  * Covers get_submission_comments, add_submission_comment, and delete_submission_comment.
+ * Tests comments across assign, forum, and quiz activity types, plus notifications.
  *
  * @package    local_unifiedgrader
  * @category   test
@@ -34,32 +35,15 @@ use core_external\external_api;
 final class submission_comment_webservices_test extends \advanced_testcase {
 
     /**
-     * Helper: create a grading scenario with a submitted student and set teacher as current user.
+     * Helper: create a grading scenario and set teacher as current user.
      *
-     * The assignsubmission_comments plugin must be enabled for submission comments
-     * to work. We also enable the Moodle comment system globally.
-     *
+     * @param string $type Activity type (assign, forum, quiz).
      * @param array $options Options passed to create_grading_scenario.
      * @return \stdClass Scenario object with course, activity, cm, context, teacher, students.
      */
-    private function create_scenario_with_submission(array $options = []): \stdClass {
-        global $CFG;
-
+    private function create_scenario(string $type = 'assign', array $options = []): \stdClass {
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
-        $modparams = array_merge([
-            'assignsubmission_comments_enabled' => 1,
-        ], $options['modparams'] ?? []);
-        $options['modparams'] = $modparams;
-
-        $scenario = $plugingen->create_grading_scenario('assign', $options);
-
-        // Enable comments globally.
-        $CFG->usecomments = 1;
-
-        // Create submission as the first student.
-        $this->setUser($scenario->students[0]);
-        $plugingen->create_assign_submission($scenario->activity, $scenario->students[0]->id, '<p>My submission</p>');
-
+        $scenario = $plugingen->create_grading_scenario($type, $options);
         $this->setUser($scenario->teacher);
         return $scenario;
     }
@@ -74,9 +58,9 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_get_submission_comments_happy_path(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
-        // Add a comment.
+        // Add a comment via the web service.
         add_submission_comment::execute(
             $scenario->cm->id,
             $scenario->students[0]->id,
@@ -88,9 +72,9 @@ final class submission_comment_webservices_test extends \advanced_testcase {
         $this->assertArrayHasKey('comments', $result);
         $this->assertArrayHasKey('count', $result);
         $this->assertArrayHasKey('canpost', $result);
-        $this->assertGreaterThanOrEqual(1, $result['count']);
+        $this->assertEquals(1, $result['count']);
+        $this->assertTrue($result['canpost']);
 
-        // Find our comment in the list.
         $found = false;
         foreach ($result['comments'] as $comment) {
             if (strpos($comment['content'], 'Test comment from teacher') !== false) {
@@ -102,19 +86,57 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     }
 
     /**
+     * Test get_submission_comments works for forum activities.
+     */
+    public function test_get_submission_comments_forum(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario('forum');
+
+        add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Forum comment',
+        );
+
+        $result = get_submission_comments::execute($scenario->cm->id, $scenario->students[0]->id);
+
+        $this->assertEquals(1, $result['count']);
+        $this->assertStringContainsString('Forum comment', $result['comments'][0]['content']);
+    }
+
+    /**
+     * Test get_submission_comments works for quiz activities.
+     */
+    public function test_get_submission_comments_quiz(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario('quiz');
+
+        add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Quiz comment',
+        );
+
+        $result = get_submission_comments::execute($scenario->cm->id, $scenario->students[0]->id);
+
+        $this->assertEquals(1, $result['count']);
+        $this->assertStringContainsString('Quiz comment', $result['comments'][0]['content']);
+    }
+
+    /**
      * Test get_submission_comments throws when user lacks both grade and viewfeedback capabilities.
      */
     public function test_get_submission_comments_no_capability(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
-        // Create a user who is enrolled but has neither grade nor viewfeedback capability.
         $gen = $this->getDataGenerator();
         $norole = $gen->create_user(['username' => 'noroleuser']);
         $gen->enrol_user($norole->id, $scenario->course->id, 'guest');
 
-        // Remove viewfeedback from guest.
         $roles = get_archetype_roles('guest');
         $guestroleobj = reset($roles);
         if ($guestroleobj) {
@@ -138,7 +160,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_get_submission_comments_return_validation(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
         $result = get_submission_comments::execute($scenario->cm->id, $scenario->students[0]->id);
 
@@ -153,20 +175,56 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     }
 
     /**
-     * Test get_submission_comments returns empty when no submission exists.
+     * Test get_submission_comments returns empty when no comments exist.
      */
-    public function test_get_submission_comments_no_submission(): void {
+    public function test_get_submission_comments_empty(): void {
         $this->resetAfterTest();
 
-        $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
-        $scenario = $plugingen->create_grading_scenario('assign');
-        $this->setUser($scenario->teacher);
+        $scenario = $this->create_scenario();
 
-        // Student 1 has no submission in this scenario.
-        $result = get_submission_comments::execute($scenario->cm->id, $scenario->students[1]->id);
+        $result = get_submission_comments::execute($scenario->cm->id, $scenario->students[0]->id);
 
         $this->assertEmpty($result['comments']);
         $this->assertEquals(0, $result['count']);
+    }
+
+    /**
+     * Test student can view their own comments via viewfeedback capability.
+     */
+    public function test_student_can_view_own_comments(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        // Teacher adds a comment.
+        add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Teacher feedback',
+        );
+
+        // Switch to student.
+        $this->setUser($scenario->students[0]);
+
+        $result = get_submission_comments::execute($scenario->cm->id, $scenario->students[0]->id);
+
+        $this->assertEquals(1, $result['count']);
+        $this->assertTrue($result['canpost']);
+    }
+
+    /**
+     * Test student cannot view another student's comments.
+     */
+    public function test_student_cannot_view_other_comments(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        // Switch to student 0, try to view student 1's comments.
+        $this->setUser($scenario->students[0]);
+
+        $this->expectException(\moodle_exception::class);
+        get_submission_comments::execute($scenario->cm->id, $scenario->students[1]->id);
     }
 
     // -------------------------------------------------------------------------
@@ -179,7 +237,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_add_submission_comment_happy_path(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
         $result = add_submission_comment::execute(
             $scenario->cm->id,
@@ -190,8 +248,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
         $this->assertArrayHasKey('id', $result);
         $this->assertGreaterThan(0, $result['id']);
         $this->assertStringContainsString('A teacher comment on the submission', $result['content']);
-        $this->assertArrayHasKey('count', $result);
-        $this->assertGreaterThanOrEqual(1, $result['count']);
+        $this->assertEquals(1, $result['count']);
     }
 
     /**
@@ -200,9 +257,8 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_add_submission_comment_no_capability(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
-        // Create a user who is enrolled but lacks the needed capabilities.
         $gen = $this->getDataGenerator();
         $norole = $gen->create_user(['username' => 'noroleuser']);
         $gen->enrol_user($norole->id, $scenario->course->id, 'guest');
@@ -234,7 +290,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_add_submission_comment_return_validation(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
         $result = add_submission_comment::execute(
             $scenario->cm->id,
@@ -255,23 +311,40 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     }
 
     /**
-     * Test add_submission_comment throws when student has no submission.
+     * Test student can post comment on their own submission.
      */
-    public function test_add_submission_comment_no_submission(): void {
+    public function test_student_can_post_own_comment(): void {
         $this->resetAfterTest();
 
-        $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
-        $scenario = $plugingen->create_grading_scenario('assign', [
-            'modparams' => ['assignsubmission_comments_enabled' => 1],
-        ]);
-        $this->setUser($scenario->teacher);
+        $scenario = $this->create_scenario();
 
-        // Student 1 has no submission.
+        $this->setUser($scenario->students[0]);
+
+        $result = add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Student question about feedback',
+        );
+
+        $this->assertGreaterThan(0, $result['id']);
+        $this->assertEquals(1, $result['count']);
+    }
+
+    /**
+     * Test student cannot post comment on another student's submission.
+     */
+    public function test_student_cannot_post_on_other(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        $this->setUser($scenario->students[0]);
+
         $this->expectException(\moodle_exception::class);
         add_submission_comment::execute(
             $scenario->cm->id,
             $scenario->students[1]->id,
-            'Comment on nonexistent submission',
+            'Should not be allowed',
         );
     }
 
@@ -285,20 +358,18 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_delete_submission_comment_happy_path(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
-        // Add a comment.
         $addresult = add_submission_comment::execute(
             $scenario->cm->id,
             $scenario->students[0]->id,
             'Comment to delete',
         );
 
-        // Delete the comment.
         $result = delete_submission_comment::execute($scenario->cm->id, $addresult['id']);
 
         $this->assertTrue($result['success']);
-        $this->assertIsInt($result['count']);
+        $this->assertEquals(0, $result['count']);
     }
 
     /**
@@ -307,16 +378,14 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_delete_submission_comment_no_capability(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
-        // Add a comment as teacher.
         $addresult = add_submission_comment::execute(
             $scenario->cm->id,
             $scenario->students[0]->id,
             'Comment to try to delete',
         );
 
-        // Create a user who is enrolled but lacks the needed capabilities.
         $gen = $this->getDataGenerator();
         $norole = $gen->create_user(['username' => 'noroleuser']);
         $gen->enrol_user($norole->id, $scenario->course->id, 'guest');
@@ -344,7 +413,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_delete_submission_comment_return_validation(): void {
         $this->resetAfterTest();
 
-        $scenario = $this->create_scenario_with_submission();
+        $scenario = $this->create_scenario();
 
         $addresult = add_submission_comment::execute(
             $scenario->cm->id,
@@ -370,11 +439,133 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     public function test_delete_submission_comment_nonexistent(): void {
         $this->resetAfterTest();
 
-        $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
-        $scenario = $plugingen->create_grading_scenario('assign');
-        $this->setUser($scenario->teacher);
+        $scenario = $this->create_scenario();
 
-        $this->expectException(\dml_missing_record_exception::class);
+        $this->expectException(\moodle_exception::class);
         delete_submission_comment::execute($scenario->cm->id, 99999);
+    }
+
+    /**
+     * Test teacher can delete any comment, student can only delete own.
+     */
+    public function test_delete_permission_rules(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        // Student posts a comment.
+        $this->setUser($scenario->students[0]);
+        $studentcomment = add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Student comment',
+        );
+
+        // Teacher posts a comment.
+        $this->setUser($scenario->teacher);
+        $teachercomment = add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Teacher comment',
+        );
+
+        // Student cannot delete teacher's comment.
+        $this->setUser($scenario->students[0]);
+        $this->expectException(\moodle_exception::class);
+        delete_submission_comment::execute($scenario->cm->id, $teachercomment['id']);
+    }
+
+    /**
+     * Test teacher can delete a student's comment.
+     */
+    public function test_teacher_can_delete_student_comment(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        // Student posts a comment.
+        $this->setUser($scenario->students[0]);
+        $studentcomment = add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Student comment to delete',
+        );
+
+        // Teacher deletes it.
+        $this->setUser($scenario->teacher);
+        $result = delete_submission_comment::execute($scenario->cm->id, $studentcomment['id']);
+        $this->assertTrue($result['success']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Notification tests.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Test that a notification is sent to the student when a teacher posts a comment.
+     */
+    public function test_notification_sent_to_student_on_teacher_comment(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        $sink = $this->redirectMessages();
+
+        add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'Please review my feedback',
+        );
+
+        $messages = $sink->get_messages();
+        $sink->close();
+
+        // Find the notification sent to the student.
+        $found = false;
+        foreach ($messages as $msg) {
+            if ((int) $msg->useridto === (int) $scenario->students[0]->id
+                    && $msg->component === 'local_unifiedgrader'
+                    && $msg->eventtype === 'submission_comment') {
+                $found = true;
+                $this->assertStringContainsString('Please review my feedback', $msg->fullmessagehtml);
+                $this->assertStringContainsString(fullname($scenario->teacher), $msg->fullmessagehtml);
+                break;
+            }
+        }
+        $this->assertTrue($found, 'Student should receive a notification when teacher comments');
+    }
+
+    /**
+     * Test that a notification is sent to the teacher when a student posts a comment.
+     */
+    public function test_notification_sent_to_teacher_on_student_comment(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        $sink = $this->redirectMessages();
+
+        $this->setUser($scenario->students[0]);
+        add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            'I have a question about my grade',
+        );
+
+        $messages = $sink->get_messages();
+        $sink->close();
+
+        // Find the notification sent to the teacher.
+        $found = false;
+        foreach ($messages as $msg) {
+            if ((int) $msg->useridto === (int) $scenario->teacher->id
+                    && $msg->component === 'local_unifiedgrader'
+                    && $msg->eventtype === 'submission_comment') {
+                $found = true;
+                $this->assertStringContainsString('I have a question about my grade', $msg->fullmessagehtml);
+                break;
+            }
+        }
+        $this->assertTrue($found, 'Teacher should receive a notification when student comments');
     }
 }

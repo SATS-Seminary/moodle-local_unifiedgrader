@@ -45,6 +45,8 @@ $string['unifiedgrader:viewfeedback'] = 'Ver retroalimentaci\u00f3n anotada del 
 // Settings.
 $string['setting_enable_assign'] = 'Habilitar para Tareas';
 $string['setting_enable_assign_desc'] = 'Permitir que el calificador unificado se use para actividades de tarea.';
+$string['setting_enable_submission_comments'] = 'Reemplazar comentarios de entrega';
+$string['setting_enable_submission_comments_desc'] = 'Reemplaza los comentarios de entrega nativos de Moodle en la vista de tarea del estudiante con los comentarios estilo mensajería del calificador unificado (con soporte de notificaciones). Los estudiantes pueden enviar mensajes a los profesores antes y después de la calificación.';
 $string['setting_enable_forum'] = 'Habilitar para Foros';
 $string['setting_enable_forum_desc'] = 'Permitir que el calificador unificado se use para actividades de foro.';
 $string['setting_enable_quiz'] = 'Habilitar para Cuestionarios';
@@ -430,8 +432,19 @@ $string['privacy:metadata:qfb:userid'] = 'El estudiante al que corresponde la re
 $string['privacy:metadata:qfb:grader'] = 'El profesor que proporcion\u00f3 la retroalimentaci\u00f3n.';
 $string['privacy:metadata:qfb:feedback'] = 'El texto de la retroalimentaci\u00f3n.';
 $string['privacy:metadata:qfb:attemptnumber'] = 'El n\u00famero de intento del cuestionario.';
+$string['privacy:metadata:scomm'] = 'Comentarios de entrega almacenados por el Unified Grader.';
+$string['privacy:metadata:scomm:cmid'] = 'El módulo del curso al que pertenece el comentario.';
+$string['privacy:metadata:scomm:userid'] = 'El estudiante sobre el que trata el hilo de comentarios.';
+$string['privacy:metadata:scomm:authorid'] = 'El usuario que escribió el comentario.';
+$string['privacy:metadata:scomm:content'] = 'El contenido del comentario.';
 $string['privacy_forum_extensions'] = 'Extensiones de foro';
 $string['privacy_quiz_feedback'] = 'Retroalimentaci\u00f3n de cuestionario';
+
+// Notification strings.
+$string['messageprovider:submission_comment'] = 'Notificaciones de comentarios de entrega';
+$string['notification_comment_subject'] = 'Nuevo comentario en {$a->activityname}';
+$string['notification_comment_body'] = '<p><strong>{$a->authorfullname}</strong> publicó un comentario en <a href="{$a->activityurl}">{$a->activityname}</a> en {$a->coursename} ({$a->timecreated}):</p><blockquote>{$a->content}</blockquote>';
+$string['notification_comment_small'] = '{$a->authorfullname} comentó en {$a->activityname}';
 
 // Offline cache and save status.
 $string['allchangessaved'] = 'Todos los cambios guardados';

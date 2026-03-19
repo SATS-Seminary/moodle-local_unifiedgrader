@@ -26,13 +26,11 @@ namespace local_unifiedgrader\external;
 
 defined('MOODLE_INTERNAL') || die();
 
-global $CFG;
-require_once($CFG->dirroot . '/comment/lib.php');
-
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_unifiedgrader\submission_comment_manager;
 
 /**
  * Deletes a submission comment.
@@ -58,7 +56,7 @@ class delete_submission_comment extends external_api {
      * @return array
      */
     public static function execute(int $cmid, int $commentid): array {
-        global $DB;
+        global $USER;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
@@ -68,39 +66,36 @@ class delete_submission_comment extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
 
-        // Allow teachers (grade) or students (viewfeedback). The comment API's
-        // can_delete() method enforces ownership rules.
+        // Allow teachers (grade) or students (viewfeedback).
         $hasgrade = has_capability('local/unifiedgrader:grade', $context);
         $hasviewfeedback = has_capability('local/unifiedgrader:viewfeedback', $context);
         if (!$hasgrade && !$hasviewfeedback) {
             require_capability('local/unifiedgrader:grade', $context);
         }
 
-        // Load the comment record to get the component/area/itemid.
-        $record = $DB->get_record('comments', ['id' => $params['commentid']], '*', MUST_EXIST);
-
-        // Verify the comment belongs to this context.
-        if ((int) $record->contextid !== (int) $context->id) {
+        // Load the comment record.
+        $record = submission_comment_manager::get_comment($params['commentid']);
+        if (!$record) {
             throw new \moodle_exception('invalidcomment', 'local_unifiedgrader');
         }
 
-        $options = new \stdClass();
-        $options->context = $context;
-        $options->component = $record->component;
-        $options->itemid = $record->itemid;
-        $options->area = $record->commentarea;
-
-        $commentobj = new \comment($options);
-
-        if (!$commentobj->can_delete($record)) {
-            throw new \moodle_exception('nopermissiontodelentry', 'comment');
+        // Verify the comment belongs to this activity.
+        if ((int) $record->cmid !== (int) $params['cmid']) {
+            throw new \moodle_exception('invalidcomment', 'local_unifiedgrader');
         }
 
-        $commentobj->delete($params['commentid']);
+        // Permission: author can delete own, or teacher can delete any.
+        if (!$hasgrade && (int) $record->authorid !== (int) $USER->id) {
+            throw new \moodle_exception('nopermission', 'local_unifiedgrader');
+        }
+
+        submission_comment_manager::delete_comment($params['commentid']);
+
+        $count = submission_comment_manager::count_comments((int) $record->cmid, (int) $record->userid);
 
         return [
             'success' => true,
-            'count' => $commentobj->count(),
+            'count' => $count,
         ];
     }
 

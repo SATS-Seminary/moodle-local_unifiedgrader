@@ -110,6 +110,27 @@ class local_unifiedgrader_generator extends component_generator_base {
     }
 
     /**
+     * Create a submission comment record.
+     *
+     * @param array $data Required: cmid, userid, authorid. Optional: content.
+     * @return \stdClass The created record.
+     */
+    public function create_submission_comment(array $data): \stdClass {
+        global $DB;
+
+        $now = time();
+
+        $record = (object) array_merge([
+            'content' => 'Test submission comment',
+            'timecreated' => $now,
+            'timemodified' => $now,
+        ], $data);
+
+        $record->id = $DB->insert_record('local_unifiedgrader_scomm', $record);
+        return $record;
+    }
+
+    /**
      * Create a user preference record.
      *
      * @param array $data Required: userid. Optional: preferences (JSON string).

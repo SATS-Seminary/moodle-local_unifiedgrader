@@ -29,7 +29,7 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/assign/locallib.php');
 require_once($CFG->dirroot . '/grade/grading/lib.php');
-require_once($CFG->dirroot . '/comment/lib.php');
+use local_unifiedgrader\submission_comment_manager;
 
 /**
  * Concrete adapter wrapping mod_assign's internal API.
@@ -316,17 +316,8 @@ class assign_adapter extends base_adapter {
 
         $onlinetext = $this->get_onlinetext($submission);
 
-        // Get submission comment count via Moodle's comment API.
-        $commentcount = 0;
-        if ($this->has_submission_plugin('comments')) {
-            $commentoptions = new \stdClass();
-            $commentoptions->context = $this->context;
-            $commentoptions->component = 'assignsubmission_comments';
-            $commentoptions->itemid = $submission->id;
-            $commentoptions->area = 'submission_comments';
-            $commentobj = new \comment($commentoptions);
-            $commentcount = $commentobj->count();
-        }
+        // Get submission comment count from our custom table.
+        $commentcount = submission_comment_manager::count_comments($this->cm->id, $userid);
 
         // Check whether any non-file submission plugins have actual student content.
         $hascontent = false;
