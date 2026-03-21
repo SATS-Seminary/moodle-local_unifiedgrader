@@ -64,45 +64,50 @@ jobs:
 
       - name: PHP Lint
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phplint
+        run: moodle-plugin-ci phplint ./plugin
 
       - name: PHP Mess Detector
         continue-on-error: true
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpmd
+        run: moodle-plugin-ci phpmd ./plugin
 
       - name: Moodle Code Checker
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpcs --max-warnings 0
+        run: moodle-plugin-ci phpcs --max-warnings 0 ./plugin
 
       - name: Moodle PHPDoc Checker
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpdoc --max-warnings 0
+        run: moodle-plugin-ci phpdoc --max-warnings 0 ./plugin
 
       - name: Validating
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci validate
+        run: moodle-plugin-ci validate ./plugin
 
       - name: Check upgrade savepoints
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci savepoints
+        run: moodle-plugin-ci savepoints ./plugin
 
       - name: Mustache Lint
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci mustache
+        run: moodle-plugin-ci mustache ./plugin
 
       - name: Grunt
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci grunt --max-lint-warnings 0
+        run: moodle-plugin-ci grunt --max-lint-warnings 0 ./plugin
 
       - name: PHPUnit tests
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpunit --fail-on-warning
+        run: moodle-plugin-ci phpunit --fail-on-warning ./plugin
 
       - name: Behat features
         id: behat
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci behat --profile chrome --scss-deprecations
+        run: |
+          if [ -d "plugin/tests/behat" ]; then
+            moodle-plugin-ci behat --profile chrome --scss-deprecations ./plugin
+          else
+            echo "No Behat features found, skipping."
+          fi
 
       - name: Upload Behat Faildump
         if: ${{ failure() && steps.behat.outcome == 'failure' }}
