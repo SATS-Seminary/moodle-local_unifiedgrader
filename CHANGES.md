@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.1.0 (2026-03-20)
+## v2.1.1 (2026-03-21)
 - Add student submission comments for quiz and forum activities (popout chat bubble)
 - Add submission comment popout to quiz feedback viewer
 - Fix SATS Mail bridge hardcoded assign URL to support all activity types
