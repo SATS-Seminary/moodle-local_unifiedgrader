@@ -93,6 +93,8 @@ abstract class base_adapter {
      * @param int $feedbackformat Text format constant.
      * @param array $advancedgradingdata Optional rubric/marking guide fill data.
      * @param int $draftitemid Draft area item ID for feedback file uploads (0 = no files).
+     * @param int $feedbackfilesdraftid Draft area item ID for feedback files plugin (0 = no files).
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
      * @return bool Success.
      */
     abstract public function save_grade(

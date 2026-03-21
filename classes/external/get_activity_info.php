@@ -77,24 +77,42 @@ class get_activity_info extends external_api {
             'intro' => new external_value(PARAM_RAW, 'Activity description HTML'),
             'gradingmethod' => new external_value(PARAM_TEXT, 'Grading method'),
             'gradingdisabled' => new external_value(
-                PARAM_BOOL, 'Whole-forum grading disabled (grade type None)', VALUE_DEFAULT, false
+                PARAM_BOOL,
+                'Whole-forum grading disabled (grade type None)',
+                VALUE_DEFAULT,
+                false,
             ),
             'teamsubmission' => new external_value(PARAM_BOOL, 'Team submission enabled'),
             'blindmarking' => new external_value(PARAM_BOOL, 'Blind marking enabled'),
             'canmanageoverrides' => new external_value(
-                PARAM_BOOL, 'Whether teacher can manage overrides', VALUE_DEFAULT, false
+                PARAM_BOOL,
+                'Whether teacher can manage overrides',
+                VALUE_DEFAULT,
+                false,
             ),
             'hasduedateplugin' => new external_value(
-                PARAM_BOOL, 'Whether quizaccess_duedate plugin is installed', VALUE_DEFAULT, false
+                PARAM_BOOL,
+                'Whether quizaccess_duedate plugin is installed',
+                VALUE_DEFAULT,
+                false,
             ),
             'canmanageextensions' => new external_value(
-                PARAM_BOOL, 'Whether teacher can manage duedate extensions', VALUE_DEFAULT, false
+                PARAM_BOOL,
+                'Whether teacher can manage duedate extensions',
+                VALUE_DEFAULT,
+                false,
             ),
             'maxattempts' => new external_value(
-                PARAM_INT, 'Maximum attempts (-1=unlimited, 1=single)', VALUE_DEFAULT, 1
+                PARAM_INT,
+                'Maximum attempts (-1=unlimited, 1=single)',
+                VALUE_DEFAULT,
+                1,
             ),
             'gradepenaltyenabled' => new external_value(
-                PARAM_BOOL, 'Whether grade penalties are enabled for this activity', VALUE_DEFAULT, false
+                PARAM_BOOL,
+                'Whether grade penalties are enabled for this activity',
+                VALUE_DEFAULT,
+                false,
             ),
         ]);
     }

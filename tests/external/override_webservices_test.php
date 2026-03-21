@@ -34,9 +34,7 @@ use core_external\external_api;
  * @covers \local_unifiedgrader\external\delete_duedate_extension
  */
 final class override_webservices_test extends \advanced_testcase {
-    // -------------------------------------------------------------------------
-    // delete_user_override tests (assignment).
-    // -------------------------------------------------------------------------
+    // Delete_user_override tests (assignment).
 
     /**
      * Test delete_user_override removes an assignment override.
@@ -185,9 +183,7 @@ final class override_webservices_test extends \advanced_testcase {
         $this->assertTrue($DB->record_exists('assign_overrides', ['id' => $override2]));
     }
 
-    // -------------------------------------------------------------------------
-    // delete_duedate_extension tests.
-    // -------------------------------------------------------------------------
+    // Delete_duedate_extension tests.
 
     /**
      * Test delete_duedate_extension is skipped when the quizaccess_duedate plugin is not installed.

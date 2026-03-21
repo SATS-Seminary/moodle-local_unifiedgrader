@@ -48,7 +48,10 @@ class prepare_feedback_draft extends external_api {
             'userid' => new external_value(PARAM_INT, 'Student user ID'),
             'draftitemid' => new external_value(PARAM_INT, 'Draft area item ID'),
             'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (1-based for quiz), -1 for latest', VALUE_DEFAULT, -1
+                PARAM_INT,
+                'Attempt number (1-based for quiz), -1 for latest',
+                VALUE_DEFAULT,
+                -1,
             ),
         ]);
     }

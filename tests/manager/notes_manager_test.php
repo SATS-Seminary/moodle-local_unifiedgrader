@@ -233,7 +233,7 @@ final class notes_manager_test extends \advanced_testcase {
         notes_manager::save_note($cm->id, $student->id, $teacher->id, '<script>alert("x")</script><p>Clean</p>');
 
         $notes = notes_manager::get_notes($cm->id, $student->id);
-        // format_text should strip script tags.
+        // The format_text() function should strip script tags.
         $this->assertStringNotContainsString('<script>', $notes[0]['content']);
         $this->assertStringContainsString('Clean', $notes[0]['content']);
         // Raw content should be preserved.

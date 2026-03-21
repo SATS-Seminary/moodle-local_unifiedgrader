@@ -27,6 +27,8 @@
 
 namespace local_unifiedgrader\form;
 
+defined('MOODLE_INTERNAL') || die();
+
 global $CFG;
 require_once($CFG->libdir . '/formslib.php');
 
@@ -49,7 +51,7 @@ class overrides_extensions_form extends \moodleform {
         $mform->addElement('hidden', 'userid');
         $mform->setType('userid', PARAM_INT);
 
-        // ── Extension section (first, most frequently used). ──
+        // Extension section (first, most frequently used).
         $mform->addElement('header', 'extensionhdr',
             get_string('overrides_section_extension', 'local_unifiedgrader'));
 
@@ -61,13 +63,13 @@ class overrides_extensions_form extends \moodleform {
             $this->add_forum_extension($mform, $defaults, $overrides);
         }
 
-        // ── Activity defaults (read-only reference). ──
+        // Activity defaults (read-only reference).
         $mform->addElement('header', 'defaultshdr',
             get_string('overrides_section_defaults', 'local_unifiedgrader'));
 
         $this->add_defaults_section($mform, $activitytype, $defaults);
 
-        // ── Overrides section (assign and quiz only). ──
+        // Overrides section (assign and quiz only).
         if ($activitytype === 'assign' || $activitytype === 'quiz') {
             $mform->addElement('header', 'overrideshdr',
                 get_string('overrides_section_overrides_only', 'local_unifiedgrader'));
@@ -82,9 +84,7 @@ class overrides_extensions_form extends \moodleform {
         $this->add_action_buttons(true, get_string('save'));
     }
 
-    // ──────────────────────────────────────────────
-    //  Extension fields (per activity type).
-    // ──────────────────────────────────────────────
+    // Extension fields (per activity type).
 
     /**
      * Add assignment extension fields.
@@ -176,9 +176,7 @@ class overrides_extensions_form extends \moodleform {
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  Activity defaults (read-only).
-    // ──────────────────────────────────────────────
+    // Activity defaults (read-only).
 
     /**
      * Add the read-only defaults section.
@@ -225,9 +223,7 @@ class overrides_extensions_form extends \moodleform {
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  Override fields (assign and quiz only).
-    // ──────────────────────────────────────────────
+    // Override fields (assign and quiz only).
 
     /**
      * Add assignment override fields (no duedate — extension handles that).
@@ -304,9 +300,7 @@ class overrides_extensions_form extends \moodleform {
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  Shared helpers.
-    // ──────────────────────────────────────────────
+    // Shared helpers.
 
     /**
      * Add a static date field.
@@ -345,9 +339,7 @@ class overrides_extensions_form extends \moodleform {
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  Validation.
-    // ──────────────────────────────────────────────
+    // Validation.
 
     /**
      * Validate the form data.

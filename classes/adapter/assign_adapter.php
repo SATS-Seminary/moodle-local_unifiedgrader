@@ -465,6 +465,7 @@ class assign_adapter extends base_adapter {
      * @param array $advancedgradingdata
      * @param int $draftitemid Draft area item ID for feedback file uploads.
      * @param int $feedbackfilesdraftid Draft area item ID for feedback files (assignfeedback_file).
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
      * @return bool
      */
     public function save_grade(
@@ -882,6 +883,7 @@ class assign_adapter extends base_adapter {
      *
      * @param int $userid The student user ID.
      * @param int $draftitemid The shared draft area item ID.
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
      * @return array With key 'feedbackhtml'.
      */
     public function prepare_feedback_draft(int $userid, int $draftitemid, int $attemptnumber = -1): array {

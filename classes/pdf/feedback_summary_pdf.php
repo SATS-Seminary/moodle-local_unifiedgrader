@@ -16,6 +16,8 @@
 
 namespace local_unifiedgrader\pdf;
 
+defined('MOODLE_INTERNAL') || die();
+
 global $CFG;
 require_once($CFG->libdir . '/pdflib.php');
 

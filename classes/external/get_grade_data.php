@@ -43,7 +43,10 @@ class get_grade_data extends external_api {
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'userid' => new external_value(PARAM_INT, 'User ID'),
             'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
+                PARAM_INT,
+                'Attempt number (0-based), -1 for latest',
+                VALUE_DEFAULT,
+                -1,
             ),
         ]);
     }

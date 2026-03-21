@@ -46,9 +46,7 @@ final class activity_webservices_test extends \advanced_testcase {
         return $scenario;
     }
 
-    // -------------------------------------------------------------------------
-    // get_activity_info tests.
-    // -------------------------------------------------------------------------
+    // Get_activity_info tests.
 
     /**
      * Test get_activity_info returns correct data for a teacher.
@@ -117,9 +115,7 @@ final class activity_webservices_test extends \advanced_testcase {
         $this->assertTrue($cleaned['blindmarking']);
     }
 
-    // -------------------------------------------------------------------------
-    // get_participants tests.
-    // -------------------------------------------------------------------------
+    // Get_participants tests.
 
     /**
      * Test get_participants returns enrolled students for a teacher.
@@ -187,9 +183,7 @@ final class activity_webservices_test extends \advanced_testcase {
         $this->assertEmpty($cleaned);
     }
 
-    // -------------------------------------------------------------------------
-    // get_submission_data tests.
-    // -------------------------------------------------------------------------
+    // Get_submission_data tests.
 
     /**
      * Test get_submission_data returns correct data for a student with a submission.
@@ -260,9 +254,7 @@ final class activity_webservices_test extends \advanced_testcase {
         $this->assertEquals(0, $result['timecreated']);
     }
 
-    // -------------------------------------------------------------------------
-    // get_grade_data tests.
-    // -------------------------------------------------------------------------
+    // Get_grade_data tests.
 
     /**
      * Test get_grade_data returns correct data after grading.

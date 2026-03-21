@@ -54,9 +54,7 @@ final class feedback_webservices_test extends \advanced_testcase {
         return file_get_unused_draft_itemid();
     }
 
-    // -------------------------------------------------------------------------
-    // prepare_feedback_draft tests.
-    // -------------------------------------------------------------------------
+    // Prepare_feedback_draft tests.
 
     /**
      * Test prepare_feedback_draft returns feedback HTML for an assignment student.
@@ -161,9 +159,7 @@ final class feedback_webservices_test extends \advanced_testcase {
         $this->assertStringContainsString('Well done on the assignment', $result['feedbackhtml']);
     }
 
-    // -------------------------------------------------------------------------
-    // prepare_feedback_files_draft tests.
-    // -------------------------------------------------------------------------
+    // Prepare_feedback_files_draft tests.
 
     /**
      * Test prepare_feedback_files_draft returns file count for an assignment student.
@@ -252,9 +248,7 @@ final class feedback_webservices_test extends \advanced_testcase {
         $this->assertEquals(0, $result['filecount']);
     }
 
-    // -------------------------------------------------------------------------
-    // save_feedback_files tests.
-    // -------------------------------------------------------------------------
+    // Save_feedback_files tests.
 
     /**
      * Test save_feedback_files with an empty draft area returns 0 files.

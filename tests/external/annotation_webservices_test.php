@@ -49,9 +49,7 @@ final class annotation_webservices_test extends \advanced_testcase {
         return $scenario;
     }
 
-    // -------------------------------------------------------------------------
-    // get_annotations tests.
-    // -------------------------------------------------------------------------
+    // Get_annotations tests.
 
     /**
      * Test get_annotations returns annotations after saving them.
@@ -148,9 +146,7 @@ final class annotation_webservices_test extends \advanced_testcase {
         $this->assertEmpty($result);
     }
 
-    // -------------------------------------------------------------------------
-    // save_annotations tests.
-    // -------------------------------------------------------------------------
+    // Save_annotations tests.
 
     /**
      * Test save_annotations saves page annotation data for a student.
@@ -254,9 +250,7 @@ final class annotation_webservices_test extends \advanced_testcase {
         $this->assertStringContainsString('circle', reset($page1)['annotationdata']);
     }
 
-    // -------------------------------------------------------------------------
-    // delete_annotations tests.
-    // -------------------------------------------------------------------------
+    // Delete_annotations tests.
 
     /**
      * Test delete_annotations removes all annotations for a file.
@@ -341,9 +335,7 @@ final class annotation_webservices_test extends \advanced_testcase {
         $this->assertTrue($result['success']);
     }
 
-    // -------------------------------------------------------------------------
-    // get_student_annotations tests.
-    // -------------------------------------------------------------------------
+    // Get_student_annotations tests.
 
     /**
      * Test get_student_annotations returns empty when grade not released.

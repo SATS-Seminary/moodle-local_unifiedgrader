@@ -504,6 +504,9 @@ class quiz_adapter extends base_adapter {
      * @param string $feedback
      * @param int $feedbackformat
      * @param array $advancedgradingdata
+     * @param int $draftitemid Draft area item ID for feedback file uploads.
+     * @param int $feedbackfilesdraftid Draft area item ID for feedback files plugin.
+     * @param int $attemptnumber Attempt number (1-based for quiz), or -1 for latest.
      * @return bool
      */
     public function save_grade(

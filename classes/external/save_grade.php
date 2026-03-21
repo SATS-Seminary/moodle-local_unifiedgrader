@@ -49,10 +49,16 @@ class save_grade extends external_api {
             'advancedgradingdata' => new external_value(PARAM_RAW, 'Advanced grading data (JSON)', VALUE_DEFAULT, ''),
             'draftitemid' => new external_value(PARAM_INT, 'Draft area item ID for feedback files', VALUE_DEFAULT, 0),
             'feedbackfilesdraftid' => new external_value(
-                PARAM_INT, 'Draft area item ID for feedback files (assignfeedback_file)', VALUE_DEFAULT, 0,
+                PARAM_INT,
+                'Draft area item ID for feedback files (assignfeedback_file)',
+                VALUE_DEFAULT,
+                0,
             ),
             'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
+                PARAM_INT,
+                'Attempt number (0-based), -1 for latest',
+                VALUE_DEFAULT,
+                -1,
             ),
         ]);
     }
@@ -66,6 +72,9 @@ class save_grade extends external_api {
      * @param string $feedback
      * @param int $feedbackformat
      * @param string $advancedgradingdata
+     * @param int $draftitemid Draft area item ID for feedback file uploads.
+     * @param int $feedbackfilesdraftid Draft area item ID for feedback files plugin.
+     * @param int $attemptnumber Attempt number (0-based), or -1 for latest.
      * @return array
      */
     public static function execute(

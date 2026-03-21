@@ -47,9 +47,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
         return $scenario;
     }
 
-    // -------------------------------------------------------------------------
-    // get_submission_comments tests.
-    // -------------------------------------------------------------------------
+    // Get_submission_comments tests.
 
     /**
      * Test get_submission_comments returns comments after adding one.
@@ -226,9 +224,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
         get_submission_comments::execute($scenario->cm->id, $scenario->students[1]->id);
     }
 
-    // -------------------------------------------------------------------------
-    // add_submission_comment tests.
-    // -------------------------------------------------------------------------
+    // Add_submission_comment tests.
 
     /**
      * Test add_submission_comment creates a comment successfully.
@@ -347,9 +343,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
         );
     }
 
-    // -------------------------------------------------------------------------
-    // delete_submission_comment tests.
-    // -------------------------------------------------------------------------
+    // Delete_submission_comment tests.
 
     /**
      * Test delete_submission_comment removes a comment successfully.
@@ -496,9 +490,7 @@ final class submission_comment_webservices_test extends \advanced_testcase {
         $this->assertTrue($result['success']);
     }
 
-    // -------------------------------------------------------------------------
     // Notification tests.
-    // -------------------------------------------------------------------------
 
     /**
      * Test that a notification is sent to the student when a teacher posts a comment.

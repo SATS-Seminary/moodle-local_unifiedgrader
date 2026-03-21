@@ -44,7 +44,10 @@ class get_submission_data extends external_api {
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'userid' => new external_value(PARAM_INT, 'User ID'),
             'attemptnumber' => new external_value(
-                PARAM_INT, 'Attempt number (0-based), -1 for latest', VALUE_DEFAULT, -1
+                PARAM_INT,
+                'Attempt number (0-based), -1 for latest',
+                VALUE_DEFAULT,
+                -1,
             ),
         ]);
     }
@@ -103,7 +106,10 @@ class get_submission_data extends external_api {
             'status' => new external_value(PARAM_TEXT, 'Submission status'),
             'content' => new external_value(PARAM_RAW, 'Rendered submission content HTML'),
             'hascontent' => new external_value(
-                PARAM_BOOL, 'Whether non-file submission plugins produced content', VALUE_DEFAULT, false
+                PARAM_BOOL,
+                'Whether non-file submission plugins produced content',
+                VALUE_DEFAULT,
+                false,
             ),
             'files' => new external_multiple_structure(
                 new external_single_structure([
@@ -134,7 +140,10 @@ class get_submission_data extends external_api {
             'hasoverride' => new external_value(PARAM_BOOL, 'Whether user has an override', VALUE_DEFAULT, false),
             'overrideid' => new external_value(PARAM_INT, 'Override ID (0 if none)', VALUE_DEFAULT, 0),
             'effectiveduedate' => new external_value(
-                PARAM_INT, 'Effective due date for this user (accounts for overrides/extensions)', VALUE_DEFAULT, 0
+                PARAM_INT,
+                'Effective due date for this user (accounts for overrides/extensions)',
+                VALUE_DEFAULT,
+                0,
             ),
             'attempts' => new external_multiple_structure(
                 new external_single_structure([

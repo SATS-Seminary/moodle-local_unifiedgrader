@@ -274,9 +274,7 @@ final class quiz_adapter_test extends \advanced_testcase {
         $this->assertFalse($s->adapter->supports_feature('annotations'));
     }
 
-    // -------------------------------------------------------------------------
     // Per-attempt feedback tests.
-    // -------------------------------------------------------------------------
 
     /**
      * Test save_grade stores per-attempt feedback in local_unifiedgrader_qfb.

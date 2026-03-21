@@ -43,8 +43,12 @@ class get_participants extends external_api {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'status' => new external_value(PARAM_ALPHA, 'Filter by status', VALUE_DEFAULT, 'all'),
-            'group' => new external_value(PARAM_TEXT,
-                'Group filter: 0=all, -1=my groups, or comma-separated group IDs', VALUE_DEFAULT, '0'),
+            'group' => new external_value(
+                PARAM_TEXT,
+                'Group filter: 0=all, -1=my groups, or comma-separated group IDs',
+                VALUE_DEFAULT,
+                '0',
+            ),
             'search' => new external_value(PARAM_TEXT, 'Search string', VALUE_DEFAULT, ''),
             'sort' => new external_value(PARAM_ALPHA, 'Sort field', VALUE_DEFAULT, 'fullname'),
             'sortdir' => new external_value(PARAM_ALPHA, 'Sort direction (asc/desc)', VALUE_DEFAULT, 'asc'),
@@ -149,13 +153,22 @@ class get_participants extends external_api {
                 'gradevalue' => new external_value(PARAM_FLOAT, 'Current grade', VALUE_OPTIONAL),
                 'locked' => new external_value(PARAM_BOOL, 'Whether submission changes are locked', VALUE_DEFAULT, false),
                 'hasoverride' => new external_value(
-                    PARAM_BOOL, 'Whether user has an override', VALUE_DEFAULT, false
+                    PARAM_BOOL,
+                    'Whether user has an override',
+                    VALUE_DEFAULT,
+                    false,
                 ),
                 'hasextension' => new external_value(
-                    PARAM_BOOL, 'Whether user has an extension', VALUE_DEFAULT, false
+                    PARAM_BOOL,
+                    'Whether user has an extension',
+                    VALUE_DEFAULT,
+                    false,
                 ),
                 'islate' => new external_value(
-                    PARAM_BOOL, 'Whether submission is late (accounts for overrides/extensions)', VALUE_DEFAULT, false
+                    PARAM_BOOL,
+                    'Whether submission is late (accounts for overrides/extensions)',
+                    VALUE_DEFAULT,
+                    false,
                 ),
             ]),
         );

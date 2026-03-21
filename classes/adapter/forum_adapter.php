@@ -406,6 +406,9 @@ class forum_adapter extends base_adapter {
      * @param string $feedback
      * @param int $feedbackformat
      * @param array $advancedgradingdata
+     * @param int $draftitemid Draft area item ID for feedback file uploads.
+     * @param int $feedbackfilesdraftid Draft area item ID for feedback files plugin.
+     * @param int $attemptnumber Attempt number (unused for forums).
      * @return bool
      */
     public function save_grade(
@@ -492,6 +495,7 @@ class forum_adapter extends base_adapter {
      *
      * @param int $userid The student user ID.
      * @param int $draftitemid The shared draft area item ID.
+     * @param int $attemptnumber Attempt number (unused for forums).
      * @return array With key 'feedbackhtml'.
      */
     public function prepare_feedback_draft(int $userid, int $draftitemid, int $attemptnumber = -1): array {
@@ -911,6 +915,7 @@ class forum_adapter extends base_adapter {
      *
      * @param array $posts Post records.
      * @param array $discussions Discussion records keyed by id.
+     * @param int $userid The user ID for plagiarism checks.
      * @return string HTML content.
      */
     private function render_posts_as_html(array $posts, array $discussions, int $userid = 0): string {
@@ -1164,6 +1169,7 @@ class forum_adapter extends base_adapter {
      * @param string $severity Severity level from extract_plagiarism_severity().
      * @param string|null $percentage Extracted percentage, or null.
      * @param string $plagiarismhtml Full plagiarism widget HTML for the popout.
+     * @param string $reporturl URL for the full plagiarism report.
      * @return string HTML for the shield + popout.
      */
     private function render_plagiarism_shield(

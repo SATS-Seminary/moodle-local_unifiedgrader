@@ -41,9 +41,7 @@ class integration_test extends \advanced_testcase {
         $this->gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
     }
 
-    // =========================================================================
-    // ASSIGNMENT TESTS
-    // =========================================================================
+    // Assignment tests.
 
     /**
      * Test full assignment grading lifecycle: submit → grade → verify student view.
@@ -221,9 +219,7 @@ class integration_test extends \advanced_testcase {
         $this->assertCount(0, $notes);
     }
 
-    // =========================================================================
-    // FORUM TESTS
-    // =========================================================================
+    // Forum tests.
 
     /**
      * Test forum grading lifecycle with grading enabled.
@@ -374,9 +370,7 @@ class integration_test extends \advanced_testcase {
         $this->assertEquals(20, $penalties[0]['percentage']);
     }
 
-    // =========================================================================
-    // QUIZ TESTS
-    // =========================================================================
+    // Quiz tests.
 
     /**
      * Test quiz adapter basic functionality.
@@ -398,9 +392,7 @@ class integration_test extends \advanced_testcase {
         $this->assertCount(1, $participants);
     }
 
-    // =========================================================================
-    // COMMENT LIBRARY TESTS
-    // =========================================================================
+    // Comment library tests.
 
     /**
      * Test comment library CRUD operations.
@@ -441,9 +433,7 @@ class integration_test extends \advanced_testcase {
         $this->assertGreaterThanOrEqual(1, count($comments));
     }
 
-    // =========================================================================
-    // FEEDBACK DOWNLOAD TESTS
-    // =========================================================================
+    // Feedback download tests.
 
     /**
      * Test feedback data helper grade formatting.
@@ -605,9 +595,7 @@ class integration_test extends \advanced_testcase {
         $this->assertStringStartsWith('%PDF', $bytes);
     }
 
-    // =========================================================================
-    // CROSS-CUTTING CONCERNS
-    // =========================================================================
+    // Cross-cutting concerns.
 
     /**
      * Test adapter factory creates correct adapter types.

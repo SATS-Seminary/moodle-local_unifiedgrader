@@ -45,9 +45,7 @@ final class notes_webservices_test extends \advanced_testcase {
         return $scenario;
     }
 
-    // -------------------------------------------------------------------------
-    // get_notes tests.
-    // -------------------------------------------------------------------------
+    // Get_notes tests.
 
     /**
      * Test get_notes returns notes created by the teacher.
@@ -131,9 +129,7 @@ final class notes_webservices_test extends \advanced_testcase {
         $this->assertEmpty($result);
     }
 
-    // -------------------------------------------------------------------------
-    // save_note tests.
-    // -------------------------------------------------------------------------
+    // Save_note tests.
 
     /**
      * Test save_note creates a new note and returns its ID.
@@ -230,9 +226,7 @@ final class notes_webservices_test extends \advanced_testcase {
         $this->assertEquals('Updated content', $notes[0]['rawcontent']);
     }
 
-    // -------------------------------------------------------------------------
-    // delete_note tests.
-    // -------------------------------------------------------------------------
+    // Delete_note tests.
 
     /**
      * Test delete_note removes a note successfully.

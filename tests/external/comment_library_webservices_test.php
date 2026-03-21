@@ -40,9 +40,7 @@ use core_external\external_api;
  * @covers \local_unifiedgrader\external\import_shared_comment
  */
 final class comment_library_webservices_test extends \advanced_testcase {
-    // -------------------------------------------------------------------------
-    // get_library_comments tests.
-    // -------------------------------------------------------------------------
+    // Get_library_comments tests.
 
     /**
      * Test get_library_comments returns comments for the logged-in user.
@@ -167,9 +165,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
         $this->assertEquals('User2 comment', $result[0]['content']);
     }
 
-    // -------------------------------------------------------------------------
-    // save_library_comment tests.
-    // -------------------------------------------------------------------------
+    // Save_library_comment tests.
 
     /**
      * Test save_library_comment creates a new comment.
@@ -250,9 +246,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
         $this->assertContains((int) $tag2->id, $comments[0]['tagids']);
     }
 
-    // -------------------------------------------------------------------------
-    // delete_library_comment tests.
-    // -------------------------------------------------------------------------
+    // Delete_library_comment tests.
 
     /**
      * Test delete_library_comment removes a comment.
@@ -313,9 +307,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
         $this->assertTrue($DB->record_exists('local_unifiedgrader_clib', ['id' => $comment->id]));
     }
 
-    // -------------------------------------------------------------------------
-    // get_library_tags tests.
-    // -------------------------------------------------------------------------
+    // Get_library_tags tests.
 
     /**
      * Test get_library_tags returns personal and system tags.
@@ -403,9 +395,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
         $this->assertEquals('User2 Tag', $result[0]['name']);
     }
 
-    // -------------------------------------------------------------------------
-    // save_library_tag tests.
-    // -------------------------------------------------------------------------
+    // Save_library_tag tests.
 
     /**
      * Test save_library_tag creates a new tag.
@@ -461,9 +451,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
         $this->assertEquals('Renamed', $tags[0]['name']);
     }
 
-    // -------------------------------------------------------------------------
-    // delete_library_tag tests.
-    // -------------------------------------------------------------------------
+    // Delete_library_tag tests.
 
     /**
      * Test delete_library_tag removes a personal tag.
@@ -537,9 +525,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
         delete_library_tag::execute((int) $tag->id);
     }
 
-    // -------------------------------------------------------------------------
-    // get_shared_library tests.
-    // -------------------------------------------------------------------------
+    // Get_shared_library tests.
 
     /**
      * Test get_shared_library returns shared comments from other users.
@@ -610,9 +596,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
         $this->assertEquals('Other shared', $result[0]['content']);
     }
 
-    // -------------------------------------------------------------------------
-    // import_shared_comment tests.
-    // -------------------------------------------------------------------------
+    // Import_shared_comment tests.
 
     /**
      * Test import_shared_comment copies a shared comment into own library.

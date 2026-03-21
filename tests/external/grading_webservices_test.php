@@ -63,9 +63,7 @@ final class grading_webservices_test extends \advanced_testcase {
         return $scenario;
     }
 
-    // -------------------------------------------------------------------------
-    // save_grade tests.
-    // -------------------------------------------------------------------------
+    // Save_grade tests.
 
     /**
      * Test save_grade successfully saves a grade for a submitted student.
@@ -154,9 +152,7 @@ final class grading_webservices_test extends \advanced_testcase {
         $this->assertNull($gradedata['grade']);
     }
 
-    // -------------------------------------------------------------------------
-    // set_grades_posted tests.
-    // -------------------------------------------------------------------------
+    // Set_grades_posted tests.
 
     /**
      * Test set_grades_posted hides and unhides grades successfully.
@@ -340,9 +336,7 @@ final class grading_webservices_test extends \advanced_testcase {
         set_grades_posted::execute($scenario->cm->id, time() + DAYSECS * 7);
     }
 
-    // -------------------------------------------------------------------------
-    // submission_action tests.
-    // -------------------------------------------------------------------------
+    // Submission_action tests.
 
     /**
      * Test submission_action locks a student's submission successfully.

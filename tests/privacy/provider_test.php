@@ -350,9 +350,7 @@ final class provider_test extends provider_testcase {
         $this->assertEquals(1, $DB->count_records('local_unifiedgrader_notes', ['userid' => $student3->id]));
     }
 
-    // -------------------------------------------------------------------------
     // Penalty-specific privacy tests.
-    // -------------------------------------------------------------------------
 
     /**
      * Helper: create a penalty record directly in the DB.
@@ -604,9 +602,7 @@ final class provider_test extends provider_testcase {
         $this->assertEquals(1, $DB->count_records('local_unifiedgrader_penalty', ['userid' => $student3->id]));
     }
 
-    // -------------------------------------------------------------------------
     // Per-attempt quiz feedback (qfb) privacy tests.
-    // -------------------------------------------------------------------------
 
     /**
      * Helper: create a quiz feedback record directly in the DB.
@@ -823,9 +819,7 @@ final class provider_test extends provider_testcase {
         $this->assertEquals(1, $DB->count_records('local_unifiedgrader_qfb', ['userid' => $student3->id]));
     }
 
-    // -------------------------------------------------------------------------
     // Submission comment (scomm) privacy tests.
-    // -------------------------------------------------------------------------
 
     /**
      * Helper: create a submission comment record.

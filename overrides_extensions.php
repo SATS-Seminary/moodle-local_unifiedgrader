@@ -184,9 +184,7 @@ echo $OUTPUT->header();
 $mform->display();
 echo $OUTPUT->footer();
 
-// ──────────────────────────────────────────────────────────────────────────────
 // Save helpers.
-// ──────────────────────────────────────────────────────────────────────────────
 
 /**
  * Save assignment overrides and extension.

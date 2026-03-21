@@ -68,6 +68,7 @@ $filesrc = (new moodle_url('/local/unifiedgrader/preview_file.php', [
 
 // Output a standalone HTML page (no Moodle chrome needed).
 header('Content-Type: text/html; charset=utf-8');
+// phpcs:disable
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -229,4 +230,5 @@ header('Content-Type: text/html; charset=utf-8');
 </body>
 </html>
 <?php
+// phpcs:enable
 exit;

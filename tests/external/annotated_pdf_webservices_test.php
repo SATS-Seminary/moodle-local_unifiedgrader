@@ -53,9 +53,7 @@ final class annotated_pdf_webservices_test extends \advanced_testcase {
         return base64_encode($content);
     }
 
-    // -------------------------------------------------------------------------
-    // save_annotated_pdf tests.
-    // -------------------------------------------------------------------------
+    // Save_annotated_pdf tests.
 
     /**
      * Test save_annotated_pdf stores a file successfully.
@@ -192,9 +190,7 @@ final class annotated_pdf_webservices_test extends \advanced_testcase {
         $this->assertEquals('Version 2', $file->get_content());
     }
 
-    // -------------------------------------------------------------------------
-    // delete_annotated_pdf tests.
-    // -------------------------------------------------------------------------
+    // Delete_annotated_pdf tests.
 
     /**
      * Test delete_annotated_pdf removes the stored file.

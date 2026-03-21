@@ -45,9 +45,7 @@ final class penalty_webservices_test extends \advanced_testcase {
         return $scenario;
     }
 
-    // -------------------------------------------------------------------------
-    // get_penalties tests.
-    // -------------------------------------------------------------------------
+    // Get_penalties tests.
 
     /**
      * Test get_penalties returns penalties created via save_penalty.
@@ -133,9 +131,7 @@ final class penalty_webservices_test extends \advanced_testcase {
         $this->assertIsInt($cleaned[0]['timemodified']);
     }
 
-    // -------------------------------------------------------------------------
-    // save_penalty tests.
-    // -------------------------------------------------------------------------
+    // Save_penalty tests.
 
     /**
      * Test save_penalty creates a new wordcount penalty.
@@ -307,9 +303,7 @@ final class penalty_webservices_test extends \advanced_testcase {
         $this->assertEquals(15, $result['penalties'][0]['percentage']);
     }
 
-    // -------------------------------------------------------------------------
-    // delete_penalty tests.
-    // -------------------------------------------------------------------------
+    // Delete_penalty tests.
 
     /**
      * Test delete_penalty removes a penalty.
