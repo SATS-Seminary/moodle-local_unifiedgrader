@@ -32,6 +32,9 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->libdir . '/formslib.php');
 
+/**
+ * Quiz extension form for granting or editing a quiz due date extension.
+ */
 class quiz_extension_form extends \moodleform {
     /**
      * Form definition.
@@ -90,7 +93,8 @@ class quiz_extension_form extends \moodleform {
         $duedate = $this->_customdata['duedate'] ?? 0;
         if ($duedate > 0 && $data['extensionduedate'] <= $duedate) {
             $errors['extensionduedate'] = get_string(
-                'quiz_extension_must_be_after_duedate', 'local_unifiedgrader'
+                'quiz_extension_must_be_after_duedate',
+                'local_unifiedgrader'
             );
         }
 

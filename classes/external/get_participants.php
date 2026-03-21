@@ -117,14 +117,14 @@ class get_participants extends external_api {
     private static function resolve_group_ids(string $groupstr, int $cmid, \context_module $context): array {
         global $USER;
 
-        // "0" or empty = all groups (no filter).
+        // Zero or empty means all groups with no filter.
         if ($groupstr === '' || $groupstr === '0') {
             return [];
         }
 
         $cm = get_coursemodule_from_id('', $cmid, 0, false, MUST_EXIST);
 
-        // "-1" = all my groups.
+        // Negative one means all groups the current user belongs to.
         if ($groupstr === '-1') {
             $usergroups = groups_get_all_groups($cm->course, $USER->id, $cm->groupingid, 'g.id');
             return array_map('intval', array_keys($usergroups));
@@ -132,9 +132,12 @@ class get_participants extends external_api {
 
         // Comma-separated group IDs.
         $ids = array_map('intval', explode(',', $groupstr));
-        return array_filter($ids, function ($id) {
-            return $id > 0;
-        });
+        return array_filter(
+            $ids,
+            function ($id) {
+                return $id > 0;
+            }
+        );
     }
 
     /**

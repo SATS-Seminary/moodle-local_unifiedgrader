@@ -1098,7 +1098,8 @@ class quiz_adapter extends base_adapter {
 
         // Resolve the effective due date for this user (honours extensions/overrides).
         $effectiveduedate = \quizaccess_duedate\override_manager::get_effective_duedate(
-            $this->quiz->id, $userid,
+            $this->quiz->id,
+            $userid,
         );
         if (!$effectiveduedate) {
             return null;
@@ -1133,6 +1134,11 @@ class quiz_adapter extends base_adapter {
         return $totalpenalty > 0 ? (int) round($totalpenalty) : null;
     }
 
+    /**
+     * Get the due date from the quizaccess_duedate plugin settings.
+     *
+     * @return int The due date timestamp, or 0 if not set.
+     */
     private function get_duedate_plugin_duedate(): int {
         global $DB;
         $settings = $DB->get_record('quizaccess_duedate_instances', ['quizid' => $this->quiz->id]);
@@ -1273,11 +1279,16 @@ class quiz_adapter extends base_adapter {
             $criteria[] = [
                 'id' => (int) $slot,
                 'shortname' => 'Q' . $questionnum . ': ' . \core_text::substr(
-                    format_string($questionname), 0, 60
+                    format_string($questionname),
+                    0,
+                    60
                 ),
                 'description' => strip_tags(
-                    format_text($question->questiontext ?? '', $question->questiontextformat ?? FORMAT_HTML,
-                        ['context' => $this->context])
+                    format_text(
+                        $question->questiontext ?? '',
+                        $question->questiontextformat ?? FORMAT_HTML,
+                        ['context' => $this->context]
+                    )
                 ),
                 'descriptionmarkers' => format_text(
                     $question->graderinfo ?? '',

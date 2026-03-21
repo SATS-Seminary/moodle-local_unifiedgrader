@@ -1,4 +1,5 @@
 /* Unified Grader - local_unifiedgrader styles. */
+/* stylelint-disable declaration-no-important */
 
 /* Hide the activity header/description that Moodle injects above our grading interface.
    grade.php uses pagelayout-embedded, so scope to that layout only. */
@@ -859,9 +860,15 @@
 }
 
 @keyframes clib-toast-fade {
-    0% { opacity: 1; }
-    75% { opacity: 1; }
-    100% { opacity: 0; }
+    0% {
+        opacity: 1;
+    }
+    75% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
 }
 
 /* Comment library modal — wider than default .modal-lg. */
@@ -961,3 +968,4 @@
 #page-mod-quiz-view #feedback {
     display: none !important;
 }
+/* stylelint-enable declaration-no-important */

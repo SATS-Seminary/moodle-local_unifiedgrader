@@ -52,8 +52,11 @@ class overrides_extensions_form extends \moodleform {
         $mform->setType('userid', PARAM_INT);
 
         // Extension section (first, most frequently used).
-        $mform->addElement('header', 'extensionhdr',
-            get_string('overrides_section_extension', 'local_unifiedgrader'));
+        $mform->addElement(
+            'header',
+            'extensionhdr',
+            get_string('overrides_section_extension', 'local_unifiedgrader')
+        );
 
         if ($activitytype === 'assign') {
             $this->add_assign_extension($mform, $defaults, $overrides);
@@ -64,15 +67,21 @@ class overrides_extensions_form extends \moodleform {
         }
 
         // Activity defaults (read-only reference).
-        $mform->addElement('header', 'defaultshdr',
-            get_string('overrides_section_defaults', 'local_unifiedgrader'));
+        $mform->addElement(
+            'header',
+            'defaultshdr',
+            get_string('overrides_section_defaults', 'local_unifiedgrader')
+        );
 
         $this->add_defaults_section($mform, $activitytype, $defaults);
 
         // Overrides section (assign and quiz only).
         if ($activitytype === 'assign' || $activitytype === 'quiz') {
-            $mform->addElement('header', 'overrideshdr',
-                get_string('overrides_section_overrides_only', 'local_unifiedgrader'));
+            $mform->addElement(
+                'header',
+                'overrideshdr',
+                get_string('overrides_section_overrides_only', 'local_unifiedgrader')
+            );
 
             if ($activitytype === 'assign') {
                 $this->add_assign_overrides($mform, $defaults, $overrides);
@@ -95,22 +104,33 @@ class overrides_extensions_form extends \moodleform {
      */
     private function add_assign_extension($mform, $defaults, $overrides) {
         // Show current due date for reference.
-        $this->add_static_date($mform, 'ext_ref_duedate',
-            get_string('duedate', 'assign'), $defaults['duedate'] ?? 0);
+        $this->add_static_date(
+            $mform,
+            'ext_ref_duedate',
+            get_string('duedate', 'assign'),
+            $defaults['duedate'] ?? 0
+        );
 
         // Extension date picker.
-        $this->add_override_date($mform, 'extensionduedate',
+        $this->add_override_date(
+            $mform,
+            'extensionduedate',
             get_string('extensionduedate', 'assign'),
-            $overrides['extensionduedate'] ?? 0, $defaults['duedate'] ?? 0);
+            $overrides['extensionduedate'] ?? 0,
+            $defaults['duedate'] ?? 0
+        );
 
         // Auto-adjust notice for cutoff.
         $cutoff = $defaults['cutoffdate'] ?? 0;
         if ($cutoff > 0) {
-            $mform->addElement('static', 'cutoff_auto_notice', '',
-                '<div class="alert alert-info small mb-0">'
-                . get_string('extension_cutoff_auto_adjust', 'local_unifiedgrader',
-                    userdate($cutoff))
-                . '</div>');
+            $noticehtml = '<div class="alert alert-info small mb-0">'
+                . get_string(
+                    'extension_cutoff_auto_adjust',
+                    'local_unifiedgrader',
+                    userdate($cutoff)
+                )
+                . '</div>';
+            $mform->addElement('static', 'cutoff_auto_notice', '', $noticehtml);
         }
     }
 
@@ -123,29 +143,40 @@ class overrides_extensions_form extends \moodleform {
      */
     private function add_quiz_extension($mform, $defaults, $overrides) {
         if (empty($defaults['hasduedateplugin'])) {
-            $mform->addElement('static', 'no_duedate_plugin', '',
-                '<div class="alert alert-warning small mb-0">'
+            $warninghtml = '<div class="alert alert-warning small mb-0">'
                 . get_string('quiz_extension_plugin_missing', 'local_unifiedgrader')
-                . '</div>');
+                . '</div>';
+            $mform->addElement('static', 'no_duedate_plugin', '', $warninghtml);
             return;
         }
 
         // Show current due date for reference.
-        $this->add_static_date($mform, 'ext_ref_duedate',
-            get_string('duedate', 'assign'), $defaults['duedate'] ?? 0);
+        $this->add_static_date(
+            $mform,
+            'ext_ref_duedate',
+            get_string('duedate', 'assign'),
+            $defaults['duedate'] ?? 0
+        );
 
-        $this->add_override_date($mform, 'extensionduedate',
+        $this->add_override_date(
+            $mform,
+            'extensionduedate',
             get_string('overrides_ext_duedate', 'local_unifiedgrader'),
-            $overrides['extensionduedate'] ?? 0, $defaults['duedate'] ?? 0);
+            $overrides['extensionduedate'] ?? 0,
+            $defaults['duedate'] ?? 0
+        );
 
         // Auto-adjust notice for timeclose.
         $timeclose = $defaults['timeclose'] ?? 0;
         if ($timeclose > 0) {
-            $mform->addElement('static', 'close_auto_notice', '',
-                '<div class="alert alert-info small mb-0">'
-                . get_string('extension_close_auto_adjust', 'local_unifiedgrader',
-                    userdate($timeclose))
-                . '</div>');
+            $noticehtml = '<div class="alert alert-info small mb-0">'
+                . get_string(
+                    'extension_close_auto_adjust',
+                    'local_unifiedgrader',
+                    userdate($timeclose)
+                )
+                . '</div>';
+            $mform->addElement('static', 'close_auto_notice', '', $noticehtml);
         }
     }
 
@@ -158,21 +189,32 @@ class overrides_extensions_form extends \moodleform {
      */
     private function add_forum_extension($mform, $defaults, $overrides) {
         // Show current due date for reference.
-        $this->add_static_date($mform, 'ext_ref_duedate',
-            get_string('duedate', 'forum'), $defaults['duedate'] ?? 0);
+        $this->add_static_date(
+            $mform,
+            'ext_ref_duedate',
+            get_string('duedate', 'forum'),
+            $defaults['duedate'] ?? 0
+        );
 
-        $this->add_override_date($mform, 'extensionduedate',
+        $this->add_override_date(
+            $mform,
+            'extensionduedate',
             get_string('overrides_ext_duedate', 'local_unifiedgrader'),
-            $overrides['extensionduedate'] ?? 0, $defaults['duedate'] ?? 0);
+            $overrides['extensionduedate'] ?? 0,
+            $defaults['duedate'] ?? 0
+        );
 
         // Cutoff warning for forums (can't auto-adjust — no override table).
         $cutoff = $defaults['cutoffdate'] ?? 0;
         if ($cutoff > 0) {
-            $mform->addElement('static', 'cutoff_warning', '',
-                '<div class="alert alert-warning small mb-0">'
-                . get_string('extension_cutoff_forum_warning', 'local_unifiedgrader',
-                    userdate($cutoff))
-                . '</div>');
+            $warninghtml = '<div class="alert alert-warning small mb-0">'
+                . get_string(
+                    'extension_cutoff_forum_warning',
+                    'local_unifiedgrader',
+                    userdate($cutoff)
+                )
+                . '</div>';
+            $mform->addElement('static', 'cutoff_warning', '', $warninghtml);
         }
     }
 
@@ -187,39 +229,83 @@ class overrides_extensions_form extends \moodleform {
      */
     private function add_defaults_section($mform, $activitytype, $defaults) {
         if ($activitytype === 'assign') {
-            $this->add_static_date($mform, 'default_duedate',
-                get_string('duedate', 'assign'), $defaults['duedate'] ?? 0);
-            $this->add_static_date($mform, 'default_cutoffdate',
-                get_string('cutoffdate', 'assign'), $defaults['cutoffdate'] ?? 0);
-            $this->add_static_date($mform, 'default_allowsubmissionsfromdate',
-                get_string('allowsubmissionsfromdate', 'assign'), $defaults['allowsubmissionsfromdate'] ?? 0);
+            $this->add_static_date(
+                $mform,
+                'default_duedate',
+                get_string('duedate', 'assign'),
+                $defaults['duedate'] ?? 0
+            );
+            $this->add_static_date(
+                $mform,
+                'default_cutoffdate',
+                get_string('cutoffdate', 'assign'),
+                $defaults['cutoffdate'] ?? 0
+            );
+            $this->add_static_date(
+                $mform,
+                'default_allowsubmissionsfromdate',
+                get_string('allowsubmissionsfromdate', 'assign'),
+                $defaults['allowsubmissionsfromdate'] ?? 0
+            );
             if (!empty($defaults['timelimit'])) {
-                $mform->addElement('static', 'default_timelimit',
-                    get_string('timelimit', 'assign'), format_time($defaults['timelimit']));
+                $mform->addElement(
+                    'static',
+                    'default_timelimit',
+                    get_string('timelimit', 'assign'),
+                    format_time($defaults['timelimit'])
+                );
             }
         } else if ($activitytype === 'quiz') {
-            $this->add_static_date($mform, 'default_timeopen',
-                get_string('quizopen', 'quiz'), $defaults['timeopen'] ?? 0);
-            $this->add_static_date($mform, 'default_timeclose',
-                get_string('quizclose', 'quiz'), $defaults['timeclose'] ?? 0);
+            $this->add_static_date(
+                $mform,
+                'default_timeopen',
+                get_string('quizopen', 'quiz'),
+                $defaults['timeopen'] ?? 0
+            );
+            $this->add_static_date(
+                $mform,
+                'default_timeclose',
+                get_string('quizclose', 'quiz'),
+                $defaults['timeclose'] ?? 0
+            );
             if (!empty($defaults['timelimit'])) {
-                $mform->addElement('static', 'default_timelimit',
-                    get_string('timelimit', 'quiz'), format_time($defaults['timelimit']));
+                $mform->addElement(
+                    'static',
+                    'default_timelimit',
+                    get_string('timelimit', 'quiz'),
+                    format_time($defaults['timelimit'])
+                );
             }
-            $mform->addElement('static', 'default_attempts',
+            $attemptsvalue = ($defaults['attempts'] ?? 0) == 0
+                ? get_string('unlimited')
+                : $defaults['attempts'];
+            $mform->addElement(
+                'static',
+                'default_attempts',
                 get_string('attemptsallowed', 'quiz'),
-                ($defaults['attempts'] ?? 0) == 0
-                    ? get_string('unlimited')
-                    : $defaults['attempts']);
+                $attemptsvalue
+            );
             if (!empty($defaults['hasduedateplugin'])) {
-                $this->add_static_date($mform, 'default_duedate',
-                    get_string('duedate', 'assign'), $defaults['duedate'] ?? 0);
+                $this->add_static_date(
+                    $mform,
+                    'default_duedate',
+                    get_string('duedate', 'assign'),
+                    $defaults['duedate'] ?? 0
+                );
             }
         } else if ($activitytype === 'forum') {
-            $this->add_static_date($mform, 'default_duedate',
-                get_string('duedate', 'forum'), $defaults['duedate'] ?? 0);
-            $this->add_static_date($mform, 'default_cutoffdate',
-                get_string('cutoffdate', 'forum'), $defaults['cutoffdate'] ?? 0);
+            $this->add_static_date(
+                $mform,
+                'default_duedate',
+                get_string('duedate', 'forum'),
+                $defaults['duedate'] ?? 0
+            );
+            $this->add_static_date(
+                $mform,
+                'default_cutoffdate',
+                get_string('cutoffdate', 'forum'),
+                $defaults['cutoffdate'] ?? 0
+            );
         }
     }
 
@@ -233,19 +319,30 @@ class overrides_extensions_form extends \moodleform {
      * @param array $overrides
      */
     private function add_assign_overrides($mform, $defaults, $overrides) {
-        $this->add_override_date($mform, 'cutoffdate',
+        $this->add_override_date(
+            $mform,
+            'cutoffdate',
             get_string('cutoffdate', 'assign'),
-            $overrides['cutoffdate'] ?? 0, $defaults['cutoffdate'] ?? 0);
+            $overrides['cutoffdate'] ?? 0,
+            $defaults['cutoffdate'] ?? 0
+        );
 
-        $this->add_override_date($mform, 'allowsubmissionsfromdate',
+        $this->add_override_date(
+            $mform,
+            'allowsubmissionsfromdate',
             get_string('allowsubmissionsfromdate', 'assign'),
             $overrides['allowsubmissionsfromdate'] ?? 0,
-            $defaults['allowsubmissionsfromdate'] ?? 0);
+            $defaults['allowsubmissionsfromdate'] ?? 0
+        );
 
         // Time limit override (Moodle 5.0 timed assignments).
         if (array_key_exists('timelimit', $defaults)) {
-            $mform->addElement('advcheckbox', 'override_timelimit',
-                '', get_string('override_enable', 'local_unifiedgrader'));
+            $mform->addElement(
+                'advcheckbox',
+                'override_timelimit',
+                '',
+                get_string('override_enable', 'local_unifiedgrader')
+            );
             $mform->addElement('duration', 'timelimit', get_string('timelimit', 'assign'));
             $mform->disabledIf('timelimit', 'override_timelimit');
 
@@ -264,17 +361,29 @@ class overrides_extensions_form extends \moodleform {
      * @param array $overrides
      */
     private function add_quiz_overrides($mform, $defaults, $overrides) {
-        $this->add_override_date($mform, 'timeopen',
+        $this->add_override_date(
+            $mform,
+            'timeopen',
             get_string('quizopen', 'quiz'),
-            $overrides['timeopen'] ?? 0, $defaults['timeopen'] ?? 0);
+            $overrides['timeopen'] ?? 0,
+            $defaults['timeopen'] ?? 0
+        );
 
-        $this->add_override_date($mform, 'timeclose',
+        $this->add_override_date(
+            $mform,
+            'timeclose',
             get_string('quizclose', 'quiz'),
-            $overrides['timeclose'] ?? 0, $defaults['timeclose'] ?? 0);
+            $overrides['timeclose'] ?? 0,
+            $defaults['timeclose'] ?? 0
+        );
 
         // Time limit.
-        $mform->addElement('advcheckbox', 'override_timelimit',
-            '', get_string('override_enable', 'local_unifiedgrader'));
+        $mform->addElement(
+            'advcheckbox',
+            'override_timelimit',
+            '',
+            get_string('override_enable', 'local_unifiedgrader')
+        );
         $mform->addElement('duration', 'timelimit', get_string('timelimit', 'quiz'));
         $mform->disabledIf('timelimit', 'override_timelimit');
 
@@ -288,10 +397,18 @@ class overrides_extensions_form extends \moodleform {
         for ($i = 1; $i <= 10; $i++) {
             $attemptoptions[$i] = $i;
         }
-        $mform->addElement('advcheckbox', 'override_attempts',
-            '', get_string('override_enable', 'local_unifiedgrader'));
-        $mform->addElement('select', 'attempts', get_string('attemptsallowed', 'quiz'),
-            $attemptoptions);
+        $mform->addElement(
+            'advcheckbox',
+            'override_attempts',
+            '',
+            get_string('override_enable', 'local_unifiedgrader')
+        );
+        $mform->addElement(
+            'select',
+            'attempts',
+            get_string('attemptsallowed', 'quiz'),
+            $attemptoptions
+        );
         $mform->disabledIf('attempts', 'override_attempts');
 
         if (isset($overrides['attempts']) && $overrides['attempts'] !== null) {
@@ -326,8 +443,12 @@ class overrides_extensions_form extends \moodleform {
      */
     private function add_override_date($mform, $name, $label, $currentvalue, $defaultvalue) {
         $checkboxname = 'override_' . $name;
-        $mform->addElement('advcheckbox', $checkboxname,
-            '', get_string('override_enable', 'local_unifiedgrader'));
+        $mform->addElement(
+            'advcheckbox',
+            $checkboxname,
+            '',
+            get_string('override_enable', 'local_unifiedgrader')
+        );
         $mform->addElement('date_time_selector', $name, $label);
         $mform->disabledIf($name, $checkboxname);
 
@@ -392,7 +513,9 @@ class overrides_extensions_form extends \moodleform {
             $duedate = $defaults['duedate'] ?? 0;
             if ($duedate > 0 && $data['extensionduedate'] <= $duedate) {
                 $errors['extensionduedate'] = get_string(
-                    'quiz_extension_must_be_after_duedate', 'local_unifiedgrader');
+                    'quiz_extension_must_be_after_duedate',
+                    'local_unifiedgrader'
+                );
             }
         }
 
@@ -416,7 +539,9 @@ class overrides_extensions_form extends \moodleform {
             $duedate = $defaults['duedate'] ?? 0;
             if ($duedate > 0 && $data['extensionduedate'] <= $duedate) {
                 $errors['extensionduedate'] = get_string(
-                    'forum_extension_must_be_after_duedate', 'local_unifiedgrader');
+                    'forum_extension_must_be_after_duedate',
+                    'local_unifiedgrader'
+                );
             }
         }
     }

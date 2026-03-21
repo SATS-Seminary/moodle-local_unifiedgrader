@@ -32,6 +32,9 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->libdir . '/formslib.php');
 
+/**
+ * Forum extension form for granting or editing a forum due date extension.
+ */
 class forum_extension_form extends \moodleform {
     /**
      * Form definition.
@@ -90,7 +93,8 @@ class forum_extension_form extends \moodleform {
         $duedate = $this->_customdata['duedate'] ?? 0;
         if ($duedate > 0 && $data['extensionduedate'] <= $duedate) {
             $errors['extensionduedate'] = get_string(
-                'forum_extension_must_be_after_duedate', 'local_unifiedgrader'
+                'forum_extension_must_be_after_duedate',
+                'local_unifiedgrader'
             );
         }
 
