@@ -86,7 +86,6 @@ class clear_all_overrides extends external_api {
             if (class_exists('\mod_assign\penalty\helper')) {
                 \mod_assign\penalty\helper::apply_penalty_to_user($cm->instance, $params['userid']);
             }
-
         } else if ($cm->modname === 'quiz') {
             // Delete core override.
             if (has_capability('mod/quiz:manageoverrides', $context)) {
@@ -97,7 +96,6 @@ class clear_all_overrides extends external_api {
             if (method_exists($adapter, 'delete_duedate_extension')) {
                 $adapter->delete_duedate_extension($params['userid']);
             }
-
         } else if ($cm->modname === 'forum') {
             // Delete forum extension.
             if (method_exists($adapter, 'delete_forum_extension')) {

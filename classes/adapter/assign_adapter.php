@@ -24,6 +24,8 @@
 
 namespace local_unifiedgrader\adapter;
 
+defined('MOODLE_INTERNAL') || die();
+
 global $CFG;
 require_once($CFG->dirroot . '/mod/assign/locallib.php');
 require_once($CFG->dirroot . '/grade/grading/lib.php');
@@ -319,9 +321,11 @@ class assign_adapter extends base_adapter {
         // Check whether any non-file submission plugins have actual student content.
         $hascontent = false;
         foreach ($this->assign->get_submission_plugins() as $plugin) {
-            if ($plugin->is_enabled() && $plugin->is_visible()
+            if (
+                $plugin->is_enabled() && $plugin->is_visible()
                     && $plugin->get_type() !== 'file'
-                    && !$plugin->is_empty($submission)) {
+                    && !$plugin->is_empty($submission)
+            ) {
                 $hascontent = true;
                 break;
             }
@@ -504,8 +508,13 @@ class assign_adapter extends base_adapter {
             // Bypass assign::save_grade() to avoid the grading form trying
             // to process null criteria data (causes foreach-on-null warnings).
             $this->save_grade_directly(
-                $userid, $grade, $feedback, $feedbackformat,
-                $attemptnumber, $draftitemid, $feedbackfilesdraftid,
+                $userid,
+                $grade,
+                $feedback,
+                $feedbackformat,
+                $attemptnumber,
+                $draftitemid,
+                $feedbackfilesdraftid,
             );
             return true;
         }
@@ -544,8 +553,10 @@ class assign_adapter extends base_adapter {
         // grade from the rubric/guide criteria, ignoring $data->grade. If the
         // admin allows manual grade overrides, apply the teacher's explicit
         // grade value after the advanced grading has been saved.
-        if ($grade !== null && !empty($advancedgradingdata)
-                && get_config('local_unifiedgrader', 'allow_manual_grade_override')) {
+        if (
+            $grade !== null && !empty($advancedgradingdata)
+                && get_config('local_unifiedgrader', 'allow_manual_grade_override')
+        ) {
             $gradeobj = $this->assign->get_user_grade($userid, false);
             if ($gradeobj && (float) $gradeobj->grade !== $grade) {
                 $gradeobj->grade = $grade;
@@ -555,7 +566,7 @@ class assign_adapter extends base_adapter {
             }
         }
 
-        // assign::save_grade() → assignfeedback_comments::save() stores the
+        // The assign::save_grade() → assignfeedback_comments::save() stores the
         // raw editor text but does NOT process draft files (that is normally
         // handled by the grading form). Move files from draft to permanent
         // storage and rewrite draftfile.php URLs to @@PLUGINFILE@@.
@@ -828,7 +839,9 @@ class assign_adapter extends base_adapter {
         $instance = $this->assign->get_instance();
         return match ($feature) {
             'rubric', 'markingguide' => (bool) get_grading_manager(
-                $this->context, 'mod_assign', 'submissions',
+                $this->context,
+                'mod_assign',
+                'submissions',
             )->get_active_method(),
             'onlinetext' => $this->has_submission_plugin('onlinetext'),
             'filesubmission' => $this->has_submission_plugin('file'),
@@ -1421,7 +1434,7 @@ class assign_adapter extends base_adapter {
                 ];
             }
             $result['criteria'] = $criteria;
-        } elseif ($method === 'guide' && !empty($definition->guide_criteria)) {
+        } else if ($method === 'guide' && !empty($definition->guide_criteria)) {
             $criteria = [];
             foreach ($definition->guide_criteria as $criterionid => $criterion) {
                 $criteria[] = [

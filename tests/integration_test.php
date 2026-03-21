@@ -74,7 +74,9 @@ class integration_test extends \advanced_testcase {
 
         // Submit for student 1.
         $this->gen->create_assign_submission(
-            $scenario->activity, $student1->id, 'My assignment submission text.'
+            $scenario->activity,
+            $student1->id,
+            'My assignment submission text.'
         );
 
         // Verify submission data.
@@ -310,8 +312,10 @@ class integration_test extends \advanced_testcase {
         $this->assertStringContainsString('Good posts', $gradedata['feedback']);
 
         // Grade was saved as -1 (no grade), so it may be stored as -1.0.
-        $this->assertTrue($gradedata['grade'] === null || $gradedata['grade'] < 0,
-            'Grade should be null or negative for ungraded forum');
+        $this->assertTrue(
+            $gradedata['grade'] === null || $gradedata['grade'] < 0,
+            'Grade should be null or negative for ungraded forum'
+        );
 
         // Format grade should handle negative/null grades gracefully.
         $gradeinfo = feedback_data_helper::format_grade($gradedata, $info);
@@ -644,8 +648,13 @@ class integration_test extends \advanced_testcase {
 
             // Add a penalty.
             $pid = penalty_manager::save_penalty(
-                $scenario->cm->id, $student->id, $scenario->teacher->id,
-                'wordcount', 'Over limit', 15, 0
+                $scenario->cm->id,
+                $student->id,
+                $scenario->teacher->id,
+                'wordcount',
+                'Over limit',
+                15,
+                0
             );
             $this->assertGreaterThan(0, $pid, "Penalty created for $type");
 
@@ -680,8 +689,11 @@ class integration_test extends \advanced_testcase {
             $value = get_string($key, 'local_unifiedgrader');
             $this->assertNotEmpty($value, "Lang string '$key' should be defined and non-empty");
             // If the string were missing, get_string returns [[key]] — check it's not that.
-            $this->assertStringNotContainsString('[[', $value,
-                "Lang string '$key' should not be a missing-string placeholder");
+            $this->assertStringNotContainsString(
+                '[[',
+                $value,
+                "Lang string '$key' should not be a missing-string placeholder"
+            );
         }
     }
 

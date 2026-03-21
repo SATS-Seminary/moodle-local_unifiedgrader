@@ -28,6 +28,8 @@
 
 namespace local_unifiedgrader\adapter;
 
+defined('MOODLE_INTERNAL') || die();
+
 use local_unifiedgrader\submission_comment_manager;
 
 global $CFG;
@@ -206,7 +208,8 @@ class quiz_adapter extends base_adapter {
             // Effective due date: duedate plugin (if installed) > native override > global timeclose.
             if ($hasduedateplugin) {
                 $effectiveduedate = (int) \quizaccess_duedate\override_manager::get_effective_duedate(
-                    $this->quiz->id, $userid
+                    $this->quiz->id,
+                    $userid
                 );
             } else {
                 $effectiveduedate = $overrideset[$userid] ?? $globaltimeclose;
@@ -527,8 +530,10 @@ class quiz_adapter extends base_adapter {
             $attempt = $this->get_latest_finished_attempt($userid);
         }
 
-        if (!empty($advancedgradingdata['method']) && $advancedgradingdata['method'] === 'quizmanual'
-                && !empty($advancedgradingdata['questions']) && $attempt) {
+        if (
+            !empty($advancedgradingdata['method']) && $advancedgradingdata['method'] === 'quizmanual'
+                && !empty($advancedgradingdata['questions']) && $attempt
+        ) {
             // Per-question manual grading.
             $this->save_manual_question_grades($attempt, $advancedgradingdata['questions']);
         }
@@ -591,7 +596,10 @@ class quiz_adapter extends base_adapter {
         $latestqfb = $this->get_latest_attempt_feedback($userid);
         if ($latestqfb) {
             $this->save_feedback_to_gradebook(
-                $userid, $latestqfb->feedback ?? '', (int) $latestqfb->feedbackformat, (int) $latestqfb->id
+                $userid,
+                $latestqfb->feedback ?? '',
+                (int) $latestqfb->feedbackformat,
+                (int) $latestqfb->id
             );
         } else {
             $this->save_feedback_to_gradebook($userid, $feedbacktosave, $feedbackformat, $qfbid);
@@ -895,7 +903,8 @@ class quiz_adapter extends base_adapter {
     public function get_effective_duedate(int $userid): int {
         if (class_exists('\quizaccess_duedate\override_manager')) {
             return (int) \quizaccess_duedate\override_manager::get_effective_duedate(
-                $this->quiz->id, $userid
+                $this->quiz->id,
+                $userid
             );
         }
 
@@ -965,9 +974,7 @@ class quiz_adapter extends base_adapter {
         return true;
     }
 
-    // -------------------------------------------------------------------------
     // Duedate plugin extension methods.
-    // -------------------------------------------------------------------------
 
     /**
      * Get the duedate plugin extension for a user (if any).
@@ -1024,7 +1031,9 @@ class quiz_adapter extends base_adapter {
 
         \quizaccess_duedate\override_manager::save_override($data);
         \quizaccess_duedate\override_manager::update_calendar_event(
-            $data, $this->quiz->name, $this->course->id
+            $data,
+            $this->quiz->name,
+            $this->course->id
         );
         \quizaccess_duedate\override_manager::recalculate_grades_for_override($data);
     }
@@ -1051,13 +1060,12 @@ class quiz_adapter extends base_adapter {
         \quizaccess_duedate\override_manager::delete_calendar_event($record);
         \quizaccess_duedate\override_manager::delete_override((int) $record->id);
         \quizaccess_duedate\override_manager::recalculate_grades_for_user(
-            $this->quiz->id, $userid
+            $this->quiz->id,
+            $userid
         );
     }
 
-    // -------------------------------------------------------------------------
     // Private helpers.
-    // -------------------------------------------------------------------------
 
     /**
      * Get the quiz-level duedate from the quizaccess_duedate plugin.

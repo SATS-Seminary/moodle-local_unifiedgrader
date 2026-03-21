@@ -27,6 +27,8 @@
 
 namespace local_unifiedgrader\adapter;
 
+defined('MOODLE_INTERNAL') || die();
+
 use local_unifiedgrader\submission_comment_manager;
 
 global $CFG;
@@ -516,7 +518,6 @@ class forum_adapter extends base_adapter {
             }
         }
 
-
         // Clear existing draft files from the previous student.
         $fs = get_file_storage();
         $usercontext = \context_user::instance($USER->id);
@@ -675,7 +676,9 @@ class forum_adapter extends base_adapter {
     public function supports_feature(string $feature): bool {
         return match ($feature) {
             'rubric', 'markingguide' => (bool) get_grading_manager(
-                $this->context, 'mod_forum', 'forum',
+                $this->context,
+                'mod_forum',
+                'forum',
             )->get_active_method(),
             'onlinetext' => true,
             'filesubmission' => true,
@@ -984,7 +987,11 @@ class forum_adapter extends base_adapter {
                         $severity = $this->extract_plagiarism_severity($plagiarismhtml);
                         $percentage = $this->extract_plagiarism_percentage($plagiarismhtml);
                         $shieldhtml = $this->render_plagiarism_shield(
-                            $post->id, $severity, $percentage, $plagiarismhtml, $reporturl,
+                            $post->id,
+                            $severity,
+                            $percentage,
+                            $plagiarismhtml,
+                            $reporturl,
                         );
                     }
                 }
@@ -1102,7 +1109,7 @@ class forum_adapter extends base_adapter {
         $levels = ['success' => 0, 'warning' => 1, 'danger' => 2];
         $worst = -1;
 
-        // --- Copyleaks ---
+        // Copyleaks detection.
         // Plagiarism indicator: cls-plag-score-level-{low,mid,high}.
         // AI content indicator: cls-ai-score-level-{low,mid,high}.
         $copyleaksmap = ['low' => 'success', 'mid' => 'warning', 'high' => 'danger'];
@@ -1122,7 +1129,7 @@ class forum_adapter extends base_adapter {
             return $worst >= 0 ? array_search($worst, $levels) : 'error';
         }
 
-        // --- Turnitin ---
+        // Turnitin detection.
         // Score colour classes: score_colour_75 (red), score_colour_50 (orange),
         // score_colour_25 (green/yellow). No class = very low (blue).
         if (preg_match_all('/score_colour_(\d+)/', $html, $matches)) {
@@ -1147,7 +1154,7 @@ class forum_adapter extends base_adapter {
             return array_search($worst, $levels);
         }
 
-        // --- Generic fallback ---
+        // Generic fallback.
         // Look for common Bootstrap-style colour classes used by other plugins.
         if (preg_match('/\b(?:text-danger|bg-danger|badge-danger|alert-danger)\b/', $html)) {
             return 'danger';
