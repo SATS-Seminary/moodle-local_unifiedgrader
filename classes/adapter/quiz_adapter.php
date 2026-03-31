@@ -1283,9 +1283,15 @@ class quiz_adapter extends base_adapter {
 
         $questionnum = 0;
         foreach ($slots as $slot) {
-            $questionnum++;
             $qa = $quba->get_question_attempt($slot);
             $question = $qa->get_question();
+
+            // Skip information-only items (description/label) — not numbered on the quiz.
+            if ($question instanceof \question_information_item) {
+                continue;
+            }
+
+            $questionnum++;
             $state = $qa->get_state();
 
             // Include questions that use manual grading behaviour.
@@ -1424,9 +1430,17 @@ class quiz_adapter extends base_adapter {
         // Render each question.
         $questionnum = 0;
         foreach ($slots as $slot) {
-            $questionnum++;
             $qa = $quba->get_question_attempt($slot);
             $question = $qa->get_question();
+
+            // Skip information-only items (e.g. description/label) — they are
+            // not numbered on the quiz itself, so including them would cause
+            // all subsequent question numbers to be out of sync.
+            if ($question instanceof \question_information_item) {
+                continue;
+            }
+
+            $questionnum++;
             $state = $qa->get_state();
 
             $questionname = $question->name ?? '';

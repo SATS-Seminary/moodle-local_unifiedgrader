@@ -11,6 +11,8 @@
 - Fix external API validation errors on quiz and forum grading (missing return fields)
 - Fix student feedback banner not showing for ungraded multi-attempt assignments
 - Fix student PDF preview 404 for multi-attempt assignments with auto-reopen
+- Fix quiz question numbering skew when description/label items are present
+- Fix comment library offline banner for non-manager teachers (permission check too strict)
 
 ## v2.1.1 (2026-03-21)
 - Add student submission comments for quiz and forum activities (popout chat bubble)

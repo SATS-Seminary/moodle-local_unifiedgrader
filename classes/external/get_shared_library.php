@@ -60,7 +60,11 @@ class get_shared_library extends external_api {
 
         $context = \context_system::instance();
         self::validate_context($context);
-        require_capability('local/unifiedgrader:sharecomments', $context);
+
+        // All teachers can view shared comments. Only return empty if guest.
+        if (isguestuser()) {
+            return [];
+        }
 
         return comment_library_manager::get_shared_comments($USER->id, $params['tagid']);
     }
