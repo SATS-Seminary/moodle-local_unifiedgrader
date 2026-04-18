@@ -60,11 +60,7 @@ $string['setting_allow_manual_override_desc'] = 'When enabled, teachers can manu
 
 // Grading interface.
 $string['grade'] = 'Grade';
-$string['savegrade'] = 'Save grade';
 $string['savefeedback'] = 'Save feedback';
-$string['savinggrade'] = 'Saving grade...';
-$string['gradesaved'] = 'Grade saved';
-$string['error_saving'] = 'Error saving grade.';
 $string['error_network'] = 'Unable to connect to the server. Please check your connection and try again.';
 $string['error_offline_comments'] = 'Cannot add comments while offline.';
 $string['feedback'] = 'Feedback';
@@ -80,10 +76,7 @@ $string['expand'] = 'Expand';
 $string['submission'] = 'Submission';
 $string['nosubmission'] = 'No submission';
 $string['previewpanel'] = 'Submission preview';
-$string['markingpanel'] = 'Grading panel';
 $string['onlinetext'] = 'Online text';
-$string['submittedfiles'] = 'Submitted files';
-$string['viewfile'] = 'View file';
 
 // Participants.
 $string['participants'] = 'Participants';
@@ -107,7 +100,6 @@ $string['status_draft'] = 'Draft';
 $string['status_submitted'] = 'Submitted';
 $string['status_graded'] = 'Graded';
 $string['status_nosubmission'] = 'No submission';
-$string['status_needsgrading'] = 'Needs grading';
 $string['status_new'] = 'Not submitted';
 $string['status_short_submitted'] = 'Sub';
 $string['status_short_graded'] = 'Grd';
@@ -128,10 +120,6 @@ $string['confirmdelete_note'] = 'Are you sure you want to delete this note?';
 
 // Comment library.
 $string['commentlibrary'] = 'Comment library';
-$string['savecomment'] = 'Save to library';
-$string['insertcomment'] = 'Insert';
-$string['deletecomment'] = 'Remove';
-$string['newcomment'] = 'New comment...';
 $string['nocomments'] = 'No saved comments.';
 
 // UI.
@@ -141,7 +129,6 @@ $string['saved'] = 'Saved';
 $string['previousstudent'] = 'Previous student';
 $string['nextstudent'] = 'Next student';
 $string['expandfilters'] = 'Show filters';
-$string['collapsefilters'] = 'Hide filters';
 $string['backtocourse'] = 'Back to course';
 $string['rubric'] = 'Rubric';
 $string['markingguide'] = 'Marking guide';
@@ -161,16 +148,13 @@ $string['teachercomment'] = 'Teacher comment';
 // Submission comments.
 $string['submissioncomments'] = 'Submission comments';
 $string['nocommentsyet'] = 'No comments yet';
-$string['addcomment'] = 'Add a comment...';
 $string['postcomment'] = 'Post';
-$string['deletesubmissioncomment'] = 'Delete comment';
 
 // Feedback files.
 $string['feedbackfiles'] = 'Feedback files';
 
 // Plagiarism.
 $string['plagiarism'] = 'Plagiarism';
-$string['plagiarism_noresults'] = 'No plagiarism results available.';
 $string['plagiarism_pending'] = 'Plagiarism scan in progress';
 $string['plagiarism_error'] = 'Plagiarism scan failed';
 
@@ -180,14 +164,12 @@ $string['teacher_remark'] = 'Teacher feedback';
 $string['view_feedback'] = 'View feedback';
 $string['view_annotated_feedback'] = 'View Annotated Feedback';
 $string['feedback_not_available'] = 'Your feedback is not yet available. Please check back after your submission has been graded and released.';
-$string['no_annotated_files'] = 'There are no annotated PDF files for your submission.';
 $string['feedback_banner_default'] = 'Your teacher has provided feedback on your submission.';
 
 // Document conversion.
 $string['conversion_failed'] = 'This file could not be converted to PDF for preview.';
 $string['converting_file'] = 'Converting document to PDF...';
 $string['conversion_timeout'] = 'Document conversion is taking too long. Please try again later.';
-$string['download_annotated_pdf'] = 'Download annotated PDF';
 $string['download_original_submission'] = 'Download original submission: {$a}';
 
 // Privacy.
@@ -325,7 +307,6 @@ $string['overrides_section_overrides_only'] = 'Overrides';
 $string['overrides_ext_duedate'] = 'Extension: Due date';
 $string['override_enable'] = 'Enable';
 $string['recalculatepenalty'] = 'Recalculate late penalty';
-$string['recalculatepenalty_help'] = 'This assignment has automated late penalties enabled and existing grades. When changing due dates, choose whether to recalculate penalties based on the new due date. Select "Yes" to update the penalty for this student, or "No" to leave the existing penalty unchanged.';
 $string['recalculate_penalty_confirm'] = 'This student has an existing grade with a late penalty. The extension has been saved. Would you like to recalculate the penalty based on the new due date?';
 $string['action_clear_overrides'] = 'Clear all overrides';
 $string['confirm_clear_overrides'] = 'Are you sure you want to clear all overrides and extensions for this student?';
@@ -370,31 +351,21 @@ $string['clib_all'] = 'All';
 $string['clib_quick_add'] = 'Quick add comment...';
 $string['clib_manage'] = 'Manage Library';
 $string['clib_no_comments'] = 'No comments yet.';
-$string['clib_insert'] = 'Insert';
 $string['clib_copied'] = 'Comment copied to clipboard';
 $string['clib_my_library'] = 'My Library';
 $string['clib_shared_library'] = 'Shared Library';
 $string['clib_new_comment'] = 'New comment';
-$string['clib_edit_comment'] = 'Edit comment';
-$string['clib_delete_comment'] = 'Delete comment';
 $string['clib_confirm_delete'] = 'Are you sure you want to delete this comment?';
 $string['clib_share'] = 'Share';
-$string['clib_unshare'] = 'Unshare';
 $string['clib_import'] = 'Import';
 $string['clib_imported'] = 'Comment imported to your library';
-$string['clib_copy_to_course'] = 'Copy to course';
 $string['clib_all_courses'] = 'All courses';
 $string['clib_tags'] = 'Tags';
 $string['clib_manage_tags'] = 'Manage tags';
 $string['clib_new_tag'] = 'New tag';
-$string['clib_edit_tag'] = 'Edit tag';
-$string['clib_delete_tag'] = 'Delete tag';
 $string['clib_confirm_delete_tag'] = 'Are you sure you want to delete this tag? It will be removed from all comments.';
 $string['clib_system_tag'] = 'System default';
-$string['clib_shared_by'] = 'Shared by {$a}';
 $string['clib_no_shared'] = 'No shared comments available.';
-$string['clib_picker_freetext'] = 'Or write your own...';
-$string['clib_picker_loading'] = 'Loading comments...';
 $string['clib_offline_mode'] = 'Showing cached comments — editing is unavailable offline.';
 $string['unifiedgrader:sharecomments'] = 'Share comments in the library with other teachers';
 
@@ -417,7 +388,6 @@ $string['penalty_other'] = 'Other';
 $string['penalty_custom'] = 'Custom';
 $string['penalty_label_placeholder'] = 'Label (max 15 chars)';
 $string['penalty_active'] = 'Active penalties';
-$string['penalty_badge'] = '-{$a->percentage}% {$a->label}';
 $string['penalty_late_label'] = 'Late';
 $string['penalty_late_applied'] = 'Late penalty of {$a}% applied';
 $string['late_days'] = '{$a} days';
