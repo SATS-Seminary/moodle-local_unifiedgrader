@@ -573,10 +573,16 @@ class assign_adapter extends base_adapter {
             $controller = $gradingmanager->get_active_controller();
         }
 
-        if ($controller && empty($advancedgradingdata)) {
-            // Advanced grading is active but no criteria data provided.
-            // Bypass assign::save_grade() to avoid the grading form trying
-            // to process null criteria data (causes foreach-on-null warnings).
+        /*
+         * Use save_grade_directly() in two cases:
+         * 1. Advanced grading is active but no criteria data — avoids the
+         *    grading form processing null criteria (foreach-on-null warnings).
+         * 2. Grade type is "None" — assign::save_grade() does not persist a
+         *    numeric grade when there is no grade column, so the "Mark as
+         *    graded" toggle state would silently revert on reload.
+         */
+        $gradingdisabled = ((int) $instance->grade === 0);
+        if (($controller && empty($advancedgradingdata)) || $gradingdisabled) {
             $this->save_grade_directly(
                 $userid,
                 $grade,

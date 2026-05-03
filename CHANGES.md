@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.1.8 (2026-04-23)
+- Fix "Mark as graded" toggle reverting on reload for Grade:None assignments
+
 ## v2.1.7 (2026-04-18)
 - Render Byblos portfolio submissions inline in the preview pane with pop-out button
 - Remove dead code: legacy v1 comment library classes and 30 unused language strings
