@@ -1,0 +1,91 @@
+{{!
+    @template local_unifiedgrader/help_section_admin
+
+    Documentation partial: admin settings reference.
+}}
+<section id="admin-settings">
+<h2>Admin settings reference</h2>
+
+<p>Settings live under <em>Site administration → Plugins → Local plugins
+→ Unified Grader</em>.</p>
+
+<table class="table table-sm table-bordered">
+    <thead>
+        <tr><th>Setting</th><th>Default</th><th>Effect</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>enable_assign</code></td>
+            <td>On</td>
+            <td>Routes assignment activities through the Unified Grader.</td>
+        </tr>
+        <tr>
+            <td><code>enable_forum</code></td>
+            <td>Off</td>
+            <td>Routes forum activities (whole-forum grading) through the Unified Grader.</td>
+        </tr>
+        <tr>
+            <td><code>enable_quiz</code></td>
+            <td>Off</td>
+            <td>Routes quiz activities through the Unified Grader.</td>
+        </tr>
+        <tr>
+            <td><code>enable_quiz_post_grades</code></td>
+            <td>Off</td>
+            <td>Surfaces a <em>Post grades</em> toggle for quizzes — programmatically updates the quiz's review-marks bitmask. Off by default because most quiz workflows manage mark visibility through review options directly.</td>
+        </tr>
+        <tr>
+            <td><code>enable_bigbluebuttonbn</code></td>
+            <td>Off</td>
+            <td>Routes BigBlueButton activities through the Unified Grader. See the BBB integration section above for prerequisites.</td>
+        </tr>
+        <tr>
+            <td><code>enable_submission_comments</code></td>
+            <td>On</td>
+            <td>Replaces / adds a chat-style messenger between teacher and student on the activity view page.</td>
+        </tr>
+        <tr>
+            <td><code>onlinetext_as_pdf</code></td>
+            <td>Off</td>
+            <td>Converts assignment online-text submissions to PDF on the fly so they can be annotated. Requires a configured document converter (unoconv or Google Drive).</td>
+        </tr>
+        <tr>
+            <td><code>allow_manual_grade_override</code></td>
+            <td>On</td>
+            <td>Lets teachers type a numeric grade even when a marking guide / rubric is configured. When off, the grade is computed exclusively from criteria.</td>
+        </tr>
+        <tr>
+            <td><code>coursecode_regex</code></td>
+            <td>(empty)</td>
+            <td>Regular expression applied to <code>course.shortname</code> to extract a course code; used by the comment library for course-scoped comments.</td>
+        </tr>
+        <tr>
+            <td><code>enable_report_form</code></td>
+            <td>Off</td>
+            <td>Surfaces a <em>Report academic impropriety</em> button in the plagiarism shield popout.</td>
+        </tr>
+        <tr>
+            <td><code>report_form_url</code></td>
+            <td>(empty)</td>
+            <td>Target URL for the impropriety report form. Supports placeholders: <code>{studentname}</code>, <code>{studentid}</code>, <code>{coursecode}</code>, <code>{coursename}</code>, <code>{activityname}</code>, <code>{activitytype}</code>, <code>{gradername}</code>, <code>{graderurl}</code>.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Capabilities</h3>
+
+<table class="table table-sm table-bordered">
+    <thead><tr><th>Capability</th><th>Risk</th><th>Default roles</th><th>Purpose</th></tr></thead>
+    <tbody>
+        <tr><td><code>local/unifiedgrader:grade</code></td><td>Write, XSS, personal</td><td>editingteacher, manager</td><td>Save grades, feedback, annotations, manage extensions/overrides</td></tr>
+        <tr><td><code>local/unifiedgrader:viewall</code></td><td>Read, personal</td><td>teacher, editingteacher, manager</td><td>Open the grader and see the participant list</td></tr>
+        <tr><td><code>local/unifiedgrader:viewfeedback</code></td><td>Read, personal</td><td>student (active enrolment)</td><td>View feedback page for the student themselves</td></tr>
+        <tr><td><code>local/unifiedgrader:viewnotes</code></td><td>Read, personal</td><td>teacher, editingteacher, manager</td><td>See private teacher notes (any author)</td></tr>
+        <tr><td><code>local/unifiedgrader:managenotes</code></td><td>Write, personal</td><td>editingteacher, manager</td><td>Create / edit / delete own notes</td></tr>
+        <tr><td><code>local/unifiedgrader:sharecomments</code></td><td>Write</td><td>editingteacher, manager</td><td>Share comment library entries with other markers</td></tr>
+    </tbody>
+</table>
+
+<p>All capabilities are scoped at <code>CONTEXT_MODULE</code> level so they
+can be tuned per-activity if needed.</p>
+</section>

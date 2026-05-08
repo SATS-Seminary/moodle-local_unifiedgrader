@@ -89,6 +89,20 @@ export default class extends BaseComponent {
         this._rubricSelections = {};
         this._guideScores = {};
         this._guideRemarks = {};
+        // Snapshot of editable values as we sent them to the most recent save.
+        // Used by _renderGrade / _renderGuide / _renderRubric / _updateFeedbackContent
+        // to distinguish "field still matches what we saved" (safe to apply
+        // server data) from "user has edited since the save fired" (preserve
+        // their input). This guards every editable surface in the marking
+        // panel — the top-level grade input, scale dropdown, advanced-grading
+        // criteria, and the TinyMCE feedback editor — from being clobbered
+        // by the post-save state refresh.
+        this._lastSentScores = null;
+        this._lastSentRemarks = null;
+        this._lastSentRubricSelections = null;
+        this._lastSentGrade = null;
+        this._lastSentScale = null;
+        this._lastSentFeedback = null;
         this._guideBaseTotal = 0;
         this._quizBaseGrade = undefined;
         this._lastFocusedField = null;
@@ -259,6 +273,29 @@ export default class extends BaseComponent {
                 if (next && next.closest('[data-action="toggle-comment-library"]')) {
                     return;
                 }
+                // Defer the decision: clicking a non-focusable element (e.g. our
+                // comment-library button in Safari/WebKit, or a popout list item)
+                // arrives here with relatedTarget=null even though the user has
+                // not actually left the rubric — focus simply has nowhere to land.
+                // Wait for focus to settle, then re-check before firing autosave;
+                // this prevents the popout-open from triggering a save that races
+                // with in-progress edits and visually resets the values.
+                if (next === null) {
+                    setTimeout(() => {
+                        const active = document.activeElement;
+                        if (active && rubricBody.contains(active)) {
+                            return;
+                        }
+                        if (active && active.closest && (
+                            active.closest('.local-unifiedgrader-clib-popout')
+                            || active.closest('[data-action="toggle-comment-library"]')
+                        )) {
+                            return;
+                        }
+                        this._debouncedAutoSave();
+                    }, 0);
+                    return;
+                }
                 this._debouncedAutoSave();
             });
         }
@@ -366,9 +403,18 @@ export default class extends BaseComponent {
      *
      * @param {string} html The HTML content to set.
      */
-    _updateFeedbackContent(html) {
+    _updateFeedbackContent(html, force = false) {
         const textarea = this.getElement(this.selectors.FEEDBACK_INPUT);
         if (!textarea) {
+            return;
+        }
+        // Without `force`, refuse to clobber the editor when the teacher is
+        // typing or has unsent edits. setContent() rewrites the entire body,
+        // blowing away cursor position and any in-progress text — exactly the
+        // race the auto-save lifecycle was losing keystrokes to. Explicit user
+        // actions (toggle-to-edit, delete-feedback) still pass force=true.
+        if (!force && !this._safeToOverwriteFeedback()) {
+            DirtyTracker.markDirty('feedback');
             return;
         }
         const editor = getInstanceForElementId(textarea.id);
@@ -377,6 +423,66 @@ export default class extends BaseComponent {
         } else {
             textarea.value = html || '';
         }
+    }
+
+    /**
+     * Decide whether a simple text/number/scale input is safe to overwrite
+     * with the server-authoritative value. Refuses when the field has focus
+     * (the teacher is typing) or when the in-memory value differs from what
+     * we last sent — i.e. there are in-flight edits that haven't reached the
+     * server yet.
+     *
+     * @param {HTMLElement} field The input element.
+     * @param {string|null} lastSentValue Snapshot from _handleSaveGrade, or null.
+     * @return {boolean}
+     */
+    _safeToOverwriteSimpleField(field, lastSentValue) {
+        if (!field) {
+            return true;
+        }
+        if (field === document.activeElement) {
+            return false;
+        }
+        if (lastSentValue === null) {
+            // No save has dispatched yet (or it has fully completed and the
+            // snapshot was cleared in _updateUI). No in-flight conflict.
+            return true;
+        }
+        return String(field.value ?? '') === String(lastSentValue);
+    }
+
+    /**
+     * Decide whether the feedback editor (TinyMCE or plain textarea) is safe
+     * to overwrite. Same shape as _safeToOverwriteSimpleField but reads
+     * content via the appropriate API.
+     *
+     * @return {boolean}
+     */
+    _safeToOverwriteFeedback() {
+        const textarea = this.getElement(this.selectors.FEEDBACK_INPUT);
+        if (!textarea) {
+            return true;
+        }
+        const editor = getInstanceForElementId(textarea.id);
+        if (editor) {
+            // TinyMCE: hasFocus is the closest signal to "user is editing".
+            // Some TinyMCE builds also expose isDirty(); prefer focus since it
+            // covers the case where typing has briefly stopped between events.
+            if (typeof editor.hasFocus === 'function' && editor.hasFocus()) {
+                return false;
+            }
+            if (this._lastSentFeedback === null) {
+                return true;
+            }
+            return editor.getContent() === this._lastSentFeedback;
+        }
+        if (textarea === document.activeElement) {
+            return false;
+        }
+        if (this._lastSentFeedback === null) {
+            return true;
+        }
+        return (textarea.value ?? '') === this._lastSentFeedback;
     }
 
     /**
@@ -486,7 +592,15 @@ export default class extends BaseComponent {
             // Scale: set the dropdown value.
             const scaleInput = this.getElement(this.selectors.SCALE_INPUT);
             if (scaleInput && state.grade) {
-                scaleInput.value = state.grade.grade !== null ? String(Math.round(state.grade.grade)) : '';
+                const newScale = state.grade.grade !== null ? String(Math.round(state.grade.grade)) : '';
+                if (this._safeToOverwriteSimpleField(scaleInput, this._lastSentScale)) {
+                    scaleInput.value = newScale;
+                } else {
+                    // User has changed the scale since the save fired — keep
+                    // their selection and re-mark dirty so the next focus
+                    // change flushes a follow-up save.
+                    DirtyTracker.markDirty('grade');
+                }
             }
         } else {
             // Points: set the numeric input value.
@@ -503,7 +617,15 @@ export default class extends BaseComponent {
                         displayGrade = Math.round(displayGrade * 100) / 100;
                     }
                 }
-                gradeInput.value = displayGrade !== null ? displayGrade : '';
+                const newValue = displayGrade !== null ? String(displayGrade) : '';
+                if (this._safeToOverwriteSimpleField(gradeInput, this._lastSentGrade)) {
+                    gradeInput.value = newValue;
+                } else {
+                    // User has typed in the grade input since the save fired —
+                    // keep their value and re-mark dirty so the next focusout
+                    // saves it.
+                    DirtyTracker.markDirty('grade');
+                }
 
                 // Store the full quiz grade as the base for quizmanual delta calculations.
                 // _updateGuideTotal uses this so manual question edits adjust the full
@@ -646,9 +768,11 @@ export default class extends BaseComponent {
         }
 
         // Re-populate the editor from state — TinyMCE may lose content set while hidden.
+        // Force the update: this is an explicit user action (Edit button), not
+        // a passive state refresh; we WANT the editor populated.
         const state = this.reactive.state;
         const feedbackHtml = state.grade?.feedbackdraft || state.grade?.feedback || '';
-        this._updateFeedbackContent(feedbackHtml);
+        this._updateFeedbackContent(feedbackHtml, true);
 
         // Focus the TinyMCE editor after a brief delay (needed after unhiding).
         const textarea = this.getElement(this.selectors.FEEDBACK_INPUT);
@@ -669,8 +793,9 @@ export default class extends BaseComponent {
             return;
         }
 
-        // Clear the editor content and save with empty feedback.
-        this._updateFeedbackContent('');
+        // Clear the editor content and save with empty feedback. Force the
+        // update: an explicit Delete action should always wipe the editor.
+        this._updateFeedbackContent('', true);
         this._handleSaveGrade();
     }
 
@@ -756,6 +881,18 @@ export default class extends BaseComponent {
 
                 // Save cycle complete — allow future saves.
                 this._saveInFlight = false;
+
+                // Clear in-flight snapshots so subsequent renders (e.g. a
+                // student switch, a penalty save, an extension grant) freely
+                // apply the new state. The snapshots only protect the window
+                // between save dispatch and state refresh; once that window
+                // closes, holding on to them would prevent legitimate updates.
+                this._lastSentScores = null;
+                this._lastSentRemarks = null;
+                this._lastSentRubricSelections = null;
+                this._lastSentGrade = null;
+                this._lastSentScale = null;
+                this._lastSentFeedback = null;
 
                 // When saving transitions to false, the save completed — mark clean.
                 const gradeInputEl = this.getElement(this.selectors.GRADE_INPUT);
@@ -1212,8 +1349,6 @@ export default class extends BaseComponent {
         if (!body) {
             return;
         }
-        body.innerHTML = '';
-        this._rubricSelections = {};
 
         // Build a map of current selections from fill data.
         const currentFill = {};
@@ -1224,6 +1359,31 @@ export default class extends BaseComponent {
                 }
             }
         }
+
+        // Incremental update path — same set of criteria already rendered.
+        // See _updateGuideValues for the equivalent reasoning: a destructive
+        // body.innerHTML='' rebuild during the in-flight window between save
+        // dispatch and state refresh would silently revert any rubric click
+        // the teacher made in that window. We instead reconcile selections
+        // in place, preserving any selection that has changed since the
+        // most recent save fired.
+        const existingButtons = body.querySelectorAll('button[data-criterionid][data-levelid]');
+        if (existingButtons.length > 0) {
+            const existingCriterionIds = new Set(
+                Array.from(existingButtons).map((el) => String(el.dataset.criterionid)),
+            );
+            const newCriterionIds = new Set(definition.criteria.map((c) => String(c.id)));
+            const sameStructure = existingCriterionIds.size === newCriterionIds.size
+                && [...existingCriterionIds].every((id) => newCriterionIds.has(id));
+            if (sameStructure) {
+                this._updateRubricSelections(body, definition, currentFill);
+                return;
+            }
+        }
+
+        // Full rebuild path.
+        body.innerHTML = '';
+        this._rubricSelections = {};
 
         definition.criteria.forEach((criterion) => {
             const row = document.createElement('div');
@@ -1322,6 +1482,79 @@ export default class extends BaseComponent {
     }
 
     /**
+     * Reconcile rubric level selections after a state refresh, without
+     * rebuilding the level-button DOM. For each criterion the server-returned
+     * selection is applied unless the in-memory selection differs from what
+     * we last sent — in which case the teacher has clicked since the save
+     * fired and we keep their selection. Mirrors _updateGuideValues.
+     *
+     * @param {HTMLElement} body The rubric body container.
+     * @param {object} definition Grading definition.
+     * @param {object} currentFill Map of criterionid → server-selected levelid.
+     */
+    _updateRubricSelections(body, definition, currentFill) {
+        const sent = this._lastSentRubricSelections;
+        let dirtyAfterReconcile = false;
+
+        definition.criteria.forEach((criterion) => {
+            const id = criterion.id;
+            const idstr = String(id);
+            const serverLevelId = currentFill[id] ?? null;
+            const inMemory = this._rubricSelections[id] || null;
+            const sentForCrit = sent ? sent[id] : undefined;
+
+            // Decide which selection should win: the server value (if no
+            // in-flight conflict) or the user's most recent click.
+            let winningSelection = inMemory;
+            if (sentForCrit !== undefined) {
+                const inMemoryLevel = inMemory ? inMemory.levelid : null;
+                const sentLevel = sentForCrit ? sentForCrit.levelid : null;
+                if (inMemoryLevel === sentLevel) {
+                    // No new click since save dispatched — adopt the server's
+                    // canonical value (and if the server cleared a level, clear too).
+                    if (serverLevelId === null) {
+                        winningSelection = null;
+                    } else {
+                        const lvl = criterion.levels.find((l) => l.id === serverLevelId);
+                        winningSelection = lvl ? {levelid: lvl.id, score: lvl.score} : null;
+                    }
+                } else {
+                    // User clicked since save fired — preserve and re-mark dirty
+                    // so the next focusout / debounce flush catches up.
+                    dirtyAfterReconcile = true;
+                }
+            } else if (serverLevelId !== null) {
+                const lvl = criterion.levels.find((l) => l.id === serverLevelId);
+                if (lvl) {
+                    winningSelection = {levelid: lvl.id, score: lvl.score};
+                }
+            }
+
+            if (winningSelection) {
+                this._rubricSelections[id] = winningSelection;
+            } else {
+                delete this._rubricSelections[id];
+            }
+
+            // Reflect the winning selection in the level-button DOM.
+            const buttons = body.querySelectorAll(
+                'button[data-criterionid="' + idstr + '"][data-levelid]',
+            );
+            buttons.forEach((btn) => {
+                const isSelected = winningSelection
+                    && parseInt(btn.dataset.levelid, 10) === winningSelection.levelid;
+                btn.className = 'btn btn-sm text-start p-2 border '
+                    + (isSelected ? 'btn-primary' : 'btn-outline-secondary');
+            });
+        });
+
+        this._updateRubricTotal();
+        if (dirtyAfterReconcile) {
+            DirtyTracker.markDirty('grade');
+        }
+    }
+
+    /**
      * Update the rubric total score display.
      */
     _updateRubricTotal() {
@@ -1364,9 +1597,6 @@ export default class extends BaseComponent {
         if (!body) {
             return;
         }
-        body.innerHTML = '';
-        this._guideScores = {};
-        this._guideRemarks = {};
 
         // Build fill map.
         const currentFill = {};
@@ -1378,6 +1608,32 @@ export default class extends BaseComponent {
                 };
             }
         }
+
+        // If the DOM already represents the same set of criteria, apply an
+        // incremental update instead of nuking and rebuilding. This preserves
+        // (a) the input element the user is currently focused on, and
+        // (b) any input the user has edited since the most recent save fired
+        //     (compared against _lastSentScores/_lastSentRemarks).
+        // Without this, fast typers lose keystrokes that arrived between the
+        // save dispatch and the post-save state refresh.
+        const existingInputs = body.querySelectorAll('input[type="number"][data-criterionid]');
+        if (existingInputs.length > 0) {
+            const existingIds = new Set(
+                Array.from(existingInputs).map((el) => String(el.dataset.criterionid)),
+            );
+            const newIds = new Set(definition.criteria.map((c) => String(c.id)));
+            const sameStructure = existingIds.size === newIds.size
+                && [...existingIds].every((id) => newIds.has(id));
+            if (sameStructure) {
+                this._updateGuideValues(body, definition, currentFill);
+                return;
+            }
+        }
+
+        // Full rebuild path (first render, or definition changed).
+        body.innerHTML = '';
+        this._guideScores = {};
+        this._guideRemarks = {};
 
         definition.criteria.forEach((criterion) => {
             const row = document.createElement('div');
@@ -1530,6 +1786,84 @@ export default class extends BaseComponent {
             }
             this._guideBaseTotal = baseTotal;
         }
+    }
+
+    /**
+     * Apply server-side fill values to existing marking-guide inputs without
+     * rebuilding the DOM. Skips fields the user is currently focused on or has
+     * edited since the most recent save was dispatched, so a slow round-trip
+     * never clobbers in-progress keystrokes.
+     *
+     * @param {HTMLElement} body The rubric body container.
+     * @param {object} definition Grading definition (criteria list).
+     * @param {object} currentFill Fill map keyed by criterion id.
+     */
+    _updateGuideValues(body, definition, currentFill) {
+        const sentScores = this._lastSentScores;
+        const sentRemarks = this._lastSentRemarks;
+
+        definition.criteria.forEach((criterion) => {
+            const id = String(criterion.id);
+            const scoreInput = body.querySelector(
+                'input[type="number"][data-criterionid="' + id + '"]',
+            );
+            const remarkInput = body.querySelector(
+                'textarea[data-criterionid="' + id + '"]',
+            );
+            const newScore = String(currentFill[id]?.score ?? '');
+            const newRemark = String(currentFill[id]?.remark ?? '');
+
+            if (scoreInput && this._safeToOverwrite(scoreInput, this._guideScores[id], sentScores?.[id])) {
+                scoreInput.value = newScore;
+                this._guideScores[id] = newScore;
+            }
+            if (remarkInput && this._safeToOverwrite(remarkInput, this._guideRemarks[id], sentRemarks?.[id])) {
+                remarkInput.value = newRemark;
+                this._guideRemarks[id] = newRemark;
+            }
+        });
+
+        this._updateGuideTotal();
+
+        // If the user has typed values that the most recent save did not
+        // include, re-mark the form dirty so the next focusout (or follow-up
+        // tick of the autosave loop) catches up. Without this the unsaved
+        // edits would silently never reach the server.
+        const hasUnsentEdits = this._gradingDefinition?.criteria?.some((c) => {
+            const id = String(c.id);
+            const sentS = sentScores?.[id];
+            const sentR = sentRemarks?.[id];
+            return (sentS !== undefined && String(this._guideScores[id] ?? '') !== String(sentS))
+                || (sentR !== undefined && String(this._guideRemarks[id] ?? '') !== String(sentR));
+        }) || false;
+        if (hasUnsentEdits) {
+            DirtyTracker.markDirty('grade');
+        }
+    }
+
+    /**
+     * Decide whether a marking-guide input is safe to overwrite with the
+     * server-authoritative value.
+     *
+     * Refuses when the field is the active element (the teacher is typing in
+     * it right now) or when the in-memory value differs from what we last
+     * sent — i.e. the teacher has edited since the save dispatched and the
+     * server response is now stale relative to the form.
+     *
+     * @param {HTMLElement} field The input or textarea element.
+     * @param {string} currentValue Current in-memory value (this._guideScores/Remarks[id]).
+     * @param {string|undefined} lastSentValue Value we sent in the most recent save.
+     * @return {boolean}
+     */
+    _safeToOverwrite(field, currentValue, lastSentValue) {
+        if (field === document.activeElement) {
+            return false;
+        }
+        if (lastSentValue === undefined) {
+            // No save has happened yet — nothing in-flight could be racing.
+            return true;
+        }
+        return String(currentValue ?? '') === String(lastSentValue);
     }
 
     /**
@@ -1810,6 +2144,21 @@ export default class extends BaseComponent {
             return;
         }
         this._saveInFlight = true;
+
+        // Snapshot every editable surface we are about to send so the post-save
+        // state refresh can reconcile per-field instead of clobbering. Without
+        // these snapshots, fast typers lose keystrokes — and fast clickers
+        // lose rubric selections — that arrive between save dispatch and the
+        // state refresh that follows. See `_safeToOverwrite*` helpers.
+        this._lastSentScores = {...this._guideScores};
+        this._lastSentRemarks = {...this._guideRemarks};
+        this._lastSentRubricSelections = JSON.parse(JSON.stringify(this._rubricSelections));
+
+        const gradeInputEl = this.getElement(this.selectors.GRADE_INPUT);
+        const scaleInputEl = this.getElement(this.selectors.SCALE_INPUT);
+        this._lastSentGrade = gradeInputEl ? gradeInputEl.value : null;
+        this._lastSentScale = scaleInputEl ? scaleInputEl.value : null;
+        this._lastSentFeedback = this._getEditorContent();
 
         const state = this.reactive.state;
 

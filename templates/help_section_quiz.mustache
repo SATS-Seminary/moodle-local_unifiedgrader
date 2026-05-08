@@ -1,0 +1,59 @@
+{{!
+    @template local_unifiedgrader/help_section_quiz
+
+    Documentation partial for the Quiz activity adapter.
+}}
+<section id="integration-quiz">
+<h3>Quiz <span class="badge bg-secondary">mod_quiz</span></h3>
+
+<p>Quiz support focuses on <strong>manual grading</strong> of essay,
+audio-response, and file-upload questions, plus a unified surface for
+quiz feedback that complements the auto-grading already performed by
+Moodle's question engine.</p>
+
+<h4>Preview</h4>
+<ul>
+    <li>The full <strong>rendered attempt</strong> with question text, student responses, and (where applicable) auto-grading correctness indicators.</li>
+    <li><strong>Native question renderers</strong> are used, so audio responses, file uploads, and drag-and-drop questions all display correctly.</li>
+    <li><strong>Question display order</strong> respects the attempt's layout (which honours per-attempt shuffle), not the quiz definition order.</li>
+    <li><strong>Description / label items</strong> are skipped when numbering manual-graded questions, so question 1 is question 1 regardless of intervening descriptions.</li>
+</ul>
+
+<h4>Marking</h4>
+<ul>
+    <li><strong>Per-question manual grade and comment</strong> with the same UI as a marking guide. Each manually-gradable question becomes a row.</li>
+    <li><strong>Zero-mark questions</strong> (e.g. information-only essay items) have their score input disabled to avoid the question engine's division-by-zero — comments are still allowed.</li>
+    <li><strong>Per-attempt feedback</strong> is stored in <code>local_unifiedgrader_qfb</code> keyed on <code>(cmid, userid, attemptnumber)</code>. Each attempt can carry its own feedback narrative.</li>
+    <li><strong>Attempt switcher</strong> appears in the marking panel header when a student has more than one finished attempt.</li>
+</ul>
+
+<h4>Post grades</h4>
+<p>Quiz grade visibility isn't controlled by the gradebook's hidden flag — it
+follows the quiz's <em>review options</em> bitmask. The Unified Grader's
+<em>Post grades</em> toggle updates <code>quiz.reviewmarks</code> and
+<code>quiz.reviewmaxmarks</code> for the <em>Later while open</em> and
+<em>After close</em> states. This is gated by the admin setting
+<code>enable_quiz_post_grades</code> (off by default; enable it only when
+your workflow explicitly relies on the toggle to control mark visibility).
+Scheduling a future post date is not supported for quizzes — review options
+are state-based, not date-based.</p>
+
+<h4>Quiz extensions</h4>
+<p>If the <code>quizaccess_duedate</code> plugin is installed, the Unified
+Grader integrates with its override system. Extensions show inline,
+overrides can be cleared, and the effective due date for late-penalty
+calculation comes from the plugin's resolver (user override &gt; group
+override &gt; quiz default).</p>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: quiz grading with the rendered attempt in the preview pane
+    and a per-question marking guide on the right, attempt selector visible.</span>
+</div>
+
+<h4>Notes</h4>
+<ul>
+    <li>Quiz grades are computed by the question engine — manual marks are added to the underlying question attempt, then the engine recalculates the overall grade.</li>
+    <li>If a question's max mark is changed mid-quiz, existing graded attempts will re-score against the new max when next viewed (standard Moodle behaviour).</li>
+</ul>
+</section>

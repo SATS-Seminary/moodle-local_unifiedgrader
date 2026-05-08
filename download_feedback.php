@@ -46,7 +46,7 @@ $context = context_module::instance($cm->id);
 require_capability('local/unifiedgrader:viewfeedback', $context);
 
 // Only supported activity types.
-$supported = ['assign', 'forum', 'quiz'];
+$supported = ['assign', 'forum', 'quiz', 'bigbluebuttonbn'];
 if (!in_array($cm->modname, $supported)) {
     throw new moodle_exception('invalidactivitytype', 'local_unifiedgrader');
 }
@@ -108,7 +108,7 @@ if ($cm->modname === 'quiz') {
         $submissiondata = $adapter->get_submission_data($userid);
     }
     $additionalcontent = $submissiondata['content'] ?? '';
-} else if ($cm->modname === 'forum') {
+} else if ($cm->modname === 'forum' || $cm->modname === 'bigbluebuttonbn') {
     $submissiondata = $adapter->get_submission_data($userid);
     $additionalcontent = $submissiondata['content'] ?? '';
 }

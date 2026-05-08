@@ -1,0 +1,410 @@
+{{!
+    @template local_unifiedgrader/help_section_features
+
+    Documentation partial for cross-cutting features.
+}}
+
+{{! ----- Annotations ----- }}
+<section id="feature-annotations">
+<h3>PDF / image annotation</h3>
+
+<p>Annotation is built on <strong>PDF.js</strong> v4.10 (rendering) and
+<strong>Fabric.js</strong> v6.9 (the interactive overlay). Both libraries
+ship bundled with the plugin under <code>thirdparty/</code>; no CDN
+dependency.</p>
+
+<h4>What you can do</h4>
+<ul>
+    <li><strong>Comment pins</strong> — drop a pin and attach hover-revealed text.</li>
+    <li><strong>Stamps</strong> — preset rubber-stamp graphics (tick, cross, etc.).</li>
+    <li><strong>Freehand pencil</strong> with adjustable width and colour.</li>
+    <li><strong>Text annotations</strong> placed directly on the page.</li>
+    <li><strong>Shapes</strong> — rectangle and circle outlines/fills.</li>
+    <li><strong>Eraser</strong> for individual annotations.</li>
+</ul>
+
+<h4>Per-page state</h4>
+<p>Annotations are stored per page as a Fabric.js JSON snapshot
+(<code>local_unifiedgrader_annot</code> table, keyed on
+<code>cmid + userid + fileid + pagenum</code>). Switching pages saves the
+current page's state and loads the next.</p>
+
+<h4>Flattened annotated PDF</h4>
+<p>When the teacher saves annotations, the plugin flattens them into a
+real PDF using <strong>pdf-lib</strong> (also bundled). The flattened PDF
+is uploaded via web service and stored in the
+<code>local_unifiedgrader/annotatedpdf</code> filearea. Students view it
+through the feedback banner; teachers can also download it from the
+preview pane's right-rail.</p>
+
+<p>The interactive viewer always shows the <em>original</em> PDF with the
+Fabric.js overlay (so comments are still hover-revealable). The flattened
+copy is only used for download.</p>
+
+<figure class="local-unifiedgrader-help-figure my-4">
+<svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Annotation flatten pipeline"
+     class="img-fluid" style="max-width: 800px;">
+    <style>
+        .ann-step { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; }
+        .ann-step-store { fill: #d1e7dd; stroke: #198754; stroke-width: 1.5; }
+        .ann-step-flatten { fill: #fff3cd; stroke: #b08800; stroke-width: 1.5; }
+        .ann-text { font-family: -apple-system, sans-serif; font-size: 12px; fill: #212529; }
+        .ann-text-bold { font-weight: bold; font-size: 13px; }
+        .ann-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
+        .ann-arrow { stroke: #6c757d; stroke-width: 1.5; fill: none; }
+    </style>
+    <defs>
+        <marker id="ann-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d"/>
+        </marker>
+    </defs>
+
+    <rect x="20" y="80" width="140" height="60" rx="6" class="ann-step"/>
+    <text x="40" y="106" class="ann-text ann-text-bold">PDF.js renders</text>
+    <text x="40" y="124" class="ann-label">page n as canvas</text>
+
+    <rect x="200" y="80" width="160" height="60" rx="6" class="ann-step"/>
+    <text x="220" y="106" class="ann-text ann-text-bold">Fabric.js overlay</text>
+    <text x="220" y="124" class="ann-label">teacher draws / pins</text>
+
+    <rect x="400" y="80" width="160" height="60" rx="6" class="ann-step-store"/>
+    <text x="420" y="106" class="ann-text ann-text-bold">save_annotations</text>
+    <text x="420" y="124" class="ann-label">JSON per (cmid,user,file,page)</text>
+
+    <rect x="600" y="20" width="180" height="60" rx="6" class="ann-step-flatten"/>
+    <text x="620" y="46" class="ann-text ann-text-bold">pdf-lib flatten</text>
+    <text x="620" y="64" class="ann-label">embed Fabric → real PDF</text>
+
+    <rect x="600" y="140" width="180" height="60" rx="6" class="ann-step-store"/>
+    <text x="620" y="166" class="ann-text ann-text-bold">save_annotated_pdf</text>
+    <text x="620" y="184" class="ann-label">filearea = annotatedpdf</text>
+
+    <path d="M160 110 L200 110" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
+    <path d="M360 110 L400 110" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
+    <path d="M560 110 Q580 110 600 70" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
+    <path d="M690 80 L690 140" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
+
+    <text x="20" y="180" class="ann-label">Editing path: pages saved as Fabric JSON, restored on switch.</text>
+    <text x="20" y="200" class="ann-label">Flatten path: pdf-lib reads JSON, redraws onto a real PDF for student download.</text>
+</svg>
+<figcaption class="text-muted small">Two parallel pipelines from the same JSON state: live editing
+(Fabric.js overlay, hover-revealed comments) for the teacher, and a flattened
+download for the student.</figcaption>
+</figure>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: PDF preview with annotation toolbar showing pencil, comment,
+    stamp and shape tools; a comment pin and a tick stamp visible on the page.</span>
+</div>
+</section>
+
+{{! ----- Rich feedback ----- }}
+<section id="feature-feedback">
+<h3>Rich feedback (TinyMCE + recordings)</h3>
+
+<p>The feedback editor is Moodle's preferred TinyMCE configuration. It is
+initialised once on page load and reused across student switches via
+<code>editor.setContent()</code> — much faster than destroying and
+recreating the editor every time.</p>
+
+<h4>Recording in the editor</h4>
+<p>The TinyMCE <em>RecordRTC</em> plugin (or the SATS recorder TinyMCE
+plugin if installed) is supported, so teachers can record audio or video
+feedback inline. Recorded clips are uploaded to the editor's draft area
+and end up in the standard <code>assignfeedback_comments</code> filearea
+on save.</p>
+
+<h4>Draft area lifecycle</h4>
+<p>One draft area is allocated per page load and reused across student
+switches. Critical detail: <code>file_prepare_draft_area()</code> only
+copies files when the draftitemid is <em>empty</em>. To swap students
+correctly the plugin manually copies files via
+<code>create_file_from_storedfile()</code> and rewrites
+<code>@@PLUGINFILE@@</code> tokens with
+<code>file_rewrite_pluginfile_urls()</code>.</p>
+
+<h4>Student feedback view</h4>
+<p>Students read feedback through <code>view_feedback.php</code>. For
+non-assignment activity types this serves a dedicated layout (e.g.
+<code>feedback_view_quiz.mustache</code>) so the student sees their
+attempt or posts alongside the marker's commentary.</p>
+</section>
+
+{{! ----- Comment library ----- }}
+<section id="feature-comment-library">
+<h3>Comment library</h3>
+
+<p>A library of canned feedback comments with tags. Comments can be:</p>
+
+<ul>
+    <li><strong>Personal</strong> — visible only to the marker who created them.</li>
+    <li><strong>Course-scoped</strong> — automatically scoped via a regex extracting a course code from the course shortname (admin setting <code>coursecode_regex</code>).</li>
+    <li><strong>Shared</strong> — visible to other markers, with optional import to make a personal copy.</li>
+</ul>
+
+<h4>Where it shows up</h4>
+<ul>
+    <li>A popout next to each marking-guide / rubric remark textarea.</li>
+    <li>A popout when annotating PDFs (attaches to the active comment pin).</li>
+    <li>An autocomplete suggester in marking-guide remark textareas (start typing to see matching library entries).</li>
+</ul>
+
+<h4>Tags</h4>
+<p>Comments can carry multiple tags. Tags are managed in a dedicated
+modal (<em>Manage</em> link in the popout footer) and shown as filter
+chips at the top of the popout list.</p>
+
+<h4>Quick add</h4>
+<p>The popout footer has a quick-add input. Whatever you type is saved as
+a new comment under the current course code, instantly available the
+next time you open the library.</p>
+</section>
+
+{{! ----- Notes ----- }}
+<section id="feature-notes">
+<h3>Teacher notes (private)</h3>
+
+<p>A note is private to the teacher who wrote it but visible to other
+teachers with the <code>local/unifiedgrader:viewnotes</code> capability —
+useful for moderation handoffs and "remember to follow up" reminders.</p>
+
+<p>Notes are not surfaced to students under any circumstance.
+Capabilities default to teacher / editingteacher / manager only.</p>
+
+<p>Notes appear in the marking panel under a <em>Notes</em> heading.
+Each note shows the author and timestamp; only the author can edit or
+delete their own. Notes don't sync to the gradebook — they are purely
+internal communication.</p>
+</section>
+
+{{! ----- Submission comments ----- }}
+<section id="feature-submission-comments">
+<h3>Submission comments (chat-style)</h3>
+
+<p>An optional messenger-style comments thread between the teacher and
+the student, gated by the admin setting <code>enable_submission_comments</code>.</p>
+
+<ul>
+    <li>For <strong>assignments</strong>, the widget replaces Moodle's core submission comments inline on the student assignment view.</li>
+    <li>For <strong>quizzes / forums / BBB</strong>, a non-intrusive chat-bubble icon appears in the activity-information region; click to open the thread.</li>
+    <li>Notifications are sent on new comments via Moodle's standard messaging API (<code>db/messages.php</code>).</li>
+</ul>
+
+<p>Comments are stored in <code>local_unifiedgrader_scomm</code> and
+remain accessible after grading is finalised.</p>
+</section>
+
+{{! ----- Penalties ----- }}
+<section id="feature-penalties">
+<h3>Penalties</h3>
+
+<p>Two kinds of grade penalty are supported:</p>
+
+<ol>
+    <li><strong>Late penalty</strong> via the <code>gradepenalty_duedate</code> plugin — automatic, based on configured rules. Applied when the gradebook receives the grade. The raw teacher-entered grade is kept in the activity's grade table; only the gradebook value is reduced.</li>
+    <li><strong>Manual penalty</strong> entered by the marker — wordcount-based, custom-labelled, or arbitrary percentage. Stored in <code>local_unifiedgrader_penalty</code>; subtracted from the gradebook value the same way.</li>
+</ol>
+
+<p>Penalties show as badges in the marking panel header. Click a badge
+to open the penalty details popout, where you can add, edit, or remove
+manual penalties.</p>
+
+<p>For <strong>scale-based grading</strong>, manual penalties are hidden
+(percentage deductions don't make sense on a discrete scale).</p>
+</section>
+
+{{! ----- Overrides & extensions ----- }}
+<section id="feature-overrides">
+<h3>Overrides &amp; extensions</h3>
+
+<p>Each adapter exposes the override / extension surface the underlying
+activity supports:</p>
+
+<ul>
+    <li><strong>Assignment</strong>: user overrides (open / close / cut-off date), extensions, with auto-adjusting cut-off when an extension exceeds it.</li>
+    <li><strong>Quiz</strong>: native <code>quiz_overrides</code> rows, plus <code>quizaccess_duedate</code> extensions when that plugin is installed.</li>
+    <li><strong>Forum</strong>: plugin-owned forum extensions (<code>local_unifiedgrader_fext</code>) — Moodle core forums don't have a native extension table.</li>
+    <li><strong>BigBlueButton</strong>: no overrides / extensions (BBB has no per-user due dates).</li>
+</ul>
+
+<p>The <em>Overrides &amp; extensions</em> modal in the marking panel
+header surfaces all of the above through one form, regardless of activity
+type. A <em>Clear all</em> action removes overrides and extensions for the
+current student in one shot.</p>
+
+<p>Granting an extension <em>after</em> the student has been graded
+opens a confirmation dialog asking whether to recalculate the late
+penalty — this avoids the "ghost penalty" pattern where a granted
+extension didn't propagate to the gradebook.</p>
+</section>
+
+{{! ----- Marking guides & rubrics ----- }}
+<section id="feature-rubrics">
+<h3>Marking guides &amp; rubrics</h3>
+
+<p>Both grading methods render in the marking pane:</p>
+
+<ul>
+    <li><strong>Marking guide</strong> — per-criterion score input + remark textarea + max-score badge + comment-library button.</li>
+    <li><strong>Rubric</strong> — per-criterion level buttons (one per defined level), click to select.</li>
+</ul>
+
+<p>The card supports both <em>simple grade override</em> (when admin
+allows) and computed totals from criteria. Switching activity types is
+seamless — assignment / forum / quiz / BBB-via-<code>bbbext_advgrd</code>
+all flow through the same code path.</p>
+
+<h4>Save lifecycle (race protection)</h4>
+<p>Auto-save fires after a 1.5 s debounce when focus leaves the rubric
+body. Without protection, the post-save state refresh would arrive while
+the teacher is still typing and would clobber in-flight keystrokes.</p>
+
+<p>The plugin avoids this with <strong>incremental DOM updates</strong>:</p>
+
+<ul>
+    <li><code>_handleSaveGrade</code> snapshots the values being sent into <code>_lastSentScores</code> / <code>_lastSentRemarks</code> / <code>_lastSentRubricSelections</code>.</li>
+    <li>When the post-save refresh arrives, <code>_renderGuide</code> / <code>_renderRubric</code> compare each field's in-memory value to the snapshot.</li>
+    <li>Fields that match the snapshot get the server's value (clean update).</li>
+    <li>Fields where the value has diverged — meaning the teacher has typed since the save fired — are <em>preserved</em>, and the form is re-marked dirty so the next focusout catches up.</li>
+    <li>The currently-focused field is never clobbered.</li>
+</ul>
+
+<p>The rebuild-from-scratch path still runs on first render and when the
+criteria definition itself has changed (e.g. switching to a different
+student). For everything else, only values are updated; input elements
+are not destroyed.</p>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: marking guide with three criteria, each showing max badge,
+    score input with autosave indicator, remark textarea, and a comment-library
+    icon button.</span>
+</div>
+</section>
+
+{{! ----- Group mode ----- }}
+<section id="feature-groups">
+<h3>Group mode</h3>
+
+<p>The student navigator's group selector supports Moodle's standard
+group modes (<em>No groups</em>, <em>Separate groups</em>, <em>Visible
+groups</em>). When the teacher belongs to multiple groups, an
+<em>"All my groups"</em> pseudo-option fans out to a multi-select
+checkbox dropdown.</p>
+
+<p>Filtering is delegated to each adapter — the adapter knows how to
+intersect its native participant set with the active group filter.</p>
+
+<p>Group / team submissions in mod_assign show the team representative
+once; saving a grade cascades to all team members per Moodle's standard
+behaviour.</p>
+</section>
+
+{{! ----- Auto-save ----- }}
+<section id="feature-autosave">
+<h3>Auto-save &amp; offline cache</h3>
+
+<p>Every editable field is tracked by a <em>DirtyTracker</em>:</p>
+
+<ul>
+    <li>Edits mark the field dirty and update the save indicator.</li>
+    <li>Focus-out triggers a 1.5 s debounce timer.</li>
+    <li>When the timer fires, a save is dispatched via the standard <code>local_unifiedgrader_save_grade</code> web service.</li>
+    <li>While a save is in flight, no second save can fire (prevents stale data overwriting fresh).</li>
+</ul>
+
+<h4>Offline cache</h4>
+<p>An IndexedDB-backed cache stores in-progress edits per
+<code>(cmid, userid, field)</code>. If the network drops:</p>
+
+<ul>
+    <li>The save is queued and retried automatically when the connection comes back.</li>
+    <li>The save indicator shows <em>Offline — saved locally</em>.</li>
+    <li>On next page load, recovered unsaved changes are offered as a banner; the teacher can <em>Restore</em> or <em>Discard</em>.</li>
+</ul>
+
+<h4>Save before navigating</h4>
+<p>The student navigator dispatches an <code>unifiedgrader:requestsave</code>
+event before switching students, giving the marking panel a chance to
+flush in-progress saves so they target the correct student.</p>
+
+<figure class="local-unifiedgrader-help-figure my-4">
+<svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Auto-save state machine"
+     class="img-fluid" style="max-width: 800px;">
+    <style>
+        .as-state { fill: #fff; stroke: #495057; stroke-width: 1.5; }
+        .as-clean { fill: #d1e7dd; stroke: #198754; stroke-width: 1.5; }
+        .as-dirty { fill: #fff3cd; stroke: #b08800; stroke-width: 1.5; }
+        .as-flight { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; }
+        .as-error { fill: #f8d7da; stroke: #b02a37; stroke-width: 1.5; }
+        .as-text { font-family: -apple-system, sans-serif; font-size: 13px; fill: #212529; font-weight: bold; }
+        .as-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
+        .as-arrow { stroke: #6c757d; stroke-width: 1.5; fill: none; }
+    </style>
+    <defs>
+        <marker id="as-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d"/>
+        </marker>
+    </defs>
+
+    <ellipse cx="100" cy="140" rx="80" ry="40" class="as-clean"/>
+    <text x="100" y="138" text-anchor="middle" class="as-text">CLEAN</text>
+    <text x="100" y="156" text-anchor="middle" class="as-label">snapshot matches</text>
+
+    <ellipse cx="320" cy="140" rx="80" ry="40" class="as-dirty"/>
+    <text x="320" y="138" text-anchor="middle" class="as-text">DIRTY</text>
+    <text x="320" y="156" text-anchor="middle" class="as-label">debounce timer running</text>
+
+    <ellipse cx="560" cy="140" rx="80" ry="40" class="as-flight"/>
+    <text x="560" y="138" text-anchor="middle" class="as-text">IN FLIGHT</text>
+    <text x="560" y="156" text-anchor="middle" class="as-label">AJAX dispatched</text>
+
+    <ellipse cx="560" cy="40" rx="80" ry="30" class="as-error"/>
+    <text x="560" y="36" text-anchor="middle" class="as-text">RETRY QUEUED</text>
+    <text x="560" y="52" text-anchor="middle" class="as-label">offline / 5xx</text>
+
+    <ellipse cx="720" cy="240" rx="60" ry="30" class="as-clean"/>
+    <text x="720" y="238" text-anchor="middle" class="as-text">CLEAN</text>
+    <text x="720" y="254" text-anchor="middle" class="as-label">snapshot updated</text>
+
+    <path d="M180 140 L240 140" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="190" y="130" class="as-label">user edits</text>
+
+    <path d="M400 140 L480 140" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="410" y="130" class="as-label">focusout · 1.5s</text>
+
+    <path d="M560 100 L560 70" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="570" y="90" class="as-label">network err</text>
+
+    <path d="M620 60 Q700 60 700 140 Q700 160 640 160" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="650" y="100" class="as-label">SaveQueue retries</text>
+
+    <path d="M620 170 Q680 200 700 215" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="630" y="200" class="as-label">200 OK</text>
+
+    <path d="M660 240 Q400 240 320 180" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="380" y="230" class="as-label">_renderGuide reconciles, _saveInFlight=false</text>
+
+    <path d="M180 130 Q200 90 300 100 L320 100" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="190" y="80" class="as-label">edits during in-flight save: stay dirty</text>
+</svg>
+<figcaption class="text-muted small">Auto-save lifecycle. Edits during the in-flight window stay dirty so
+the next focusout flushes them; failed network requests park in
+<code>SaveQueue</code> and retry until success.</figcaption>
+</figure>
+</section>
+
+{{! ----- i18n ----- }}
+<section id="feature-i18n">
+<h3>Languages</h3>
+
+<p>The plugin ships with full translations for: Afrikaans, German, Greek,
+Spanish, French, Hebrew, Italian, Portuguese, Russian, Swahili, Xhosa,
+Zulu — alongside English. Set the language via Moodle's standard user /
+site language preferences.</p>
+
+<p>Strings used by client-side code are loaded via the standard
+<code>core/str</code> module rather than hard-coded; a missing translation
+falls back to English without breaking the UI.</p>
+</section>

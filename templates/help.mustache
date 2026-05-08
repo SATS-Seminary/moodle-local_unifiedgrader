@@ -1,0 +1,157 @@
+{{!
+    @template local_unifiedgrader/help
+
+    Unified Grader help / documentation page. Single self-contained reference
+    covering every adapter integration and cross-cutting feature.
+
+    Context variables:
+    * wwwroot - string - Moodle root URL (used to build deep links).
+    * pluginrelease - string - Plugin release version (e.g. "2.2.0").
+    * pluginversion - string - Plugin version stamp (YYYYMMDDXX).
+
+    Example context (json):
+    {
+        "wwwroot": "https://moodle.example.com",
+        "pluginrelease": "2.2.0",
+        "pluginversion": "2026050804"
+    }
+}}
+<div class="local-unifiedgrader-help container-fluid">
+    <div class="row">
+
+        {{! Sidebar TOC }}
+        <nav class="col-lg-3 col-md-4 d-none d-md-block local-unifiedgrader-help-toc">
+            <div class="position-sticky pt-3" style="top: 0;">
+                <p class="text-muted small mb-1">Unified Grader</p>
+                <p class="small mb-3">Release {{pluginrelease}} <span class="text-muted">({{pluginversion}})</span></p>
+                <ul class="nav flex-column small">
+                    <li class="nav-item"><a class="nav-link p-1" href="#overview">Overview</a></li>
+                    <li class="nav-item"><a class="nav-link p-1" href="#quickstart">Quick start</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link p-1 fw-bold" href="#integrations">Activity integrations</a>
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item"><a class="nav-link p-1" href="#integration-assign">Assignment</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#integration-forum">Forum</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#integration-quiz">Quiz</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#integration-bigbluebuttonbn">BigBlueButton</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link p-1 fw-bold" href="#plugins">Companion plugins</a>
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item"><a class="nav-link p-1" href="#plugin-byblos">Byblos portfolio</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#plugin-advgrd">bbbext_advgrd</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#plugin-quizaccess-duedate">quizaccess_duedate</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#plugin-gradepenalty-duedate">gradepenalty_duedate</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#plugin-plagiarism">Plagiarism plugins</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#plugin-tinymce-recorder">TinyMCE recorder</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link p-1 fw-bold" href="#features">Cross-cutting features</a>
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-annotations">Annotations</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-feedback">Rich feedback</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-comment-library">Comment library</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-notes">Teacher notes</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-submission-comments">Submission comments</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-penalties">Penalties</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-overrides">Overrides &amp; extensions</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-rubrics">Marking guides &amp; rubrics</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-groups">Group mode</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-autosave">Auto-save &amp; offline</a></li>
+                            <li class="nav-item"><a class="nav-link p-1" href="#feature-i18n">Languages</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item"><a class="nav-link p-1" href="#admin-settings">Admin settings</a></li>
+                    <li class="nav-item"><a class="nav-link p-1" href="#architecture">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link p-1" href="#troubleshooting">Troubleshooting</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        {{! Main content }}
+        <main class="col-lg-9 col-md-8 col-12 local-unifiedgrader-help-main">
+
+{{! ============================== OVERVIEW ============================== }}
+<section id="overview">
+<h2>Overview</h2>
+
+<p>Unified Grader replaces Moodle's per-activity grading screens with a single
+two-panel interface: <strong>submission preview on the left</strong>,
+<strong>marking on the right</strong>. The same interface grades assignments,
+forum discussions, quizzes, and BigBlueButton sessions — switching activity
+type just swaps the adapter behind the scenes.</p>
+
+<p>Use it whenever a Moodle activity has <em>something to look at and
+something to mark</em>. The plugin doesn't introduce its own grade store;
+grades land in the standard gradebook and per-activity grading tables, the
+same place they would if you graded through Moodle's native UI.</p>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: full grading interface (assignment), labelled to show the
+    student navigator (top right), preview pane (left), marking panel (right),
+    and toolbar pills.</span>
+</div>
+
+<h3>Key benefits</h3>
+<ul>
+    <li><strong>One UI for every gradable activity.</strong> Less context-switch when grading mixed-type courseware.</li>
+    <li><strong>PDF annotation</strong> with comments, stamps, and freehand drawing — flattened into a downloadable annotated PDF for the student.</li>
+    <li><strong>Rich feedback editor</strong> (TinyMCE) including audio/video recording.</li>
+    <li><strong>Comment library</strong> with tags, sharing across markers, and autocomplete inside marking-guide remarks.</li>
+    <li><strong>Auto-save</strong> with offline IndexedDB cache and retry queue — your work isn't lost on a flaky connection.</li>
+    <li><strong>Pluggable adapter</strong> design — additional activity types can be wired in without touching the UI.</li>
+</ul>
+</section>
+
+{{! ============================ QUICK START ============================ }}
+<section id="quickstart">
+<h2>Quick start (teachers)</h2>
+
+<ol>
+    <li><strong>Open the grader.</strong> From a supported activity's view page, click <em>Unified Grader</em> in the secondary navigation tab bar (just after <em>Edit settings</em>), or click the <em>Grade</em> / <em>Grade users</em> button — the plugin replaces the native action with a redirect to the grader.</li>
+    <li><strong>Pick a student.</strong> Use the prev/next arrows in the top-right toolbar, the counter (<em>3 / 24</em>), or open the navigator (<i class="fa fa-bars" aria-hidden="true"></i>) to filter/search/sort.</li>
+    <li><strong>Review the submission</strong> in the left pane — PDFs render with annotation tools; forum posts, quiz attempts, and BBB recordings render in their natural form.</li>
+    <li><strong>Mark on the right</strong> — enter a grade, write feedback, attach files, add private notes. Save explicitly with <em>Save feedback</em> or rely on auto-save when you focus out of the form.</li>
+    <li><strong>Post grades</strong> when you're ready: the toggle in the toolbar reveals/hides the gradebook column for students. Schedule a future post date if your workflow allows.</li>
+</ol>
+
+<div class="alert alert-info">
+    <strong>Help is contextual.</strong> The <i class="fa fa-question-circle" aria-hidden="true"></i> icon
+    deep-links to the section of this page matching the activity type you're grading.
+</div>
+</section>
+
+{{! ====================== ACTIVITY INTEGRATIONS ======================= }}
+<section id="integrations">
+<h2>Activity integrations</h2>
+<p>Each supported activity type is wired in via an adapter that normalises
+its data to a shared shape. Activity-specific behaviour is documented below.</p>
+
+{{> local_unifiedgrader/help_section_assign }}
+{{> local_unifiedgrader/help_section_forum }}
+{{> local_unifiedgrader/help_section_quiz }}
+{{> local_unifiedgrader/help_section_bbb }}
+</section>
+
+{{! ===================== COMPANION PLUGIN INTEGRATIONS =============== }}
+{{> local_unifiedgrader/help_section_plugins }}
+
+{{! ====================== CROSS-CUTTING FEATURES ====================== }}
+<section id="features">
+<h2>Cross-cutting features</h2>
+<p>These work the same across every supported activity type, unless noted otherwise.</p>
+
+{{> local_unifiedgrader/help_section_features }}
+</section>
+
+{{! ====================== ADMIN / DEV / TROUBLESHOOTING ============== }}
+{{> local_unifiedgrader/help_section_admin }}
+{{> local_unifiedgrader/help_section_architecture }}
+{{> local_unifiedgrader/help_section_troubleshooting }}
+
+        </main>
+    </div>
+</div>

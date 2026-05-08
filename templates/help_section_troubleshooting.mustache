@@ -1,0 +1,130 @@
+{{!
+    @template local_unifiedgrader/help_section_troubleshooting
+
+    Documentation partial: troubleshooting common issues.
+}}
+<section id="troubleshooting">
+<h2>Troubleshooting</h2>
+
+<dl>
+
+<dt>The Unified Grader tab doesn't appear on a supported activity</dt>
+<dd>
+    Check that the corresponding <code>enable_*</code> setting is on (e.g.
+    <code>enable_quiz</code>) <em>and</em> that the user has
+    <code>local/unifiedgrader:grade</code> at the activity context.
+    Students don't see the tab; only graders do.
+</dd>
+
+<dt>BBB Activity Points card stays stuck on "engagement summary not yet received"</dt>
+<dd>
+    The Moodle plugin setting <em>Register live sessions</em>
+    (<code>mod_bigbluebuttonbn/meetingevents_enabled</code>) is off, or the
+    BBB server isn't keeping events. Site admins see the exact remediation
+    in the warning. Make sure both flags are on, then start a <em>fresh</em>
+    meeting — the analytics callback URL is set at meeting create time, so
+    existing recordings will not be retroactively called back. As a stop-gap,
+    use the <em>Pull engagement data from BBB recordings</em> button to scrape
+    BBB's Statistics page directly.
+</dd>
+
+<dt>Marking guide values reset shortly after I type them</dt>
+<dd>
+    Pre-2.2.0 bug. Update the plugin and try again. The fix lives in the
+    incremental-render path of <code>_renderGuide</code> /
+    <code>_renderRubric</code> and the corresponding payload-shape correction
+    in the BBB adapter's advanced-grading save flow.
+</dd>
+
+<dt>BBB recording iframe is blank / "refused to connect"</dt>
+<dd>
+    The BBB CDN's signed cookies didn't propagate. Try the <em>Open in new
+    tab</em> button next to the recording switcher. If that also fails, the
+    recording probably wasn't published yet, or your network blocks the CDN
+    host. Check the BBB activity's recording table — if the recording isn't
+    listed there either, it isn't ready.
+</dd>
+
+<dt>The fullscreen button on the BBB player doesn't work, only ours does</dt>
+<dd>
+    Browser security: BBB's native fullscreen control needs every iframe in
+    the chain to declare <code>allow="fullscreen"</code>. Both layers
+    (preview iframe and recording iframe) now do, so this should work in
+    Chromium / Firefox. Some Safari versions still gate fullscreen on a
+    direct user gesture in the topmost frame — our explicit button works
+    around that by requesting fullscreen on the parent frame.
+</dd>
+
+<dt>PDF annotations vanished / didn't save</dt>
+<dd>
+    Check the AMD console for save errors — the plugin queues failed saves
+    via <code>SaveQueue</code> and retries. If you see <em>Offline — saved
+    locally</em> in the toolbar status and the connection has since
+    recovered, click <em>Restore</em> on the next page load to recover them.
+    Annotations live in <code>local_unifiedgrader_annot</code>; admins can
+    inspect that table directly if a recovery is needed.
+</dd>
+
+<dt>Group / team submissions don't show all members</dt>
+<dd>
+    By design — Moodle's team-submission model has one canonical
+    submission per team. Saving a grade against the team rep cascades to
+    all members. If the cascade isn't happening, check Moodle's own
+    assignment settings (<em>Apply grades to all team members</em>).
+</dd>
+
+<dt>Comment library is empty / I can't add new comments</dt>
+<dd>
+    Capability check — non-managers see the comment library but can only
+    create personal comments unless they have
+    <code>local/unifiedgrader:sharecomments</code>. The plugin shows an
+    offline banner if it can't reach the comment-library web service; that
+    typically means the AJAX session has expired.
+</dd>
+
+<dt>Late penalty isn't applying</dt>
+<dd>
+    Late penalty integration requires the <code>gradepenalty_duedate</code>
+    plugin. Without it, the badge might still appear (showing days late)
+    but no actual percentage deduction is computed. Manual penalties always
+    work regardless.
+</dd>
+
+<dt>Manual grade override doesn't persist when a rubric is configured</dt>
+<dd>
+    Check the admin setting <code>allow_manual_grade_override</code>. With
+    it off, the rubric's computed total wins. With it on, your typed value
+    is re-applied <em>after</em> the rubric save, so consecutive saves keep
+    the override.
+</dd>
+
+<dt>Plagiarism shield doesn't appear</dt>
+<dd>
+    The site-wide <code>$CFG->enableplagiarism</code> must be on, and a
+    plagiarism plugin must return non-empty results from
+    <code>plagiarism_get_links()</code>. The shield is rendered per
+    submission item (post / file); empty results = no shield.
+</dd>
+
+<dt>"Cannot use database for testing" when running PHPUnit</dt>
+<dd>
+    The PHPUnit env got into a half-installed state. Run
+    <code>php admin/tool/phpunit/cli/init.php --force</code> from Moodle
+    root with the same PHP binary you'll run tests under (use
+    <code>PATH="..."</code> if you have multiple PHP installs).
+</dd>
+
+<dt>"Could not open input file: vendor/bin/phpunit"</dt>
+<dd>
+    Wrong cwd — run from Moodle root. The vendor directory is part of
+    Moodle's install, not the plugin.
+</dd>
+
+</dl>
+
+<hr class="my-4">
+<p class="text-muted small">
+    Have a question that isn't answered here? Open an issue against the
+    plugin's repository, or contact your site administrator.
+</p>
+</section>

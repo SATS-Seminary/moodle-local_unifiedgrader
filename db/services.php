@@ -247,4 +247,10 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_refresh_bbb_engagement' => [
+        'classname' => 'local_unifiedgrader\external\refresh_bbb_engagement',
+        'description' => 'Scrape per-user engagement metrics from each BBB recording statistics page and cache them as a fallback for missing analytics callbacks.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
 ];

@@ -1,5 +1,33 @@
 # Changelog
 
+## v2.3.0 (2026-05-09)
+### BigBlueButton activity adapter
+- Recording playback rendered inline in the preview pane via iframe to BBB's playback wrapper, with a fullscreen button and "Open in new tab" link
+- Recording switcher ("All sessions" + one pill per recording) — clicking a pill loads that recording and pivots the Activity Points card to that session's metrics
+- Activity Points card with chats, talks, raise hand, poll votes, emojis, and duration — aggregated across all sessions or filtered to a single session
+- BigBlueButton's 0-10 Activity Score surfaced as a tile (averaged across sessions in the aggregate view, exact value in the per-session view)
+- "View full analytics" button opens BBB's Statistics dashboard in a new tab — single button when there is one recording, dropdown when there are several
+- "Did not attend" badge for students with no JOIN or SUMMARY logs (still gradeable)
+- Group mode supported via BBB's native group filtering
+- New `enable_bigbluebuttonbn` admin setting (default off)
+
+### Companion-plugin integrations
+- `bbbext_advgrd` — rubric / marking-guide definitions on a BBB activity render in the marking pane and save through the extension's grader pipeline (per-user evidence snapshot, gradebook passthrough, analytic sub-scores). Grading instance is reused across saves rather than minted fresh each time.
+- Engagement metric fallback for missing analytics callbacks: parses BBB's Statistics playback page server-side and caches per-user metrics in a new `local_unifiedgrader_bbbeng` table. Triggered by a "Pull engagement data from BBB recordings" button in the engagement-pending warning.
+- New web service `local_unifiedgrader_refresh_bbb_engagement` (requires `local/unifiedgrader:grade`).
+- Engagement-pending banner is actionable: site admins see the exact admin setting to enable plus a deep link to the BBB plugin settings; teachers without site access see a softer message.
+
+### In-product documentation
+- New `?` icon to the right of the hamburger in the grading toolbar opens a dedicated help page in a new tab, deep-linked to the section matching the active activity type
+- Covers every adapter (assign, forum, quiz, BigBlueButton), companion-plugin integrations (Byblos portfolio, `bbbext_advgrd`, `quizaccess_duedate`, `gradepenalty_duedate`, plagiarism plugins, TinyMCE recorder), cross-cutting features, admin settings, architecture, and troubleshooting
+- Six inline SVG diagrams — adapter pattern, BBB engagement data flow, marking-guide save lifecycle, companion-plugin landscape, annotation flatten pipeline, auto-save state machine. No CDN dependency.
+
+### Auto-save race fixes (affect all activity types, not just BBB)
+- `_renderGuide` and `_renderRubric` switch from destructive `innerHTML = ''` rebuilds to incremental DOM updates: snapshot values at save dispatch, then on the post-save state refresh keep the focused field — and any field edited since the save fired — instead of clobbering it
+- Same protection extended to the top-level grade input, scale dropdown, and TinyMCE feedback editor (`setContent()` calls during a state refresh now refuse when the editor has focus or contains unsent edits)
+- Re-mark grade dirty after a reconciled refresh so the next focusout flushes a follow-up save
+- Treat `focusout` with null `relatedTarget` as ambiguous (defer to a microtask and re-check `document.activeElement`) — fixes marking-guide values resetting when opening the comment library in WebKit/Safari
+
 ## v2.1.8 (2026-04-23)
 - Fix "Mark as graded" toggle reverting on reload for Grade:None assignments
 

@@ -66,6 +66,13 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_configcheckbox(
+        'local_unifiedgrader/enable_bigbluebuttonbn',
+        get_string('setting_enable_bigbluebuttonbn', 'local_unifiedgrader'),
+        get_string('setting_enable_bigbluebuttonbn_desc', 'local_unifiedgrader'),
+        0
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
         'local_unifiedgrader/onlinetext_as_pdf',
         get_string('setting_onlinetext_as_pdf', 'local_unifiedgrader'),
         get_string('setting_onlinetext_as_pdf_desc', 'local_unifiedgrader'),

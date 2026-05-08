@@ -52,7 +52,7 @@ function local_unifiedgrader_extend_settings_navigation(
 
     // Only inject for supported activity types that are enabled.
     $modname = $cm->modname;
-    $supported = ['assign', 'forum', 'quiz'];
+    $supported = ['assign', 'forum', 'quiz', 'bigbluebuttonbn'];
     if (!in_array($modname, $supported)) {
         return;
     }
@@ -136,7 +136,7 @@ function local_unifiedgrader_pluginfile(
         return false;
     }
 
-    $validfileareas = ['annotatedpdf', 'forumfeedback', 'quizfeedback', 'onlinetextpdf'];
+    $validfileareas = ['annotatedpdf', 'forumfeedback', 'quizfeedback', 'onlinetextpdf', 'bbbfeedback'];
     if (!in_array($filearea, $validfileareas)) {
         return false;
     }
@@ -150,8 +150,8 @@ function local_unifiedgrader_pluginfile(
         return false;
     }
 
-    // Forum feedback files: itemid = grade_grades.id.
-    if ($filearea === 'forumfeedback') {
+    // Forum and BBB feedback files: itemid = grade_grades.id.
+    if ($filearea === 'forumfeedback' || $filearea === 'bbbfeedback') {
         global $DB;
 
         $itemid = (int) array_shift($args);

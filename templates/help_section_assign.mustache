@@ -1,0 +1,60 @@
+{{!
+    @template local_unifiedgrader/help_section_assign
+
+    Documentation partial for the Assignment activity adapter. Rendered as a
+    section inside help.mustache.
+}}
+<section id="integration-assign">
+<h3>Assignment <span class="badge bg-secondary">mod_assign</span></h3>
+
+<p>Assignments are the primary use case. Every assignment-grading feature in
+Moodle's native interface is supported, with the addition of inline PDF
+annotation and a comment library.</p>
+
+<h4>Submission preview</h4>
+<ul>
+    <li><strong>PDFs and convertible files</strong> (Word, PowerPoint via the configured document converter) load into a PDF.js viewer with annotation tools.</li>
+    <li><strong>Images</strong> open in the same viewer for annotation.</li>
+    <li><strong>Online text</strong> renders inline. With <em>Render online text as PDF</em> enabled in admin settings, online-text submissions are converted on-the-fly so they pick up the same annotation toolset.</li>
+    <li><strong>Audio / video</strong> attachments play with HTML5 controls — no plugin required.</li>
+    <li><strong>Multiple attachments</strong> appear as pills in the right-rail file selector. Click to swap the preview.</li>
+    <li><strong>Byblos portfolio</strong> submissions render in an iframe with a pop-out button (see <a href="#plugin-byblos">Byblos portfolio</a>).</li>
+</ul>
+
+<h4>Marking</h4>
+<ul>
+    <li><strong>Numeric grade or scale</strong> — input or dropdown depending on activity config.</li>
+    <li><strong>Feedback comments</strong> via TinyMCE, with embedded image/audio/video uploads (see <a href="#feature-feedback">Rich feedback</a>).</li>
+    <li><strong>Feedback files</strong> via standard Moodle filemanager when the <em>assignfeedback_file</em> plugin is enabled.</li>
+    <li><strong>Marking guides and rubrics</strong> render with metric-driven suggestions where applicable (see <a href="#feature-rubrics">Marking guides &amp; rubrics</a>).</li>
+    <li><strong>Manual grade override</strong> when a marking guide / rubric is configured, gated by the admin setting <code>allow_manual_grade_override</code>.</li>
+    <li><strong>Submission status actions</strong> — lock/unlock submission, revert to draft, remove submission.</li>
+</ul>
+
+<h4>Multi-attempt support</h4>
+<ul>
+    <li>An <strong>attempt selector</strong> appears in the marking panel header when more than one attempt exists.</li>
+    <li>Per-attempt feedback and grades are correctly written to the right attempt.</li>
+    <li><strong>Reopen-on-save</strong> (e.g. <em>Until pass</em>) is detected after save and the UI hops to the new attempt.</li>
+</ul>
+
+<h4>Overrides &amp; extensions</h4>
+<ul>
+    <li>User overrides (open/close date, cut-off date) are shown inline with the per-student data.</li>
+    <li>Extensions can be granted directly from the grader.</li>
+    <li>Granting an extension that exceeds the activity's cut-off auto-adjusts the cut-off override.</li>
+    <li>If grades exist, the post-save dialog prompts whether to recalculate late penalties.</li>
+</ul>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: assignment grading with PDF + annotation toolbar visible on left,
+    marking panel on right showing TinyMCE feedback editor and feedback files area.</span>
+</div>
+
+<h4>Notes</h4>
+<ul>
+    <li>Group / team submissions display once per team (the team representative). Grades cascade to all team members on save, matching native behaviour.</li>
+    <li>Blind marking is currently <strong>not</strong> supported in the unified UI — fall back to native grading for blind activities.</li>
+</ul>
+</section>

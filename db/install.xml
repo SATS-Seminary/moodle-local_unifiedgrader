@@ -200,5 +200,30 @@
         <INDEX NAME="ix_authorid" UNIQUE="false" FIELDS="authorid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_unifiedgrader_bbbeng" COMMENT="Cached per-user engagement metrics scraped from BBB recording statistics pages, used as a fallback when no analytics callback was received.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="FK to course_modules.id"/>
+        <FIELD NAME="recordingid" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="BBB recording id (matches bigbluebuttonbn_recordings.recordingid)"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Moodle user id (0 when no fullname match was found)"/>
+        <FIELD NAME="bbbuid" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="BBB internal session id (w_xxx)"/>
+        <FIELD NAME="fullname" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Participant fullname as it appeared on the BBB statistics page"/>
+        <FIELD NAME="duration" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Attendance seconds"/>
+        <FIELD NAME="talks" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Talk-time seconds"/>
+        <FIELD NAME="chats" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="raisehand" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="polls" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="emojis" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="activityscore" TYPE="number" LENGTH="6" NOTNULL="false" SEQUENCE="false" DECIMALS="2" COMMENT="BBB-computed Activity Score 0-10"/>
+        <FIELD NAME="timefetched" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="uix_cmid_recording_userid" UNIQUE="true" FIELDS="cmid, recordingid, userid"/>
+        <INDEX NAME="ix_cmid_userid" UNIQUE="false" FIELDS="cmid, userid"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

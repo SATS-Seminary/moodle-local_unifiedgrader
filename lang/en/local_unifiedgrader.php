@@ -53,6 +53,8 @@ $string['setting_enable_quiz'] = 'Enable for Quizzes';
 $string['setting_enable_quiz_desc'] = 'Allow the Unified Grader to be used for quiz activities.';
 $string['setting_enable_quiz_post_grades'] = 'Enable post grades for quizzes';
 $string['setting_enable_quiz_post_grades_desc'] = 'Quiz grade visibility is normally managed by the quiz\'s review options. When enabled, the Unified Grader\'s "Post grades" toggle will update the quiz review options programmatically to show or hide marks. When disabled (default), the post grades toggle is hidden for quizzes.';
+$string['setting_enable_bigbluebuttonbn'] = 'Enable for BigBlueButton';
+$string['setting_enable_bigbluebuttonbn_desc'] = 'Allow the Unified Grader to be used for BigBlueButton activities. Renders session recordings inline and surfaces per-student engagement metrics (Activity Points) so teachers can grade based on objective participation data.';
 $string['setting_onlinetext_as_pdf'] = 'Render online text as PDF';
 $string['setting_onlinetext_as_pdf_desc'] = 'When enabled, online text submissions are converted to PDF so teachers can annotate them with the PDF markup tools. Requires a document converter (unoconv or Google Drive) to be configured in Moodle. When disabled, online text is displayed in an inline preview.';
 $string['setting_allow_manual_override'] = 'Allow manual grade override';
@@ -452,6 +454,44 @@ $string['recoveredunsavedchanges'] = 'Recovered unsaved changes from your last s
 $string['restore'] = 'Restore';
 $string['discard'] = 'Discard';
 $string['mark_as_graded'] = 'Mark as graded';
+
+// BigBlueButton adapter.
+$string['bbb_activitypoints_heading'] = 'Activity Points';
+$string['bbb_session_count'] = '{$a} session(s)';
+$string['bbb_metric_chats'] = 'Chats';
+$string['bbb_metric_talks'] = 'Talks';
+$string['bbb_metric_raisehand'] = 'Hand raises';
+$string['bbb_metric_pollvotes'] = 'Poll votes';
+$string['bbb_metric_emojis'] = 'Emoji reactions';
+$string['bbb_metric_duration'] = 'Attendance';
+$string['bbb_recording_switcher'] = 'Recording';
+$string['bbb_recording_iframe_title'] = 'BigBlueButton recording';
+$string['bbb_didnotattend'] = 'Did not attend';
+$string['bbb_didnotattend_desc'] = 'No engagement summary or recordings have been recorded for this student. You can still enter a grade and feedback.';
+$string['bbb_no_recordings'] = 'No recordings are available for this session, but engagement metrics were captured.';
+$string['bbb_engagement_pending'] = 'This student joined the meeting, but the engagement summary has not yet been received from the BigBlueButton server. Activity Points will appear once the summary callback completes (this normally arrives within a few minutes of the meeting ending).';
+$string['bbb_engagement_callback_disabled_admin'] = 'No engagement summary has been received for this student. The BigBlueButton plugin\'s "Register live sessions" setting is currently disabled, which means the analytics callback URL is not being sent to the BBB server when meetings are created — without it, no engagement data flows back. Enable the setting and start a fresh meeting to begin capturing Activity Points. The BBB server also needs <code>defaultKeepEvents=true</code> in <code>bbb-web.properties</code>.';
+$string['bbb_engagement_callback_disabled_teacher'] = 'No engagement summary has been received for this student. The BigBlueButton plugin\'s analytics callback is currently disabled site-wide. Ask your site administrator to enable "Register live sessions" in the BigBlueButton plugin settings, and confirm the BBB server is configured to keep meeting events.';
+$string['bbb_engagement_open_settings'] = 'Open BigBlueButton settings →';
+$string['bbb_engagement_scrape_button'] = 'Pull engagement data from BBB recordings';
+$string['bbb_engagement_scrape_running'] = 'Fetching from BBB…';
+$string['bbb_engagement_scrape_result'] = 'Done — matched {matched}, unmatched {unmatched} across {recordings} recording(s).';
+$string['bbb_engagement_scrape_error'] = 'Scrape failed. Check the BBB server is reachable.';
+$string['bbb_recording_fullscreen'] = 'Fullscreen';
+$string['bbb_recording_newtab'] = 'Open in new tab';
+$string['bbb_view_full_analytics'] = 'View full analytics';
+$string['bbb_view_full_analytics_help'] = 'Open the BigBlueButton Statistics dashboard for this session in a new tab — full per-attendee timeline, polls, and engagement breakdown.';
+$string['bbb_all_sessions'] = 'All sessions';
+$string['bbb_session_label_prefix'] = 'Session:';
+$string['bbb_session_unmatched'] = 'Session (no recording)';
+$string['bbb_activity_score'] = 'Activity Score';
+$string['bbb_activity_score_avg_help'] = 'BigBlueButton\'s composite engagement score (averaged across this student\'s sessions, max 10).';
+
+// Help / documentation page.
+$string['help_page_title'] = 'Unified Grader documentation';
+$string['help_open_docs'] = 'Open documentation';
+$string['view_bbb_feedback'] = 'View feedback';
+$string['bbb_feedback_banner'] = 'Your participation has been graded. View your feedback and engagement summary.';
 
 // Generic UI strings.
 $string['save'] = 'Save';

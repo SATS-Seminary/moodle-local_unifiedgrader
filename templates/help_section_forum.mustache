@@ -1,0 +1,51 @@
+{{!
+    @template local_unifiedgrader/help_section_forum
+
+    Documentation partial for the Forum activity adapter.
+}}
+<section id="integration-forum">
+<h3>Forum <span class="badge bg-secondary">mod_forum</span></h3>
+
+<p>Forum support targets <strong>whole-forum grading</strong> (the
+<code>itemnumber 1</code> grading mode). Per-post ratings are a separate
+Moodle subsystem and are not handled here.</p>
+
+<h4>Preview</h4>
+<ul>
+    <li><strong>All of a student's posts</strong> across every discussion in the forum, grouped by discussion, oldest first.</li>
+    <li><strong>Embedded media</strong> (video, audio, images) are rewritten through Moodle's media filter so they play inline — no broken <code>@@PLUGINFILE@@</code> URLs.</li>
+    <li><strong>Wordcount badge</strong> on each post header.</li>
+    <li><strong>Plagiarism shield</strong> appears next to each post when a plagiarism plugin (Copyleaks, Turnitin, etc.) is configured (see <a href="#plugin-plagiarism">Plagiarism plugins</a>).</li>
+    <li><strong>Attachments</strong> render in the right-rail file selector exactly like assignment attachments.</li>
+</ul>
+
+<h4>Marking</h4>
+<ul>
+    <li>Whole-forum grades are written to <code>forum_grades</code> with <code>itemnumber = 1</code>.</li>
+    <li>Forum has no native feedback table; comments are stored in the gradebook's <code>grade_grades.feedback</code>, with file attachments living in a plugin-owned filearea (<code>local_unifiedgrader/forumfeedback</code>).</li>
+    <li>The <em>"Mark as graded"</em> toggle replaces the grade input for forums with grade type <em>None</em>.</li>
+</ul>
+
+<h4>Forum extensions</h4>
+<p>Moodle core forums don't have a native extension mechanism — the plugin
+adds one via the <code>local_unifiedgrader_fext</code> table. Extensions are
+respected when computing late status and when applying late penalties.</p>
+
+<h4>Late penalty integration</h4>
+<p>If the <code>gradepenalty_duedate</code> plugin is installed, late penalty
+percentages are applied automatically using its configured rules. The raw
+grade you enter is preserved in <code>forum_grades</code>; the penalised
+grade is what the gradebook sees.</p>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: forum grading showing posts grouped by discussion in the
+    preview pane, plagiarism shield badge visible, and marking panel on the right.</span>
+</div>
+
+<h4>Notes</h4>
+<ul>
+    <li>The plugin doesn't override Moodle's native <em>View grades</em> button on the <em>student</em> forum view; that flow uses a feedback banner injected via PSR-14 hook (see <a href="#feature-feedback">Rich feedback</a>).</li>
+    <li>For forums with grade type <em>None</em>, the marking guide / rubric section is hidden — assigning criteria values would be a non-sequitur without a numeric grade.</li>
+</ul>
+</section>

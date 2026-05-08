@@ -75,7 +75,7 @@ class hook_callbacks {
         }
 
         $modname = $cm->modname;
-        $supported = ['assign', 'forum', 'quiz'];
+        $supported = ['assign', 'forum', 'quiz', 'bigbluebuttonbn'];
         if (!in_array($modname, $supported)) {
             return;
         }
@@ -84,8 +84,8 @@ class hook_callbacks {
             return;
         }
 
-        // For quizzes and forums, only act on the overview page — not subpages.
-        if ($modname === 'quiz' || $modname === 'forum') {
+        // For quiz, forum, and BBB activities, only act on the overview page — not subpages.
+        if ($modname === 'quiz' || $modname === 'forum' || $modname === 'bigbluebuttonbn') {
             try {
                 $pagepath = $PAGE->url->get_path();
             } catch (\Throwable $e) {
@@ -130,8 +130,8 @@ class hook_callbacks {
                     'init',
                     [$cm->id, (int) $USER->id],
                 );
-            } else if ($modname === 'quiz' || $modname === 'forum') {
-                // Quiz/forum: non-intrusive chat bubble in activity-information region.
+            } else if ($modname === 'quiz' || $modname === 'forum' || $modname === 'bigbluebuttonbn') {
+                // Quiz/forum/BBB: non-intrusive chat bubble in activity-information region.
                 $PAGE->requires->js_call_amd(
                     'local_unifiedgrader/activity_comments',
                     'init',
@@ -163,11 +163,13 @@ class hook_callbacks {
                 'assign' => 'view_annotated_feedback',
                 'forum' => 'view_forum_feedback',
                 'quiz' => 'view_quiz_feedback',
+                'bigbluebuttonbn' => 'view_bbb_feedback',
             ];
             $bannermapping = [
                 'assign' => 'view_annotated_feedback',
                 'forum' => 'forum_feedback_banner',
                 'quiz' => 'quiz_feedback_banner',
+                'bigbluebuttonbn' => 'bbb_feedback_banner',
             ];
             $labelkey = $labelmapping[$modname] ?? 'view_feedback';
             $bannertext = get_string(

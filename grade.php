@@ -232,6 +232,15 @@ $templatedata['feedbackfileshtml'] = $feedbackfileshtml;
 $templatedata['feedbackfilesdraftid'] = $feedbackfilesdraftid;
 $templatedata['feedbackfilesclientid'] = $feedbackfilesclientid;
 
+// Help-page URL surfaced in the toolbar's "?" icon. Anchor-deep-linked to
+// the section matching the active activity type so the teacher lands on
+// the relevant integration docs.
+$templatedata['helpurl'] = (new moodle_url(
+    '/local/unifiedgrader/help.php',
+    [],
+    'integration-' . $cm->modname,
+))->out(false);
+
 // Output.
 echo $OUTPUT->header();
 echo $OUTPUT->render_from_template('local_unifiedgrader/grading_interface', $templatedata);

@@ -296,6 +296,8 @@ class local_unifiedgrader_generator extends component_generator_base {
         } else if ($modname === 'quiz') {
             $defaults['timeclose'] = time() + DAYSECS * 7;
             $defaults['grade'] = 100;
+        } else if ($modname === 'bigbluebuttonbn') {
+            $defaults['grade'] = 100;
         }
         $activity = $gen->create_module($modname, array_merge($defaults, $modparams));
         $cm = get_coursemodule_from_instance($modname, $activity->id, $course->id, false, MUST_EXIST);
@@ -393,5 +395,114 @@ class local_unifiedgrader_generator extends component_generator_base {
             'discussion' => $discussion,
             'post' => $post,
         ];
+    }
+
+    /**
+     * Insert a BBB engagement summary log row for a user.
+     *
+     * Mirrors the JSON shape produced by the BBB server's meeting events
+     * callback: meta->data->duration + meta->data->engagement->{chats, talks,
+     * raisehand, poll_votes, emojis}.
+     *
+     * @param \stdClass $bbb The bigbluebuttonbn instance record.
+     * @param int $userid The student user ID.
+     * @param array $engagement Optional engagement counts (chats, talks, raisehand, pollvotes, emojis).
+     * @param int $duration Session duration in seconds.
+     * @param int|null $timecreated Override timecreated (defaults to now).
+     * @return \stdClass The created log record.
+     */
+    public function create_bbb_summary_log(
+        \stdClass $bbb,
+        int $userid,
+        array $engagement = [],
+        int $duration = 1800,
+        ?int $timecreated = null,
+    ): \stdClass {
+        global $DB;
+
+        $meta = [
+            'data' => [
+                'duration' => $duration,
+                'engagement' => [
+                    'chats' => (int) ($engagement['chats'] ?? 0),
+                    'talks' => (int) ($engagement['talks'] ?? 0),
+                    'raisehand' => (int) ($engagement['raisehand'] ?? 0),
+                    'poll_votes' => (int) ($engagement['pollvotes'] ?? 0),
+                    'emojis' => (int) ($engagement['emojis'] ?? 0),
+                ],
+            ],
+        ];
+
+        $record = (object) [
+            'courseid' => (int) $bbb->course,
+            'bigbluebuttonbnid' => (int) $bbb->id,
+            'userid' => $userid,
+            'meetingid' => 'meeting-' . $bbb->id,
+            'timecreated' => $timecreated ?? time(),
+            'log' => \mod_bigbluebuttonbn\logger::EVENT_SUMMARY,
+            'meta' => json_encode($meta),
+        ];
+
+        $record->id = $DB->insert_record('bigbluebuttonbn_logs', $record);
+        return $record;
+    }
+
+    /**
+     * Insert a BBB join log row for a user (attendance signal without engagement data).
+     *
+     * @param \stdClass $bbb The bigbluebuttonbn instance record.
+     * @param int $userid The student user ID.
+     * @param int|null $timecreated Override timecreated (defaults to now).
+     * @return \stdClass The created log record.
+     */
+    public function create_bbb_join_log(\stdClass $bbb, int $userid, ?int $timecreated = null): \stdClass {
+        global $DB;
+
+        $record = (object) [
+            'courseid' => (int) $bbb->course,
+            'bigbluebuttonbnid' => (int) $bbb->id,
+            'userid' => $userid,
+            'meetingid' => 'meeting-' . $bbb->id,
+            'timecreated' => $timecreated ?? time(),
+            'log' => \mod_bigbluebuttonbn\logger::EVENT_JOIN,
+            'meta' => json_encode((object) ['origin' => 0]),
+        ];
+
+        $record->id = $DB->insert_record('bigbluebuttonbn_logs', $record);
+        return $record;
+    }
+
+    /**
+     * Insert a BBB recording stub.
+     *
+     * Creates a row in bigbluebuttonbn_recordings with status=PROCESSED so
+     * it appears in get_recordings_for_instance(). Note: the recording's
+     * playback URLs come from BBB server metadata, which is not available
+     * in tests. Tests that need playback URLs should mock or skip.
+     *
+     * @param \stdClass $bbb The bigbluebuttonbn instance record.
+     * @param int $groupid Optional group ID (0 = no group).
+     * @return \stdClass The created recording record.
+     */
+    public function create_bbb_recording(\stdClass $bbb, int $groupid = 0): \stdClass {
+        global $DB;
+
+        $now = time();
+        $record = (object) [
+            'courseid' => (int) $bbb->course,
+            'bigbluebuttonbnid' => (int) $bbb->id,
+            'groupid' => $groupid,
+            'recordingid' => uniqid('rec-'),
+            'headless' => 0,
+            'imported' => 0,
+            'status' => 2, // RECORDING_STATUS_PROCESSED.
+            'importeddata' => '',
+            'timecreated' => $now,
+            'usermodified' => 0,
+            'timemodified' => $now,
+        ];
+
+        $record->id = $DB->insert_record('bigbluebuttonbn_recordings', $record);
+        return $record;
     }
 }

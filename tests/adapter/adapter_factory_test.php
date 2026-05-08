@@ -75,6 +75,25 @@ final class adapter_factory_test extends \advanced_testcase {
     }
 
     /**
+     * Test creating a BigBlueButton adapter.
+     */
+    public function test_create_bbb_adapter(): void {
+        if (!class_exists('\mod_bigbluebuttonbn\instance')) {
+            $this->markTestSkipped('mod_bigbluebuttonbn not installed');
+        }
+        $this->resetAfterTest();
+        set_config('enable_bigbluebuttonbn', 1, 'local_unifiedgrader');
+
+        $gen = $this->getDataGenerator();
+        $course = $gen->create_course();
+        $bbb = $gen->create_module('bigbluebuttonbn', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('bigbluebuttonbn', $bbb->id);
+
+        $adapter = adapter_factory::create($cm->id);
+        $this->assertInstanceOf(bbb_adapter::class, $adapter);
+    }
+
+    /**
      * Test creating an adapter for an unsupported type throws.
      */
     public function test_create_unsupported_type_throws(): void {

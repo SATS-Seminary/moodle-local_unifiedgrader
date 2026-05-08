@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard</title>
+  <link rel="stylesheet" type="text/css" href="css/dashboard.css">
+  <link rel="stylesheet" type="text/css" href="css/student.css">
+  <script defer src="js/dateformatter.js"></script>
+</head>
+
+<body>
+  <div class="dashboard" id="dashboard-main">
+  <div class="container">
+    <div class="row" id="header">
+      <div class="header-text">
+        <h2>BBB_Test</h2>
+        <p class="date"><time datetime="2026-05-06T13:00:50+00:00">May 6, 2026 at 13:00:50 UTC</time>.</p>
+        
+      </div>
+      <div class="button right" id="downloadexcel">
+        <p class="buttontext caps">Download csv</p>
+      </div>
+    </div>
+    <div class="row-section">
+      <div class="col-3">
+        <!--OVERVIEW TILE-->
+        <div class="tile selectable grey-outline" id="overview">
+          <div class="tile-header">
+            <h1 class="caps">Overview</h1>
+            <div class="tile-line"></div>
+          </div>
+          <div class="stats" id="overview-stats">
+            <div class="row">
+              <div class="icon">
+                <img class="iconimg" src="images/time.png"/>
+              </div>
+              <h3 class="overview-text left left-margin">Duration</h3>
+              <h3 class="overview-number right">00:04:33</h3>
+            </div>
+            <div class="row" id="line"></div>
+            <div class="row">
+              <div class="block right-margin">
+                <img class="icon icon-center" src="images/moderator.png"/>
+                <h4 class="overview-number">1</h4>
+                <h4 class="overview-text-small">Moderators</h4>
+              </div>
+              <div class="block left-margin">
+                <img class="icon icon-center" src="images/students.png"/>
+                <h4 class="overview-number">1</h4>
+                <h4 class="overview-text-small">Viewers</h4>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <!--ATTENTION TILE-->
+        <div class="tile selectable" id="attention">
+          <div class="tile-header">
+            <h1 class="caps">Attention</h1>
+            <div class="tile-line"></div>
+          </div>
+          <div class="stats" id="attention-stats">
+
+            <div>
+              <div class="row">
+                <p class="attention-text"># of Students Speaking</p>
+                <p class="right attention-text">2/2</p>
+              </div>
+              <div class="row">
+                <div class="attention-bar">
+                  <div class="attention-bar-fill" style="width:100.0%;">
+                    <div class="animated-bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="row">
+                <p class="attention-text"># of Students Messaging</p>
+                <p class="right attention-text">1/2</p>
+              </div>
+              <div class="row">
+                <div class="attention-bar">
+                  <div class="attention-bar-fill" style="width:50.0%;">
+                    <div class="animated-bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="row">
+                <p class="attention-text"># of Students Using Emojis</p>
+                <p class="right attention-text">1/2</p>
+              </div>
+              <div class="row">
+                <div class="attention-bar">
+                  <div class="attention-bar-fill" style="width:50.0%;">
+                    <div class="animated-bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="row">
+                <p class="attention-text"># of Students Raising Hands</p>
+                <p class="right attention-text">1/2</p>
+              </div>
+              <div class="row">
+                <div class="attention-bar">
+                  <div class="attention-bar-fill" style="width:50.0%;">
+                    <div class="animated-bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <div class="col-3">
+        <!--POLLING TILE-->
+        <div class="tile selectable" id="polling">
+          <div class="tile-header">
+            <h1 class="caps">Polling (0)</h1>
+            <div class="tile-line"></div>
+          </div>
+          <div class="stats" id="polling-stats">
+          
+            <div class="full-block" id="nopolls">
+              <img class="icon icon-center" src="images/poll.png"/>
+              <h4 class="overview-number">No Polls!</h4>
+            </div>
+          
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row-section" id="results">
+      <div class="col-12">
+        <!--PARTICIPANT LIST TILE-->
+        <div class="tile tile-nohover" id="participant-list">
+          <div class="tile-header" id="participant-list-header">
+            <h1 id="section-title" class="caps">Overview</h1>
+            <div class="tile-line"></div>
+
+            <div class="polling-scroll-controls none" id='scroll-controls'>
+              <div class="arrowbtn arrowbtn-left" id="poll-left"><p class="arrow-poll">&#9668;</p></div>
+              <div class="polling-display"><p class="poll-display-text" id="poll-page">4 / 12</p></div>
+              <div class="arrowbtn arrowbtn-right" id="poll-right"><p class="arrow-poll">&#9658;</p></div>
+            </div>
+          </div>
+
+          <!-- OVERVIEW TABLE -->
+          <div class="activity-hover none" id="activity-hover">
+            <div class="hover-info">Activity Score is a weighted average out of 10 that represents the participation level of the user in the meeting.</div>
+            <div class="hover-point"></div>
+          </div>
+          <table class="participant-table sortable" id="overview-table">
+            <tr class="participant-heading">
+              <th class="participant-title" id="overview-participant">Participant</th>
+              <th class="item-title">Duration</th>
+              <th class="item-title">Time Joined</th>
+              <th class="item-title">Time Left</th>
+              <th class="item-title" id="activity">Activity Score</th>
+            </tr>
+
+            
+            <tr class="participant">
+              <td class="name-cell" id="overview-participant" data-uid="w_uaras4dzc7pp">
+                <div class="circle-cont">
+                  <div class="icon-circle" style='background-color: rgb(5, 31, 58)'>
+                    <h3 id="initials">AU</h3>
+                  </div>
+                </div>
+                <div class="inline-flex">
+                  <h4 id="name">Admin User</h4>
+                </div>
+
+                
+                  <div class="circle-cont">
+                    <div class="moderator caps">Moderator</div>
+                  </div>
+                
+              </td>
+              <td class="item-title table-text"><p>00:04:27</p></td>
+              <td class="item-title table-text"><p><time data-format="time" datetime="2026-05-06T13:00:56+00:00">13:00:56 UTC</time></p></td>
+              <td class="item-title table-text"><p><time data-format="time" datetime="2026-05-06T13:05:23+00:00">13:05:23 UTC</time></p></td>
+              <td class="item-title table-text"><p>-</p></td>
+            </tr>
+            
+            <tr class="participant">
+              <td class="name-cell" id="overview-participant" data-uid="w_s0csz8yfjfag">
+                <div class="circle-cont">
+                  <div class="icon-circle" style='background-color: rgb(73, 103, 78)'>
+                    <h3 id="initials">T0</h3>
+                  </div>
+                </div>
+                <div class="inline-flex">
+                  <h4 id="name">Teststudent 015</h4>
+                </div>
+
+                
+              </td>
+              <td class="item-title table-text"><p>00:03:03</p></td>
+              <td class="item-title table-text"><p><time data-format="time" datetime="2026-05-06T13:02:20+00:00">13:02:20 UTC</time></p></td>
+              <td class="item-title table-text"><p><time data-format="time" datetime="2026-05-06T13:05:23+00:00">13:05:23 UTC</time></p></td>
+              <td class="item-title table-text"><p>10.0</p></td>
+            </tr>
+            
+          </table>
+
+           <!--ATTENTION TABLE-->
+          <table class="participant-table sortable none" id="attention-table">
+            <tr class="participant-heading">
+              <th class="participant-title" id="attention-participant">Participant</th>
+              <th class="item-title">Talk Time</th>
+              <th class="item-title">Messages</th>
+              <th class="item-title">Emojis</th>
+              <th class="item-title">Hand Raises</th>
+            </tr>
+
+            
+            <tr class="participant">
+              <td class="name-cell" id="attention-participant" data-uid="w_uaras4dzc7pp">
+                <div class="circle-cont">
+                  <div class="icon-circle" style='background-color: rgb(5, 31, 58)'>
+                    <h3 id="initials">AU</h3>
+                  </div>
+                </div>
+                <div class="inline-flex">
+                  <h4 id="name">Admin User</h4>
+                </div>
+
+                
+                <div class="circle-cont">
+                  <div class="moderator caps">Moderator</div>
+                </div>
+                
+              </td>
+              <td class="item-title table-text"><p>00:00:45</p></td>
+              <td class="item-title table-text"><p>0</p></td>
+              <td class="item-title table-text"><p>0</p></td>
+              <td class="item-title table-text"><p>0</p></td>
+            </tr>
+            
+            <tr class="participant">
+              <td class="name-cell" id="attention-participant" data-uid="w_s0csz8yfjfag">
+                <div class="circle-cont">
+                  <div class="icon-circle" style='background-color: rgb(73, 103, 78)'>
+                    <h3 id="initials">T0</h3>
+                  </div>
+                </div>
+                <div class="inline-flex">
+                  <h4 id="name">Teststudent 015</h4>
+                </div>
+
+                
+              </td>
+              <td class="item-title table-text"><p>00:00:30</p></td>
+              <td class="item-title table-text"><p>2</p></td>
+              <td class="item-title table-text"><p>2</p></td>
+              <td class="item-title table-text"><p>3</p></td>
+            </tr>
+            
+          </table>
+
+          <div class="no-polling none" id='no-polls-message'>
+            <p class="no-polling-text">There were no polls during this meeting.</p>
+          </div>
+
+          <!--POLLING TABLE-->
+          
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <p class="logotext"> Generated By:</p>
+      <a href='https://blindsidenetworks.com' target='_blank'><img class="logo" src="images/logo.png"/></a>
+    </div>
+  </div>
+
+  </div>
+
+  <!--STUDENT INFO OVERLAY-->
+  
+  <div class="student-more-info none" id="w_uaras4dzc7pp">
+    <div class="overlay">
+    </div>
+    <div class="sidepanel">
+    </div>
+    <div class="student-panel">
+      <div class="closediv">
+        <img class="closebtn" src="images/close.png"/>
+      </div>
+      <div class="student-panel-content">
+        <div class="row center-content" id="student-panel-info">
+          <div class="student-info">
+            <div class="student-icon" style='background-color: rgb(5, 31, 58)'>
+              <h1 class="student-icon-text">AU</h1>
+            </div>
+            <h1 class="student-name">Admin User</h1>
+            
+            <div class="panel-moderator-div">
+              <div class="panel-moderator">Moderator</div>
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-12">
+            <div class="tile tile-nohover">
+              <div class="tile-header row">
+                <img class="student-tile-icon" src="images/time.png"/>
+                <h1 class="student-tile-text caps">overview</h1>
+              </div>
+
+              <div class="overview-bar-div">
+                <div class="row" id="overview-line-div">
+                  <div class="enddot"></div>
+                  <div class="overview-line"></div>
+                  <div class="enddot"></div>
+                </div>
+
+                <div class="overview-time-bar" style="width: calc(97.8% - 60px); left: 2.2%;">
+                  <p class="overview-bar-text">00:04:27</p>
+                </div>
+                <div class="row">
+                  <p class="left overview-time-text">Start Time<br/><time data-format="time" datetime="2026-05-06T13:00:50+00:00">13:00:50 UTC</time></p>
+                  <p class="right overview-time-text">End Time<br/><time data-format="time" datetime="2026-05-06T13:05:23+00:00">13:05:23 UTC</time></p>
+                </div>
+              </div>
+
+              <div class="row overview-stat-cont">
+                <div class="overview-item left">
+                  <h3 class="overview-time-value">00:04:27</h3>
+                  <p class="overview-time-text">Duration</p>
+                </div>
+                <div class="overview-item left">
+                  <h3 class="overview-time-value" style="color: #707070;"><time data-format="time" datetime="2026-05-06T13:00:56+00:00">13:00:56 UTC</time></h3>
+                  <p class="overview-time-text left">Joined</p>
+                </div>
+                <div class="overview-item left">
+                  <h3 class="overview-time-value" style="color: #707070;"><time data-format="time" datetime="2026-05-06T13:05:23+00:00">13:05:23 UTC</time></h3>
+                  <p class="overview-time-text left">Left</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        
+
+        <div class="row">
+          <div class="col-12">
+            <div class="tile tile-nohover">
+              <div class="tile-header row">
+                <img class="student-tile-icon" src="images/poll-result.png"/>
+                <h1 class="student-tile-text caps">polling</h1>
+              </div>
+
+              <table class="student-table">
+                <tr class="student-poll-header">
+                  <th class="left student-poll student-th">Poll</th>
+                  <th class="center student-poll-response student-th">Response</th>
+                  <th class="center student-poll-MCA student-th">Most Common Answer</th>
+                </tr>
+                
+              </table>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="student-more-info none" id="w_s0csz8yfjfag">
+    <div class="overlay">
+    </div>
+    <div class="sidepanel">
+    </div>
+    <div class="student-panel">
+      <div class="closediv">
+        <img class="closebtn" src="images/close.png"/>
+      </div>
+      <div class="student-panel-content">
+        <div class="row center-content" id="student-panel-info">
+          <div class="student-info">
+            <div class="student-icon" style='background-color: rgb(73, 103, 78)'>
+              <h1 class="student-icon-text">T0</h1>
+            </div>
+            <h1 class="student-name">Teststudent 015</h1>
+            
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-12">
+            <div class="tile tile-nohover">
+              <div class="tile-header row">
+                <img class="student-tile-icon" src="images/time.png"/>
+                <h1 class="student-tile-text caps">overview</h1>
+              </div>
+
+              <div class="overview-bar-div">
+                <div class="row" id="overview-line-div">
+                  <div class="enddot"></div>
+                  <div class="overview-line"></div>
+                  <div class="enddot"></div>
+                </div>
+
+                <div class="overview-time-bar" style="width: calc(67.03% - 60px); left: 32.97%;">
+                  <p class="overview-bar-text">00:03:03</p>
+                </div>
+                <div class="row">
+                  <p class="left overview-time-text">Start Time<br/><time data-format="time" datetime="2026-05-06T13:00:50+00:00">13:00:50 UTC</time></p>
+                  <p class="right overview-time-text">End Time<br/><time data-format="time" datetime="2026-05-06T13:05:23+00:00">13:05:23 UTC</time></p>
+                </div>
+              </div>
+
+              <div class="row overview-stat-cont">
+                <div class="overview-item left">
+                  <h3 class="overview-time-value">00:03:03</h3>
+                  <p class="overview-time-text">Duration</p>
+                </div>
+                <div class="overview-item left">
+                  <h3 class="overview-time-value" style="color: #707070;"><time data-format="time" datetime="2026-05-06T13:02:20+00:00">13:02:20 UTC</time></h3>
+                  <p class="overview-time-text left">Joined</p>
+                </div>
+                <div class="overview-item left">
+                  <h3 class="overview-time-value" style="color: #707070;"><time data-format="time" datetime="2026-05-06T13:05:23+00:00">13:05:23 UTC</time></h3>
+                  <p class="overview-time-text left">Left</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        
+        <div class="row">
+          <div class="col-12">
+            <div class="tile tile-nohover">
+              <div class="tile-header row">
+                <img class="student-tile-icon" src="images/graph.png"/>
+                <h1 class="student-tile-text">ACTIVITY SCORE: <strong>10.0</strong></h1>
+              </div>
+
+              <table class="student-table">
+                <tr class="student-poll-header">
+                  <th class="left student-activity student-th">Category</th>
+                  <th class="center student-activity-average student-th">Average</th>
+                  <th class="right student-activity-points student-th">Activity Points</th>
+                </tr>
+
+                <tr class="student-poll-row">
+                  <td class="left student-activity student-activity-td">Talks</td>
+                  <td class="center student-activity-average">
+                    <div class="average-mark">
+                      5.0
+                      <div class="average-line"></div>
+                    </div>
+                    <div class="row">
+                      <div class="activity-bar">
+                        <div class="activity-bar-fill" style="width: 100.0%;">
+                          <div class="animated-bar roundedbar"> <p class="bar-text">5</p></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="right student-activity-points student-activity-td">2.5</td>
+                </tr>
+
+                <tr class="student-poll-row">
+                  <td class="left student-activity student-activity-td">Messages</td>
+                  <td class="center student-activity-average">
+                    <div class="average-mark">
+                      2.0
+                      <div class="average-line"></div>
+                    </div>
+                    <div class="row">
+                      <div class="activity-bar">
+                        <div class="activity-bar-fill" style="width: 100.0%;">
+                          <div class="animated-bar roundedbar"> <p class="bar-text">2</p></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="right student-activity-points student-activity-td">2.5</td>
+                </tr>
+
+                <tr class="student-poll-row">
+                  <td class="left student-activity student-activity-td">Emojis</td>
+                  <td class="center student-activity-average">
+                    <div class="average-mark">
+                      2.0
+                      <div class="average-line"></div>
+                    </div>
+                    <div class="row">
+                      <div class="activity-bar">
+                        <div class="activity-bar-fill" style="width: 100.0%;">
+                          <div class="animated-bar roundedbar"> <p class="bar-text">2</p></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="right student-activity-points student-activity-td">2.5</td>
+                </tr>
+
+                <tr class="student-poll-row">
+                  <td class="left student-activity student-activity-td">Raised Hands</td>
+                  <td class="center student-activity-average">
+                    <div class="average-mark">
+                      3.0
+                      <div class="average-line"></div>
+                    </div>
+                    <div class="row">
+                      <div class="activity-bar">
+                        <div class="activity-bar-fill" style="width: 100.0%;">
+                          <div class="animated-bar roundedbar"> <p class="bar-text">3</p></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="right student-activity-points student-activity-td">2.5</td>
+                </tr>
+
+                <tr class="student-poll-row">
+                  <td class="left student-activity student-activity-td">Poll Votes</td>
+                  <td class="center student-activity-average">
+                    <div class="average-mark">
+                      0.0
+                      <div class="average-line"></div>
+                    </div>
+                    <div class="row">
+                      <div class="activity-bar">
+                        <div class="activity-bar-fill" style="width: 0.0%;">
+                          <div class="animated-bar roundedbar"> <p class="bar-text">0</p></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="right student-activity-points student-activity-td">0.0</td>
+                </tr>
+
+              </table>
+
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="row">
+          <div class="col-12">
+            <div class="tile tile-nohover">
+              <div class="tile-header row">
+                <img class="student-tile-icon" src="images/poll-result.png"/>
+                <h1 class="student-tile-text caps">polling</h1>
+              </div>
+
+              <table class="student-table">
+                <tr class="student-poll-header">
+                  <th class="left student-poll student-th">Poll</th>
+                  <th class="center student-poll-response student-th">Response</th>
+                  <th class="center student-poll-MCA student-th">Most Common Answer</th>
+                </tr>
+                
+              </table>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+</body>
+
+<!-- JS library for sorting tables. -->
+<script type='text/javascript' src="js/sorttable.js"></script>
+<!-- Handles tile events. -->
+<script type='text/javascript' src="js/tiles.js"></script>
+<!-- Handles student popout. -->
+<script type='text/javascript' src="js/students.js"></script>
+</html>

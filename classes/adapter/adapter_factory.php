@@ -33,6 +33,7 @@ class adapter_factory {
         'assign' => assign_adapter::class,
         'forum' => forum_adapter::class,
         'quiz' => quiz_adapter::class,
+        'bigbluebuttonbn' => bbb_adapter::class,
     ];
 
     /**

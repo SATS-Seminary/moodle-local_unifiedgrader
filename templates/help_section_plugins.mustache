@@ -1,0 +1,244 @@
+{{!
+    @template local_unifiedgrader/help_section_plugins
+
+    Companion plugin integrations — optional Moodle plugins that the Unified
+    Grader detects at runtime and integrates with when present. Bundled
+    capabilities live in the Cross-cutting features section instead.
+}}
+<section id="plugins">
+<h2>Companion plugin integrations</h2>
+
+<p>The Unified Grader is opinionated about what should live inside the
+plugin and what should be borrowed from elsewhere. The integrations on
+this page are optional — if the partner plugin isn't installed, the
+relevant UI is simply hidden. Nothing on this list is required for core
+grading to work.</p>
+
+<figure class="local-unifiedgrader-help-figure my-4">
+<svg viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Companion plugin landscape"
+     class="img-fluid" style="max-width: 800px;">
+    <style>
+        .cp-core { fill: #d1e7dd; stroke: #198754; stroke-width: 1.5; }
+        .cp-mod { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; }
+        .cp-opt { fill: #fff3cd; stroke: #b08800; stroke-width: 1.5; }
+        .cp-3p { fill: #fde2cf; stroke: #c54d00; stroke-width: 1.5; }
+        .cp-text { font-family: -apple-system, sans-serif; font-size: 12px; fill: #212529; }
+        .cp-text-bold { font-weight: bold; font-size: 13px; }
+        .cp-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
+        .cp-arrow { stroke: #6c757d; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+    </style>
+    <defs>
+        <marker id="cp-arrowhead" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 9 3, 0 6" fill="#6c757d"/>
+        </marker>
+    </defs>
+
+    <!-- Core in the middle -->
+    <rect x="280" y="160" width="240" height="60" rx="6" class="cp-core"/>
+    <text x="300" y="186" class="cp-text cp-text-bold">local_unifiedgrader (core)</text>
+    <text x="300" y="204" class="cp-label">adapter pattern · web services · UI</text>
+
+    <!-- Activity adapters: top -->
+    <rect x="40" y="40" width="160" height="40" rx="6" class="cp-mod"/>
+    <text x="60" y="64" class="cp-text cp-text-bold">mod_assign · forum · quiz · bigbluebuttonbn</text>
+
+    <!-- Optional plugins: bottom row -->
+    <rect x="20" y="280" width="170" height="50" rx="6" class="cp-opt"/>
+    <text x="34" y="304" class="cp-text cp-text-bold">bbbext_advgrd</text>
+    <text x="34" y="322" class="cp-label">BBB rubric / marking guide</text>
+
+    <rect x="200" y="280" width="170" height="50" rx="6" class="cp-opt"/>
+    <text x="214" y="304" class="cp-text cp-text-bold">quizaccess_duedate</text>
+    <text x="214" y="322" class="cp-label">per-user quiz extensions</text>
+
+    <rect x="380" y="280" width="170" height="50" rx="6" class="cp-opt"/>
+    <text x="394" y="304" class="cp-text cp-text-bold">gradepenalty_duedate</text>
+    <text x="394" y="322" class="cp-label">automatic late penalties</text>
+
+    <rect x="560" y="280" width="220" height="50" rx="6" class="cp-3p"/>
+    <text x="574" y="304" class="cp-text cp-text-bold">plagiarism plugins</text>
+    <text x="574" y="322" class="cp-label">Copyleaks · Turnitin · …</text>
+
+    <!-- Right column extras -->
+    <rect x="600" y="40" width="180" height="50" rx="6" class="cp-3p"/>
+    <text x="614" y="64" class="cp-text cp-text-bold">Byblos portfolio</text>
+    <text x="614" y="82" class="cp-label">submission plugin in mod_assign</text>
+
+    <rect x="600" y="110" width="180" height="50" rx="6" class="cp-opt"/>
+    <text x="614" y="134" class="cp-text cp-text-bold">TinyMCE recorder</text>
+    <text x="614" y="152" class="cp-label">audio / video feedback inline</text>
+
+    <!-- Arrows from core to companions -->
+    <path d="M400 220 L105 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M400 220 L285 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M400 220 L465 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M400 220 L670 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M520 175 L600 75" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M520 190 L600 135" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M280 175 L200 80" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+</svg>
+<figcaption class="text-muted small">
+    Solid green is this plugin. Blue is the four supported activity types.
+    Yellow is optional companion plugins; orange is third-party Moodle plugins
+    by other vendors. Dashed arrows represent runtime <code>class_exists()</code>
+    checks — if the companion isn't installed, the integration silently disables.
+</figcaption>
+</figure>
+
+{{! ----- Byblos portfolio ----- }}
+<section id="plugin-byblos">
+<h3>Byblos portfolio (assignment submission plugin)</h3>
+
+<p>Byblos is an <em>assignment submission plugin</em> — students submit a
+portfolio URL instead of (or alongside) files and online text. The
+Unified Grader detects a Byblos submission via its presence in the
+assignment's submission plugin output and surfaces it as the primary
+preview.</p>
+
+<h4>What you see</h4>
+<ul>
+    <li><strong>Iframe</strong> embedding the portfolio with a pop-out button that opens it full-window.</li>
+    <li><strong>Portfolio pill</strong> at the start of the right-rail file selector — click to switch back to the portfolio when a submission also has files attached.</li>
+    <li>Existing assignment annotation tools still apply to any attached files (PDFs, images), so a teacher can grade the portfolio <em>and</em> annotate supporting documents.</li>
+</ul>
+
+<p>No setting in the Unified Grader controls this — the integration
+activates whenever an assignment submission plugin returns a portfolio
+URL. If you want to disable Byblos for a specific activity, do it from
+the assignment's submission plugin configuration directly.</p>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: Byblos portfolio rendered in the preview pane with the
+    pop-out button visible top-right and the Portfolio pill highlighted in the
+    right-rail file selector.</span>
+</div>
+</section>
+
+{{! ----- bbbext_advgrd ----- }}
+<section id="plugin-advgrd">
+<h3>bbbext_advgrd — BBB rubric / marking guide</h3>
+
+<p>Adds an advanced-grading area (rubric or marking guide) to a
+BigBlueButton activity. When installed and configured for a BBB
+activity, the Unified Grader renders the rubric / marking guide in the
+marking pane the same way assignment / forum rubrics are rendered.</p>
+
+<h4>How the integration works</h4>
+<ul>
+    <li>The adapter calls <code>get_grading_manager($context, 'bbbext_advgrd', 'participation')</code> to detect the active method.</li>
+    <li>Saves go through <code>\bbbext_advgrd\local\grader::record_grade</code>, which writes the per-user evidence snapshot to <code>bbbext_advgrd_grade</code>, pushes the score to the BBB gradebook item, and emits per-presence sub-scores in analytic mode.</li>
+    <li>Metric-driven level suggestions (<code>grader::suggest_levels</code>) are sent to the marking pane in the grading-definition payload — the rubric UI <em>could</em> highlight recommended cells based on engagement metrics, though that final highlight UI is on the roadmap rather than shipped.</li>
+    <li>The grading instance id is reused across saves (looked up from the previous <code>bbbext_advgrd_grade</code> row) so consecutive saves update the same fillings rather than minting a new <code>grading_instances</code> row each time.</li>
+</ul>
+
+<p>For full BBB context see <a href="#integration-bigbluebuttonbn">BigBlueButton</a>.
+For general rubric / marking-guide UX see
+<a href="#feature-rubrics">Marking guides &amp; rubrics</a>.</p>
+</section>
+
+{{! ----- quizaccess_duedate ----- }}
+<section id="plugin-quizaccess-duedate">
+<h3>quizaccess_duedate — per-user quiz extensions</h3>
+
+<p>Provides a per-user / per-group due-date override system for quizzes,
+filling a gap in Moodle core (which has open / close / cut-off but no
+clean "extension" concept).</p>
+
+<p>When installed, the Unified Grader:</p>
+<ul>
+    <li>Lets teachers grant and revoke extensions inline from the grader.</li>
+    <li>Resolves the effective due date through <code>\quizaccess_duedate\override_manager::get_effective_duedate()</code> — user override &gt; group override &gt; quiz default — when checking lateness.</li>
+    <li>Surfaces extensions in the unified <em>Overrides &amp; extensions</em> modal alongside Moodle's native <code>quiz_overrides</code>.</li>
+</ul>
+
+<p>Without the plugin, lateness falls back to <code>quiz.timeclose</code>
+and the native <code>quiz_overrides</code> table.</p>
+
+<p>This integration is checked at runtime via
+<code>class_exists('\quizaccess_duedate\override_manager')</code> — no
+configuration needed beyond installing the plugin.</p>
+</section>
+
+{{! ----- gradepenalty_duedate ----- }}
+<section id="plugin-gradepenalty-duedate">
+<h3>gradepenalty_duedate — automatic late penalties</h3>
+
+<p>Computes a late-penalty percentage based on configurable rules
+(per-module, per-course, or site-wide). The Unified Grader applies the
+calculated deduction when pushing the grade to the gradebook.</p>
+
+<ul>
+    <li>For <strong>assignments</strong>, Moodle's own gradebook respects penalties; the integration surfaces the late badge with days-late count and percentage.</li>
+    <li>For <strong>forums</strong>, the raw teacher-given grade is preserved in <code>forum_grades</code> and only the gradebook value is reduced. The plugin's <code>sync_gradebook_penalty()</code> step recalculates after extensions are granted, so granting an extension after grading correctly removes the penalty.</li>
+    <li>For <strong>quizzes</strong>, penalty integration is disabled — quiz grades are computed by the question engine and percent-deducted penalties don't compose cleanly.</li>
+</ul>
+
+<p>Without the plugin, manual penalties (entered through the marking
+panel) still work — they live in <code>local_unifiedgrader_penalty</code>
+and are subtracted at gradebook-push time.</p>
+
+<p>For UX details see <a href="#feature-penalties">Penalties</a>.</p>
+</section>
+
+{{! ----- Plagiarism plugins ----- }}
+<section id="plugin-plagiarism">
+<h3>Plagiarism plugins (Copyleaks, Turnitin, etc.)</h3>
+
+<p>Any plugin returning HTML from Moodle's standard
+<code>plagiarism_get_links()</code> API will integrate. The Unified
+Grader doesn't talk to plagiarism vendors directly; it forwards the
+submission item (post text, online-text submission, attached file) to
+the API and renders whatever comes back.</p>
+
+<h4>Plagiarism shield UX</h4>
+<ul>
+    <li>A small shield badge appears next to each submission item that has a non-empty plagiarism result.</li>
+    <li>Colour-coded by severity — extracted from the plagiarism plugin's <em>own</em> CSS classes (e.g. <code>cls-plag-score-level-high</code>, <code>score_colour_75</code>) so it respects the plugin's configured thresholds rather than inventing new ones.</li>
+    <li>Pending state (Copyleaks "scheduled" / "in-progress") and error state (Turnitin "queued" / Copyleaks "failed") render with appropriate icons.</li>
+    <li>For Copyleaks, both the plagiarism score and the AI-content score contribute to the worst-severity colour.</li>
+    <li>Click the shield to open a popout with the plagiarism plugin's full widget — match percentage, originality breakdown, etc. — and a click-through to the plugin's full report.</li>
+</ul>
+
+<h4>Academic impropriety report</h4>
+<p>If the admin has set <code>enable_report_form</code> +
+<code>report_form_url</code>, the popout exposes a <em>Report academic
+impropriety</em> button that opens a configurable external form (e.g. a
+Google Form or LMS-internal workflow). The URL template supports these
+placeholders:</p>
+
+<ul>
+    <li><code>{studentname}</code>, <code>{studentid}</code></li>
+    <li><code>{coursecode}</code> (extracted via the configured regex), <code>{coursename}</code></li>
+    <li><code>{activityname}</code>, <code>{activitytype}</code></li>
+    <li><code>{gradername}</code>, <code>{graderurl}</code></li>
+</ul>
+
+<p>Without <code>$CFG->enableplagiarism</code> on, no shields appear and
+the report-form button is hidden.</p>
+</section>
+
+{{! ----- TinyMCE recorder ----- }}
+<section id="plugin-tinymce-recorder">
+<h3>TinyMCE recorder plugins</h3>
+
+<p>The feedback editor is Moodle's preferred TinyMCE configuration.
+Audio / video feedback recording is delegated to whichever TinyMCE
+recorder plugin is installed:</p>
+
+<ul>
+    <li><strong>RecordRTC</strong> (the standard Moodle plugin).</li>
+    <li><strong>SATS Recorder</strong> (institution-specific TinyMCE plugin with cloud-storage backend).</li>
+</ul>
+
+<p>The Unified Grader doesn't ship its own recorder. The TinyMCE editor
+is initialised once on page load and reused across student switches via
+<code>editor.setContent()</code>; the recorder plugin (whichever is
+present) attaches to that editor instance.</p>
+
+<p>Recorded clips are uploaded to the editor's draft area and end up in
+the <code>assignfeedback_comments</code> filearea on save — same path as
+images / files inserted via the editor.</p>
+</section>
+
+</section>

@@ -42,7 +42,7 @@ $context = context_module::instance($cm->id);
 require_capability('local/unifiedgrader:viewfeedback', $context);
 
 // Only supported activity types.
-$supported = ['assign', 'forum', 'quiz'];
+$supported = ['assign', 'forum', 'quiz', 'bigbluebuttonbn'];
 if (!in_array($cm->modname, $supported)) {
     throw new moodle_exception('invalidactivitytype', 'local_unifiedgrader');
 }
@@ -299,6 +299,69 @@ if ($cm->modname === 'quiz') {
         'hasmultipleattempts' => $hasmultipleattempts,
         'attempts' => $attemptlist,
         'selectedattempt' => $selectedattempt,
+        'hascommentsfeature' => $hascommentsfeature,
+        'commentcount' => $commentcount,
+    ];
+
+    echo $OUTPUT->header();
+    echo $OUTPUT->render_from_template('local_unifiedgrader/feedback_view_quiz', $templatedata);
+    echo $OUTPUT->footer();
+    exit;
+}
+
+// BigBlueButton feedback view — reuses the quiz template with empty attempt list.
+// The adapter's submission content already renders recordings and engagement metrics.
+if ($cm->modname === 'bigbluebuttonbn') {
+    $activityinfo = $adapter->get_activity_info();
+    $gradedata = $adapter->get_grade_data($userid);
+    $submissiondata = $adapter->get_submission_data($userid);
+
+    $PAGE->set_url(new moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cmid]));
+    $PAGE->set_context($context);
+    $PAGE->set_title(
+        get_string('view_feedback', 'local_unifiedgrader') . ': ' .
+        format_string($cm->name),
+    );
+    $PAGE->set_heading($course->fullname);
+    $PAGE->set_pagelayout('standard');
+    $PAGE->activityheader->disable();
+    $PAGE->add_body_class('local-unifiedgrader-feedback-page');
+
+    $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
+    $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
+    $gradedisplay = $gradeinfo['gradedisplay'];
+
+    $feedback = $gradedata['feedback'] ?? '';
+    $showrightcolumn = !empty($feedback);
+
+    $feedbackdownloadurl = (new moodle_url(
+        '/local/unifiedgrader/download_feedback.php',
+        ['cmid' => $cmid],
+    ))->out(false);
+
+    $hascommentsfeature = (bool) get_config('local_unifiedgrader', 'enable_submission_comments');
+    $commentcount = $hascommentsfeature
+        ? \local_unifiedgrader\submission_comment_manager::count_comments($cmid, $userid)
+        : 0;
+
+    $templatedata = [
+        'cmid' => $cmid,
+        'activityname' => $activityinfo['name'],
+        'activityurl' => (new moodle_url('/mod/bigbluebuttonbn/view.php', ['id' => $cmid]))->out(false),
+        'gradedisplay' => $gradedisplay,
+        'feedback' => $feedback,
+        'hasfeedback' => !empty($feedback),
+        'attemptcontent' => $submissiondata['content'] ?? '',
+        'hasattempt' => !empty($submissiondata['hascontent']),
+        'feedbackdownloadurl' => $feedbackdownloadurl,
+        'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
+        'userid' => $userid,
+        'showrightcolumn' => $showrightcolumn,
+        'haspenalties' => $penaltyinfo['haspenalties'],
+        'penalties' => $penaltyinfo['penalties'],
+        'hasmultipleattempts' => false,
+        'attempts' => [],
+        'selectedattempt' => 0,
         'hascommentsfeature' => $hascommentsfeature,
         'commentcount' => $commentcount,
     ];

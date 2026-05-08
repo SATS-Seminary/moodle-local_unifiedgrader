@@ -1,0 +1,124 @@
+{{!
+    @template local_unifiedgrader/help_section_bbb
+
+    Documentation partial for the BigBlueButton activity adapter.
+}}
+<section id="integration-bigbluebuttonbn">
+<h3>BigBlueButton <span class="badge bg-secondary">mod_bigbluebuttonbn</span></h3>
+
+<p>The BBB adapter turns a live-meeting activity into something gradable: a
+recording playback area, an <em>Activity Points</em> engagement panel, and
+a deep link to BBB's per-attendee Statistics dashboard. Where the
+<code>bbbext_advgrd</code> extension is installed, a rubric or marking guide
+configured for the activity is rendered in the marking pane the same way
+assignment / forum rubrics are.</p>
+
+<div class="alert alert-info">
+    <strong>Prerequisite for engagement metrics:</strong> the Moodle
+    <em>Register live sessions</em> setting (<code>mod_bigbluebuttonbn/meetingevents_enabled</code>)
+    must be on, <em>and</em> the BBB server must have <code>defaultKeepEvents=true</code>
+    in <code>bbb-web.properties</code>. Without both, BBB never POSTs the analytics
+    callback to Moodle and engagement metrics are missing — see <a href="#troubleshooting">Troubleshooting</a>.
+    The plugin offers a scraper fallback for when the callback isn't configured;
+    that's described below.
+</div>
+
+<h4>Recording playback</h4>
+<ul>
+    <li><strong>Inline iframe</strong> using BBB's playback wrapper URL — the same player you'd see on BBB's recording table.</li>
+    <li><strong>Recording switcher</strong> when the activity has multiple recordings: an <em>"All sessions"</em> pill at the start, then one pill per recording (oldest-first, labelled by start time).</li>
+    <li><strong>Fullscreen popout</strong> button — requests fullscreen on the outer preview iframe so the player area expands to fill the screen with BBB's controls intact. Works around the nested-iframe permission chain that blocks BBB's own fullscreen control.</li>
+    <li><strong>Open in new tab</strong> button next to fullscreen for cases where the embedded player is constrained.</li>
+</ul>
+
+<h4>Activity Points card</h4>
+<p>The card shows BBB's engagement breakdown for the current student. It has
+two views, toggled by the recording switcher:</p>
+
+<ul>
+    <li><strong>All sessions</strong> (default): cumulative chats, talks, raise-hand events, poll votes, emoji reactions, and total attendance duration across every session the student attended. The <em>Activity Score</em> tile shows BBB's 0-10 composite, averaged across sessions.</li>
+    <li><strong>Per-session</strong>: clicking a recording pill loads that recording in the iframe <em>and</em> filters the card to that session's metrics with the session's exact Activity Score badge.</li>
+</ul>
+
+<p>Sessions match recordings on BBB's internal recording id (the same string
+that appears in <code>meta.recordid</code> of an <code>EVENT_SUMMARY</code>
+log row, and in <code>local_unifiedgrader_bbbeng.recordingid</code>).
+Sessions whose log was recorded but the recording was later deleted from
+BBB get a fallback timestamp label.</p>
+
+<h4>Activity Score caveat</h4>
+<p>BBB computes the 0-10 Activity Score <em>client-side</em> in its
+Statistics playback page — it's not in the meeting-events callback payload.
+That means the score appears only when the data has been scraped (see next
+section). Sessions whose data came purely from <code>bigbluebuttonbn_logs</code>
+won't show a score badge; the rest of the metrics still appear.</p>
+
+<h4>Statistics scraper fallback</h4>
+<p>When the BBB analytics callback isn't configured (or is misconfigured),
+no <code>EVENT_SUMMARY</code> rows reach Moodle and the engagement card is
+empty for everyone. Rather than block grading, the plugin can scrape BBB's
+own Statistics playback page server-side:</p>
+
+<ol>
+    <li>The teacher clicks <em>"Pull engagement data from BBB recordings"</em> in the engagement-pending warning.</li>
+    <li>For each recording, Moodle fetches the <code>statistics</code> playback URL via Moodle's curl wrapper.</li>
+    <li>The HTML is parsed (DOMDocument + XPath against the <code>#overview-table</code> and <code>#attention-table</code> sections).</li>
+    <li>Participants are matched to Moodle users by normalised fullname.</li>
+    <li>Results are cached in <code>local_unifiedgrader_bbbeng</code>, keyed on <code>(cmid, recordingid, userid)</code>.</li>
+    <li>The card re-renders, this time with engagement <em>and</em> Activity Score data.</li>
+</ol>
+
+<p>Scrape results are visible to the teacher who clicked: matched count,
+unmatched count, and total recordings inspected. Unmatched rows land with
+<code>userid = 0</code> for manual reconciliation. The button is gated by
+the <code>local/unifiedgrader:grade</code> capability.</p>
+
+<h4>"View full analytics" link</h4>
+<p>The Activity Points card header carries a button that opens BBB's hosted
+Statistics dashboard for the recording in a new tab — full per-attendee
+timeline, polls, and engagement breakdown. With multiple recordings the
+button becomes a dropdown listing one entry per session.</p>
+
+<h4>Advanced grading via <code>bbbext_advgrd</code></h4>
+<p>The companion <code>bbbext_advgrd</code> extension lets you configure a
+rubric or marking guide on a BBB activity. When present and configured:</p>
+
+<ul>
+    <li>The marking pane renders the rubric / marking guide alongside the standard grade and feedback fields.</li>
+    <li>Grades are saved through <code>\bbbext_advgrd\local\grader::record_grade</code> — this writes the per-user evidence snapshot, pushes the score to the gradebook (with optional passthrough), and emits per-presence sub-scores in analytic mode.</li>
+    <li>Metric-driven level suggestions (<code>grader::suggest_levels</code>) are passed into the grading definition so rubric cells could be highlighted based on the student's engagement profile.</li>
+    <li>The grading instance is reused across saves rather than minted fresh each time, so consecutive saves update the same fillings rather than orphaning prior ones.</li>
+</ul>
+
+<h4>Attendance status</h4>
+<p>A student counts as <em>submitted</em> if they have either an
+<code>EVENT_JOIN</code> or an <code>EVENT_SUMMARY</code> log for the
+activity, or any cached scrape row. The dual signal handles environments
+where the analytics callback isn't wired (you still see attendance from the
+JOIN logs Moodle writes itself when a student clicks <em>Join</em>).
+Non-attendees show a <em>"Did not attend"</em> badge but remain gradeable.</p>
+
+<h4>Group mode</h4>
+<p>BBB tags meetings and recordings with a <code>groupid</code>; the
+adapter inherits that filter when it lists recordings, so the recording
+switcher only shows recordings visible to the active group. Engagement
+data is scoped per-user regardless of group.</p>
+
+<div class="local-unifiedgrader-help-screenshot">
+    <i class="fa fa-image" aria-hidden="true"></i>
+    <span>Screenshot: BBB grading interface showing the recording switcher (with
+    "All sessions" + 3 session pills), the recording iframe playing a session,
+    and the Activity Points card below with Activity Score badge and 6 metric tiles.</span>
+</div>
+
+<h4>Required configuration recap</h4>
+<table class="table table-sm table-bordered">
+    <thead><tr><th>Where</th><th>Setting</th><th>Why</th></tr></thead>
+    <tbody>
+        <tr><td>Moodle admin</td><td><code>local_unifiedgrader/enable_bigbluebuttonbn</code></td><td>Routes BBB activities through the unified grader</td></tr>
+        <tr><td>Moodle admin</td><td><code>mod_bigbluebuttonbn/meetingevents_enabled</code> (<em>Register live sessions</em>)</td><td>Tells the BBB server where to POST analytics callbacks</td></tr>
+        <tr><td>BBB server</td><td><code>defaultKeepEvents=true</code> in <code>bbb-web.properties</code></td><td>Server keeps the raw events needed to generate the callback payload</td></tr>
+        <tr><td>BBB server</td><td>Reachable from Moodle host (HTTP/S)</td><td>Recording metadata + statistics page fetch</td></tr>
+    </tbody>
+</table>
+</section>
