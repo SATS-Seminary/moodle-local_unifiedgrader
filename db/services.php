@@ -121,6 +121,12 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_retry_file_conversion' => [
+        'classname' => 'local_unifiedgrader\external\retry_file_conversion',
+        'description' => 'Drop the cached failed-conversion record so the next preview triggers a fresh attempt.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
     'local_unifiedgrader_get_shared_library' => [
         'classname' => 'local_unifiedgrader\external\get_shared_library',
         'description' => 'Get instance-wide shared comments from other teachers.',

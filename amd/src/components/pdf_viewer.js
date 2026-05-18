@@ -28,6 +28,7 @@
 
 import {BaseComponent} from 'core/reactive';
 import {get_string as getString, get_strings as getStrings} from 'core/str';
+import Ajax from 'core/ajax';
 import PdfjsLoader from 'local_unifiedgrader/lib/pdfjs_loader';
 import FabricLoader from 'local_unifiedgrader/lib/fabric_loader';
 import AnnotationLayer from 'local_unifiedgrader/components/annotation_layer';
@@ -506,7 +507,18 @@ export default class PdfViewer extends BaseComponent {
                 return;
             }
             window.console.error('[pdf_viewer] Failed to load PDF:', err);
-            this._showError(err.message || 'Failed to load document.');
+            // When the failed URL was a docx → PDF conversion attempt and
+            // the error looks conversion-shaped (HTTP 422 from preview_file
+            // .php, or our 30-second timeout message), surface a retry
+            // affordance instead of a flat error — the underlying converter
+            // (Google Docs / unoconv / FlaskOffice) is the most common
+            // cause and is often recoverable by re-queuing the job.
+            const isConversionUrl = url.includes('preview_file.php') && url.includes('convert=pdf');
+            if (isConversionUrl) {
+                this._showConversionError(err.message || 'Document conversion failed.', url);
+            } else {
+                this._showError(err.message || 'Failed to load document.');
+            }
         } finally {
             this._showLoading(false);
             this._showLoadingMessage('');
@@ -2124,6 +2136,84 @@ export default class PdfViewer extends BaseComponent {
         if (el) {
             el.textContent = text;
             el.classList.toggle('d-none', !text);
+        }
+    }
+
+    /**
+     * Render a conversion-failed error with a "Retry conversion" button.
+     * The button asks the server to drop the cached failed-conversion row
+     * (so the next preview attempt re-runs the converter) and then re-fires
+     * the PDF load with the same URL.
+     *
+     * @param {string} text The user-facing error message.
+     * @param {string} url The conversion URL the viewer was trying to load.
+     */
+    _showConversionError(text, url) {
+        const el = this.getElement(this.selectors.ERROR_MESSAGE);
+        if (!el) {
+            return;
+        }
+        el.textContent = '';
+        el.classList.remove('d-none');
+
+        const msg = document.createElement('div');
+        msg.className = 'mb-2';
+        msg.textContent = text;
+        el.appendChild(msg);
+
+        // Pull the args the WS needs straight out of the failed URL.
+        let fileid = 0;
+        let cmid = 0;
+        try {
+            const u = new URL(url, window.location.origin);
+            fileid = parseInt(u.searchParams.get('fileid') || '0', 10);
+            cmid = parseInt(u.searchParams.get('cmid') || '0', 10);
+        } catch {
+            // Malformed URL — fall through to a plain error, no retry.
+        }
+        if (!fileid || !cmid) {
+            return;
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-primary';
+        btn.innerHTML = '<i class="fa fa-refresh me-1"></i>Retry conversion';
+        getString('retry_conversion', 'local_unifiedgrader').then((s) => {
+            btn.innerHTML = '<i class="fa fa-refresh me-1"></i>' + s;
+            return s;
+        }).catch(() => {});
+        btn.addEventListener('click', () => this._retryConversion(fileid, cmid, url, btn));
+        el.appendChild(btn);
+    }
+
+    /**
+     * Drop the cached failed-conversion row server-side and re-fire the
+     * PDF load. The retry button is disabled while in flight to prevent
+     * a rapid double-click from triggering two parallel conversions.
+     *
+     * @param {number} fileid Source file ID.
+     * @param {number} cmid Course module ID.
+     * @param {string} url The PDF preview URL to re-fetch after the cache clear.
+     * @param {HTMLButtonElement} btn The retry button (for in-flight state).
+     */
+    async _retryConversion(fileid, cmid, url, btn) {
+        btn.disabled = true;
+        try {
+            await Ajax.call([{
+                methodname: 'local_unifiedgrader_retry_file_conversion',
+                args: {cmid, fileid},
+            }])[0];
+            // Clear the early-return guard in loadPdf — it would otherwise
+            // skip the re-fetch because the URL hasn't changed.
+            this._currentUrl = null;
+            this._showError('');
+            await this.loadPdf(url);
+        } catch (err) {
+            window.console.error('[pdf_viewer] Retry conversion failed:', err);
+            this._showError(err.message || 'Retry failed.');
+        } finally {
+            btn.disabled = false;
         }
     }
 

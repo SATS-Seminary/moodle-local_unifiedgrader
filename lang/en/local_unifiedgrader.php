@@ -173,6 +173,8 @@ $string['feedback_banner_default'] = 'Your teacher has provided feedback on your
 $string['conversion_failed'] = 'This file could not be converted to PDF for preview.';
 $string['converting_file'] = 'Converting document to PDF...';
 $string['conversion_timeout'] = 'Document conversion is taking too long. Please try again later.';
+$string['retry_conversion'] = 'Retry conversion';
+$string['error_file_not_found'] = 'Source file not found.';
 $string['download_original_submission'] = 'Download original submission: {$a}';
 
 // Privacy.
