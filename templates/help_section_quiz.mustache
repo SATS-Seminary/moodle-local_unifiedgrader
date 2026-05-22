@@ -32,14 +32,43 @@ Moodle's question engine.</p>
 
 <h4>Post grades</h4>
 <p>Quiz grade visibility isn't controlled by the gradebook's hidden flag — it
-follows the quiz's <em>review options</em> bitmask. The Unified Grader's
-<em>Post grades</em> toggle updates <code>quiz.reviewmarks</code> and
-<code>quiz.reviewmaxmarks</code> for the <em>Later while open</em> and
-<em>After close</em> states. This is gated by the admin setting
-<code>enable_quiz_post_grades</code> (off by default; enable it only when
-your workflow explicitly relies on the toggle to control mark visibility).
-Scheduling a future post date is not supported for quizzes — review options
-are state-based, not date-based.</p>
+follows the quiz's <em>review options</em> matrix. Unified Grader's
+<em>Post grades</em> toggle deliberately flips a <strong>narrow, well-defined
+slice</strong> of that matrix and leaves everything else alone.</p>
+
+<p><strong>What posting changes:</strong></p>
+<ul>
+    <li><code>reviewmarks</code> — Marks shown on the quiz view page.</li>
+    <li><code>reviewmaxmarks</code> — Maximum mark shown alongside.</li>
+    <li><code>reviewoverallfeedback</code> — Per-grade-range overall feedback.</li>
+</ul>
+<p>...for the <em>Later, while the quiz is still open</em> and <em>After the quiz
+is closed</em> timeframes only. Unposting clears the same three.</p>
+
+<p><strong>What posting does <em>not</em> change:</strong></p>
+<ul>
+    <li><code>reviewattempt</code> — Whether the student can open the attempt
+    at all. If this is off in the quiz Review options, posting grades will
+    expose the score but the <em>Review</em> link won't render — students
+    can't click through to inspect their questions, answers, or any
+    per-question feedback.</li>
+    <li><code>reviewcorrectness</code>, <code>reviewspecificfeedback</code>,
+    <code>reviewrightanswer</code>, <code>reviewgeneralfeedback</code> — all
+    governed by <code>reviewattempt</code> anyway (they only appear inside
+    the attempt review page).</li>
+    <li>The <em>During the attempt</em> and <em>Immediately after the
+    attempt</em> timeframes are never touched.</li>
+</ul>
+
+<p>This means a teacher who wants <em>marks only, no question review</em>
+just leaves <code>reviewattempt</code> off in the quiz Review options page
+and uses Unified Grader's Post grades toggle to flip marks/maxmarks/overall
+feedback on or off. The two layers compose cleanly.</p>
+
+<p>Gated by the admin setting <code>enable_quiz_post_grades</code> (off by
+default; enable it only when your workflow explicitly relies on the toggle
+to control mark visibility). Scheduling a future post date is not supported
+for quizzes — review options are state-based, not date-based.</p>
 
 <h4>Quiz extensions</h4>
 <p>If the <code>quizaccess_duedate</code> plugin is installed, the Unified

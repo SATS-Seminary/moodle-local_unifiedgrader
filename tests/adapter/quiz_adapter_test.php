@@ -203,6 +203,112 @@ final class quiz_adapter_test extends \advanced_testcase {
     }
 
     /**
+     * Test set_grades_posted flips ONLY marks + maxmarks + overallfeedback
+     * for the LATER_WHILE_OPEN and AFTER_CLOSE timeframes, and leaves
+     * every other review option exactly as configured. Bug #13: teachers
+     * who deliberately disabled reviewattempt to hide the attempt
+     * contents would see UG silently revealing it; this test pins down
+     * that UG never touches those bits.
+     */
+    public function test_set_grades_posted_only_touches_marks_maxmarks_overallfeedback(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $quizid = $s->scenario->activity->id;
+
+        // Seed a "marks visible, attempt hidden" baseline — the exact case
+        // bug #13 reports. reviewattempt = 0 everywhere; everything else
+        // also off so we can detect any stray flip.
+        $DB->update_record('quiz', (object) [
+            'id' => $quizid,
+            'reviewattempt'          => 0,
+            'reviewcorrectness'      => 0,
+            'reviewmarks'            => 0,
+            'reviewmaxmarks'         => 0,
+            'reviewspecificfeedback' => 0,
+            'reviewgeneralfeedback'  => 0,
+            'reviewrightanswer'      => 0,
+            'reviewoverallfeedback'  => 0,
+        ]);
+
+        $s->adapter->set_grades_posted(0);
+        $after = $DB->get_record('quiz', ['id' => $quizid], '*', MUST_EXIST);
+
+        // The mask UG should flip: LATER_WHILE_OPEN | AFTER_CLOSE = 0x110.
+        $expectedmask = 0x00100 | 0x00010;
+
+        $this->assertSame($expectedmask, (int) $after->reviewmarks,
+            'reviewmarks should have LATER_WHILE_OPEN + AFTER_CLOSE set');
+        $this->assertSame($expectedmask, (int) $after->reviewmaxmarks,
+            'reviewmaxmarks should have LATER_WHILE_OPEN + AFTER_CLOSE set');
+        $this->assertSame($expectedmask, (int) $after->reviewoverallfeedback,
+            'reviewoverallfeedback should have LATER_WHILE_OPEN + AFTER_CLOSE set');
+
+        // The whole point of bug #13: these must remain at zero.
+        $this->assertSame(0, (int) $after->reviewattempt,
+            'reviewattempt must NOT be touched');
+        $this->assertSame(0, (int) $after->reviewcorrectness,
+            'reviewcorrectness must NOT be touched');
+        $this->assertSame(0, (int) $after->reviewspecificfeedback,
+            'reviewspecificfeedback must NOT be touched');
+        $this->assertSame(0, (int) $after->reviewgeneralfeedback,
+            'reviewgeneralfeedback must NOT be touched');
+        $this->assertSame(0, (int) $after->reviewrightanswer,
+            'reviewrightanswer must NOT be touched');
+
+        // Unposting should clear the same three back to zero without
+        // disturbing the others (still zero in this scenario).
+        $s->adapter->set_grades_posted(1);
+        $after = $DB->get_record('quiz', ['id' => $quizid], '*', MUST_EXIST);
+        $this->assertSame(0, (int) $after->reviewmarks);
+        $this->assertSame(0, (int) $after->reviewmaxmarks);
+        $this->assertSame(0, (int) $after->reviewoverallfeedback);
+        $this->assertSame(0, (int) $after->reviewattempt);
+    }
+
+    /**
+     * Test that pre-existing bits on untouched review options survive a
+     * post / unpost cycle. A teacher who enabled "Right answer" only for
+     * AFTER_CLOSE should still have that bit set after UG flips Post
+     * grades — UG must not collateral-clear what it never set.
+     */
+    public function test_set_grades_posted_preserves_unrelated_review_bits(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $quizid = $s->scenario->activity->id;
+
+        // Teacher's manual config: reviewrightanswer on for AFTER_CLOSE,
+        // reviewspecificfeedback on for LATER_WHILE_OPEN. Marks etc. off.
+        $afterclose     = 0x00010;
+        $laterwhileopen = 0x00100;
+        $DB->update_record('quiz', (object) [
+            'id' => $quizid,
+            'reviewmarks'            => 0,
+            'reviewmaxmarks'         => 0,
+            'reviewoverallfeedback'  => 0,
+            'reviewrightanswer'      => $afterclose,
+            'reviewspecificfeedback' => $laterwhileopen,
+        ]);
+
+        $s->adapter->set_grades_posted(0);
+        $after = $DB->get_record('quiz', ['id' => $quizid], '*', MUST_EXIST);
+        $this->assertSame($afterclose, (int) $after->reviewrightanswer,
+            'Right answer (AFTER_CLOSE) must survive post');
+        $this->assertSame($laterwhileopen, (int) $after->reviewspecificfeedback,
+            'Specific feedback (LATER_WHILE_OPEN) must survive post');
+
+        $s->adapter->set_grades_posted(1);
+        $after = $DB->get_record('quiz', ['id' => $quizid], '*', MUST_EXIST);
+        $this->assertSame($afterclose, (int) $after->reviewrightanswer,
+            'Right answer (AFTER_CLOSE) must survive unpost');
+        $this->assertSame($laterwhileopen, (int) $after->reviewspecificfeedback,
+            'Specific feedback (LATER_WHILE_OPEN) must survive unpost');
+    }
+
+    /**
      * Test get_user_override returns null when no override.
      */
     public function test_get_user_override_returns_null(): void {

@@ -878,9 +878,30 @@ class quiz_adapter extends base_adapter {
      * Post or unpost quiz grades by updating review options.
      *
      * Unlike assignments and forums, quiz grade visibility is controlled by
-     * the quiz's review options (reviewmarks/reviewmaxmarks bitmasks), not
-     * the gradebook's hidden flag. This override updates those bitmasks so
-     * the change persists through grade recalculations.
+     * the quiz's review options (a matrix of bitmasks), not the gradebook's
+     * hidden flag. This override flips a narrow, well-defined slice of that
+     * matrix so the change persists through grade recalculations.
+     *
+     * What this touches:
+     *   - reviewmarks            (Marks)
+     *   - reviewmaxmarks         (Maximum mark)
+     *   - reviewoverallfeedback  (Overall feedback)
+     * ...for the LATER_WHILE_OPEN and AFTER_CLOSE timeframes only.
+     *
+     * What this does NOT touch (regardless of post/unpost):
+     *   - reviewattempt          (Whether the attempt can be opened at all)
+     *   - reviewcorrectness      (Right/wrong indicator)
+     *   - reviewspecificfeedback (Per-question feedback)
+     *   - reviewrightanswer      (Correct answer reveal)
+     *   - reviewgeneralfeedback  (Per-question general feedback)
+     *   - any DURING / IMMEDIATELY_AFTER timeframe bit
+     *
+     * In other words: posting grades exposes the score + overall feedback
+     * on the quiz view page, but the per-question review experience stays
+     * exactly as the teacher configured it on the quiz Review options
+     * page. If a teacher wants students to be able to open and inspect
+     * their attempts, they must enable reviewattempt themselves — UG
+     * deliberately does not flip that switch.
      *
      * Scheduling (hidden > 1) is not supported because review options are
      * state-based (open/closed), not date-based.
@@ -903,13 +924,17 @@ class quiz_adapter extends base_adapter {
         $mask = $laterwhileopen | $afterclose;
 
         if ($hidden === 0) {
-            // Post: enable marks + max marks for LATER_WHILE_OPEN and AFTER_CLOSE.
-            $quiz->reviewmarks    = $quiz->reviewmarks | $mask;
-            $quiz->reviewmaxmarks = $quiz->reviewmaxmarks | $mask;
+            // Post: enable marks + max marks + overall feedback for
+            // LATER_WHILE_OPEN and AFTER_CLOSE. Every other review option
+            // is left untouched.
+            $quiz->reviewmarks           = $quiz->reviewmarks           | $mask;
+            $quiz->reviewmaxmarks        = $quiz->reviewmaxmarks        | $mask;
+            $quiz->reviewoverallfeedback = $quiz->reviewoverallfeedback | $mask;
         } else {
-            // Unpost: clear marks + max marks for LATER_WHILE_OPEN and AFTER_CLOSE.
-            $quiz->reviewmarks    = $quiz->reviewmarks & ~$mask;
-            $quiz->reviewmaxmarks = $quiz->reviewmaxmarks & ~$mask;
+            // Unpost: clear the same three for LATER_WHILE_OPEN and AFTER_CLOSE.
+            $quiz->reviewmarks           = $quiz->reviewmarks           & ~$mask;
+            $quiz->reviewmaxmarks        = $quiz->reviewmaxmarks        & ~$mask;
+            $quiz->reviewoverallfeedback = $quiz->reviewoverallfeedback & ~$mask;
         }
 
         $DB->update_record('quiz', $quiz);

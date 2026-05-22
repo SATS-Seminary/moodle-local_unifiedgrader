@@ -93,7 +93,14 @@ export default class extends BaseComponent {
             return;
         }
 
-        const confirmMsg = await getString('confirm_post_grades', 'local_unifiedgrader');
+        // Quizzes get a more specific confirmation because the post / unpost
+        // action there flips a narrow slice of the review-options matrix and
+        // teachers (rightly) want to know exactly what changes vs what
+        // stays as they configured it on the quiz Review options page.
+        const stringkey = state.activity.type === 'quiz'
+            ? 'confirm_post_grades_quiz'
+            : 'confirm_post_grades';
+        const confirmMsg = await getString(stringkey, 'local_unifiedgrader');
         if (!window.confirm(confirmMsg)) {
             return;
         }
@@ -113,7 +120,10 @@ export default class extends BaseComponent {
             return;
         }
 
-        const confirmMsg = await getString('confirm_unpost_grades', 'local_unifiedgrader');
+        const stringkey = state.activity.type === 'quiz'
+            ? 'confirm_unpost_grades_quiz'
+            : 'confirm_unpost_grades';
+        const confirmMsg = await getString(stringkey, 'local_unifiedgrader');
         if (!window.confirm(confirmMsg)) {
             return;
         }
