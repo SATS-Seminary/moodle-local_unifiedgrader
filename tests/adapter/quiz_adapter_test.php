@@ -238,24 +238,19 @@ final class quiz_adapter_test extends \advanced_testcase {
         // The mask UG should flip: LATER_WHILE_OPEN | AFTER_CLOSE = 0x110.
         $expectedmask = 0x00100 | 0x00010;
 
-        $this->assertSame($expectedmask, (int) $after->reviewmarks,
-            'reviewmarks should have LATER_WHILE_OPEN + AFTER_CLOSE set');
-        $this->assertSame($expectedmask, (int) $after->reviewmaxmarks,
-            'reviewmaxmarks should have LATER_WHILE_OPEN + AFTER_CLOSE set');
-        $this->assertSame($expectedmask, (int) $after->reviewoverallfeedback,
-            'reviewoverallfeedback should have LATER_WHILE_OPEN + AFTER_CLOSE set');
+        // The three review options UG flips on post — each should now
+        // have the LATER_WHILE_OPEN + AFTER_CLOSE bits set.
+        $this->assertSame($expectedmask, (int) $after->reviewmarks);
+        $this->assertSame($expectedmask, (int) $after->reviewmaxmarks);
+        $this->assertSame($expectedmask, (int) $after->reviewoverallfeedback);
 
-        // The whole point of bug #13: these must remain at zero.
-        $this->assertSame(0, (int) $after->reviewattempt,
-            'reviewattempt must NOT be touched');
-        $this->assertSame(0, (int) $after->reviewcorrectness,
-            'reviewcorrectness must NOT be touched');
-        $this->assertSame(0, (int) $after->reviewspecificfeedback,
-            'reviewspecificfeedback must NOT be touched');
-        $this->assertSame(0, (int) $after->reviewgeneralfeedback,
-            'reviewgeneralfeedback must NOT be touched');
-        $this->assertSame(0, (int) $after->reviewrightanswer,
-            'reviewrightanswer must NOT be touched');
+        // The whole point of bug #13: these must remain at zero. UG
+        // must never touch reviewattempt or its dependent fields.
+        $this->assertSame(0, (int) $after->reviewattempt);
+        $this->assertSame(0, (int) $after->reviewcorrectness);
+        $this->assertSame(0, (int) $after->reviewspecificfeedback);
+        $this->assertSame(0, (int) $after->reviewgeneralfeedback);
+        $this->assertSame(0, (int) $after->reviewrightanswer);
 
         // Unposting should clear the same three back to zero without
         // disturbing the others (still zero in this scenario).
@@ -282,7 +277,7 @@ final class quiz_adapter_test extends \advanced_testcase {
 
         // Teacher's manual config: reviewrightanswer on for AFTER_CLOSE,
         // reviewspecificfeedback on for LATER_WHILE_OPEN. Marks etc. off.
-        $afterclose     = 0x00010;
+        $afterclose = 0x00010;
         $laterwhileopen = 0x00100;
         $DB->update_record('quiz', (object) [
             'id' => $quizid,
@@ -293,19 +288,17 @@ final class quiz_adapter_test extends \advanced_testcase {
             'reviewspecificfeedback' => $laterwhileopen,
         ]);
 
+        // Post grades — teacher's reviewrightanswer + reviewspecificfeedback bits must survive.
         $s->adapter->set_grades_posted(0);
         $after = $DB->get_record('quiz', ['id' => $quizid], '*', MUST_EXIST);
-        $this->assertSame($afterclose, (int) $after->reviewrightanswer,
-            'Right answer (AFTER_CLOSE) must survive post');
-        $this->assertSame($laterwhileopen, (int) $after->reviewspecificfeedback,
-            'Specific feedback (LATER_WHILE_OPEN) must survive post');
+        $this->assertSame($afterclose, (int) $after->reviewrightanswer);
+        $this->assertSame($laterwhileopen, (int) $after->reviewspecificfeedback);
 
+        // Unpost grades — same survival expectation.
         $s->adapter->set_grades_posted(1);
         $after = $DB->get_record('quiz', ['id' => $quizid], '*', MUST_EXIST);
-        $this->assertSame($afterclose, (int) $after->reviewrightanswer,
-            'Right answer (AFTER_CLOSE) must survive unpost');
-        $this->assertSame($laterwhileopen, (int) $after->reviewspecificfeedback,
-            'Specific feedback (LATER_WHILE_OPEN) must survive unpost');
+        $this->assertSame($afterclose, (int) $after->reviewrightanswer);
+        $this->assertSame($laterwhileopen, (int) $after->reviewspecificfeedback);
     }
 
     /**

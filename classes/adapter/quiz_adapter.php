@@ -927,13 +927,13 @@ class quiz_adapter extends base_adapter {
             // Post: enable marks + max marks + overall feedback for
             // LATER_WHILE_OPEN and AFTER_CLOSE. Every other review option
             // is left untouched.
-            $quiz->reviewmarks           = $quiz->reviewmarks           | $mask;
-            $quiz->reviewmaxmarks        = $quiz->reviewmaxmarks        | $mask;
+            $quiz->reviewmarks = $quiz->reviewmarks | $mask;
+            $quiz->reviewmaxmarks = $quiz->reviewmaxmarks | $mask;
             $quiz->reviewoverallfeedback = $quiz->reviewoverallfeedback | $mask;
         } else {
             // Unpost: clear the same three for LATER_WHILE_OPEN and AFTER_CLOSE.
-            $quiz->reviewmarks           = $quiz->reviewmarks           & ~$mask;
-            $quiz->reviewmaxmarks        = $quiz->reviewmaxmarks        & ~$mask;
+            $quiz->reviewmarks = $quiz->reviewmarks & ~$mask;
+            $quiz->reviewmaxmarks = $quiz->reviewmaxmarks & ~$mask;
             $quiz->reviewoverallfeedback = $quiz->reviewoverallfeedback & ~$mask;
         }
 
