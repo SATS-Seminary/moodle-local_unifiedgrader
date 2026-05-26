@@ -58,15 +58,59 @@ class submission_comment_notification {
                 self::send_message($author, $student, $course, $cm, $url, $content);
             }
         } else {
-            // Student posted — notify all teachers with grading capability.
+            // Student posted — notify the teachers responsible for them.
+            //
+            // When the activity is in group mode AND the student belongs to
+            // at least one group, scope the notification to teachers who
+            // share a group with the student. Otherwise the course-level
+            // teacher gets pinged for every group's comments, which is
+            // exactly what the group-teacher model is meant to avoid.
+            //
+            // If no group teacher matches (e.g. an orphan group with no
+            // teacher assigned, or the student is in no groups at all),
+            // fall back to all graders so the message never gets lost.
+            global $CFG;
+            require_once($CFG->libdir . '/grouplib.php');
+
             $graders = get_enrolled_users($context, 'local/unifiedgrader:grade');
             $graderurl = new \moodle_url('/local/unifiedgrader/grade.php', ['cmid' => $cmid]);
+
+            $groupmode = groups_get_activity_groupmode($cm, $course);
+            $studentgroupids = [];
+            if ($groupmode != NOGROUPS) {
+                foreach (groups_get_user_groups($course->id, $studentuserid) as $groupids) {
+                    foreach ($groupids as $gid) {
+                        $studentgroupids[(int) $gid] = true;
+                    }
+                }
+            }
+
+            $matched = [];
+            $fallback = [];
             foreach ($graders as $grader) {
-                // Don't notify the author themselves.
                 if ((int) $grader->id === $authorid) {
                     continue;
                 }
-                self::send_message($author, $grader, $course, $cm, $graderurl, $content);
+                $fallback[] = $grader;
+                if (empty($studentgroupids)) {
+                    continue;
+                }
+                $teachergroupids = [];
+                foreach (groups_get_user_groups($course->id, $grader->id) as $groupids) {
+                    foreach ($groupids as $gid) {
+                        $teachergroupids[(int) $gid] = true;
+                    }
+                }
+                if (!empty(array_intersect_key($studentgroupids, $teachergroupids))) {
+                    $matched[] = $grader;
+                }
+            }
+
+            // Use group teachers when at least one shares a group with the
+            // student; fall back to every grader only if none does.
+            $recipients = !empty($matched) ? $matched : $fallback;
+            foreach ($recipients as $recipient) {
+                self::send_message($author, $recipient, $course, $cm, $graderurl, $content);
             }
         }
     }
