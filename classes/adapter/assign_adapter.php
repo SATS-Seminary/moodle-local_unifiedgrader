@@ -1377,6 +1377,16 @@ class assign_adapter extends base_adapter {
         if (!$submission || $submission->status === 'new') {
             return 'nosubmission';
         }
+        // Explicit draft status takes precedence over a lingering grade row:
+        // reverting a graded submission flips assign_submission.status to
+        // 'draft' but leaves the assign_grades row intact, so a grade-first
+        // check here would keep returning 'graded' and the participants list
+        // would never reflect the revert (the marking-panel pill, which reads
+        // submission.status raw, would say 'Draft' — two contradictory verdicts).
+        if ($submission->status === ASSIGN_SUBMISSION_STATUS_DRAFT
+            || $submission->status === ASSIGN_SUBMISSION_STATUS_REOPENED) {
+            return $submission->status;
+        }
         if ($grade && $grade->grade !== null && $grade->grade >= 0) {
             return 'graded';
         }

@@ -406,6 +406,73 @@ final class assign_adapter_test extends \advanced_testcase {
     }
 
     /**
+     * Reverting an ungraded submission to draft must surface as 'draft' in
+     * the participant list. revert_to_draft creates a placeholder assign_grades
+     * row with grade=null even when the teacher never scored the work, so this
+     * pins down that the no-grade path still resolves to 'draft' and doesn't
+     * stay on 'submitted' or fall through to 'graded'.
+     */
+    public function test_get_participants_reverted_ungraded_submission_shows_draft(): void {
+        $this->resetAfterTest();
+
+        $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $s = $this->create_scenario();
+        $student = $s->scenario->students[0];
+
+        $this->setUser($student);
+        $plugingen->create_assign_submission($s->scenario->activity, $student->id);
+
+        $this->setUser($s->scenario->teacher);
+        $s->adapter->perform_submission_action($student->id, 'revert_to_draft');
+
+        $participants = $s->adapter->get_participants();
+        $entry = null;
+        foreach ($participants as $p) {
+            if ((int) $p['id'] === (int) $student->id) {
+                $entry = $p;
+                break;
+            }
+        }
+        $this->assertNotNull($entry, 'student missing from participants');
+        $this->assertSame('draft', $entry['status']);
+    }
+
+    /**
+     * Reverting a graded submission to draft must surface as 'draft' in the
+     * participant list. The assign_grades row outlives the revert action, so
+     * resolve_status used to short-circuit on the grade and keep returning
+     * 'graded' — the marking panel pill said 'Draft' while the participant
+     * list still said 'Graded' for the same student.
+     */
+    public function test_get_participants_reverted_graded_submission_shows_draft(): void {
+        $this->resetAfterTest();
+
+        $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $s = $this->create_scenario();
+        $student = $s->scenario->students[0];
+
+        // Student submits.
+        $this->setUser($student);
+        $plugingen->create_assign_submission($s->scenario->activity, $student->id);
+
+        // Teacher grades, then reverts to draft.
+        $this->setUser($s->scenario->teacher);
+        $s->adapter->save_grade($student->id, 85.0, '<p>Initial grade.</p>');
+        $s->adapter->perform_submission_action($student->id, 'revert_to_draft');
+
+        $participants = $s->adapter->get_participants();
+        $entry = null;
+        foreach ($participants as $p) {
+            if ((int) $p['id'] === (int) $student->id) {
+                $entry = $p;
+                break;
+            }
+        }
+        $this->assertNotNull($entry, 'student missing from participants');
+        $this->assertSame('draft', $entry['status']);
+    }
+
+    /**
      * Test get_user_override returns null when no override exists.
      */
     public function test_get_user_override_returns_null(): void {
