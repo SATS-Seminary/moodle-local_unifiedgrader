@@ -830,13 +830,17 @@ export default class extends BaseComponent {
         nameEl.textContent = student.fullname;
         info.appendChild(nameEl);
 
-        if (student.email) {
+        // Show the email as a mailto: link only when satsmail is not installed.
+        // When satsmail is available, the Send mail button below provides the
+        // mail action and the email address itself is noise — the teacher can
+        // still find it on the full profile via the View profile button.
+        if (student.email && !state.ui.hassatsmail) {
             const emailLink = document.createElement('a');
             emailLink.className = 'small text-muted text-decoration-none';
             emailLink.href = 'mailto:' + student.email;
             emailLink.textContent = student.email;
             info.appendChild(emailLink);
-        } else {
+        } else if (!student.email) {
             const noEmail = document.createElement('span');
             noEmail.className = 'small text-muted';
             noEmail.textContent = '—';
