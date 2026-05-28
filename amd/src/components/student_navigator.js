@@ -833,30 +833,8 @@ export default class extends BaseComponent {
         if (student.email) {
             const emailLink = document.createElement('a');
             emailLink.className = 'small text-muted text-decoration-none';
-            // When local_satsmail is installed, the email line becomes a
-            // 'Send mail' shortcut into satsmail's compose flow (course-
-            // scoped, student pre-filled as recipient). Otherwise fall back
-            // to the standard mailto: link so the teacher's mail client
-            // still gets used. The email address itself is still visible
-            // in the student's full profile via the View profile button.
-            if (state.ui.hassatsmail) {
-                const composeUrl = new URL(window.M.cfg.wwwroot + '/local/satsmail/create.php');
-                composeUrl.searchParams.set('course', String(state.activity.courseid));
-                composeUrl.searchParams.set('recipients', String(student.id));
-                composeUrl.searchParams.set('sesskey', window.M.cfg.sesskey);
-                emailLink.href = composeUrl.toString();
-                emailLink.target = '_blank';
-                emailLink.rel = 'noopener';
-                emailLink.title = student.email;
-                emailLink.textContent = 'Send mail';
-                getString('profile_send_mail', 'local_unifiedgrader').then((s) => {
-                    emailLink.textContent = s;
-                    return s;
-                }).catch(() => {});
-            } else {
-                emailLink.href = 'mailto:' + student.email;
-                emailLink.textContent = student.email;
-            }
+            emailLink.href = 'mailto:' + student.email;
+            emailLink.textContent = student.email;
             info.appendChild(emailLink);
         } else {
             const noEmail = document.createElement('span');
@@ -892,6 +870,28 @@ export default class extends BaseComponent {
             // Ignore.
         });
         actions.appendChild(profileLink);
+
+        // When local_satsmail is installed, surface a "Send mail" action that
+        // opens satsmail's compose flow pre-filled with course context and
+        // the student as the recipient. Falls back silently to the mailto:
+        // link on the email line when satsmail isn't deployed.
+        if (state.ui.hassatsmail && student.email) {
+            const mailLink = document.createElement('a');
+            const composeUrl = new URL(window.M.cfg.wwwroot + '/local/satsmail/create.php');
+            composeUrl.searchParams.set('course', String(state.activity.courseid));
+            composeUrl.searchParams.set('recipients', String(student.id));
+            composeUrl.searchParams.set('sesskey', window.M.cfg.sesskey);
+            mailLink.href = composeUrl.toString();
+            mailLink.className = 'btn btn-sm btn-outline-secondary';
+            mailLink.target = '_blank';
+            mailLink.rel = 'noopener';
+            mailLink.innerHTML = '<i class="fa fa-envelope me-1"></i>Send mail';
+            getString('profile_send_mail', 'local_unifiedgrader').then((s) => {
+                mailLink.innerHTML = '<i class="fa fa-envelope me-1"></i>' + s;
+                return s;
+            }).catch(() => {});
+            actions.appendChild(mailLink);
+        }
 
         if (state.ui.canloginas) {
             const loginLink = document.createElement('a');
