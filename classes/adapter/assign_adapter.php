@@ -1383,8 +1383,10 @@ class assign_adapter extends base_adapter {
         // check here would keep returning 'graded' and the participants list
         // would never reflect the revert (the marking-panel pill, which reads
         // submission.status raw, would say 'Draft' — two contradictory verdicts).
-        if ($submission->status === ASSIGN_SUBMISSION_STATUS_DRAFT
-            || $submission->status === ASSIGN_SUBMISSION_STATUS_REOPENED) {
+        if (
+            $submission->status === ASSIGN_SUBMISSION_STATUS_DRAFT
+            || $submission->status === ASSIGN_SUBMISSION_STATUS_REOPENED
+        ) {
             return $submission->status;
         }
         if ($grade && $grade->grade !== null && $grade->grade >= 0) {
