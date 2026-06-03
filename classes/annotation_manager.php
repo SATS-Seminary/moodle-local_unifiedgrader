@@ -89,6 +89,12 @@ class annotation_manager {
 
         $now = time();
 
+        // Wrap the per-page batch in a delegated transaction so all pages from a single
+        // client-initiated save either commit or roll back together. The unique index on
+        // (cmid, userid, authorid, fileid, pagenum) means the race-condition loser will
+        // throw cleanly on insert; the transaction guarantees a partial batch never lands.
+        $transaction = $DB->start_delegated_transaction();
+
         foreach ($pages as $page) {
             $pagenum = (int) $page['pagenum'];
             $data = $page['annotationdata'];
@@ -131,6 +137,8 @@ class annotation_manager {
                 $DB->insert_record('local_unifiedgrader_annot', $record);
             }
         }
+
+        $transaction->allow_commit();
 
         return true;
     }

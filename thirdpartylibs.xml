@@ -6,17 +6,27 @@
     <version>4.10.38</version>
     <license>Apache-2.0</license>
     <licenseversion>2.0</licenseversion>
+    <sha256>
+      <file path="pdf.min.js">27fc2a057a00f92a4334ad06e17dbd7259912954e9fb7f76400bcca5fd190a9c</file>
+      <file path="pdf.worker.min.js">1baa1844c89c80a5b2797c916e75ab29254be46d8e9cb53cb6364d7aad84be36</file>
+    </sha256>
   </library>
   <library>
     <location>thirdparty/fabric</location>
     <name>Fabric.js</name>
     <version>6.9.1</version>
     <license>MIT</license>
+    <sha256>
+      <file path="fabric.js">125c92d38f195e19cdcbd963791098ab0c5d48ae661223b806a19659e613764b</file>
+    </sha256>
   </library>
   <library>
     <location>thirdparty/pdflib</location>
     <name>pdf-lib</name>
     <version>1.17.1</version>
     <license>MIT</license>
+    <sha256>
+      <file path="pdf-lib.min.js">0f9a5cad07941f0826586c94e089d89b918c46e5c17cf2d5a3c6f666e3bc694f</file>
+    </sha256>
   </library>
 </libraries>

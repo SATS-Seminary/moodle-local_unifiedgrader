@@ -62,6 +62,20 @@ export default class extends BaseComponent {
         this._profileVisible = false;
         /** @type {?Function} Outside-click handler for profile popout dismissal. */
         this._profileOutsideClickHandler = null;
+        /**
+         * Cache of the last-known participant record per userid. Survives the
+         * client-side filter changes that occasionally evict the current student
+         * from `state.participants` — e.g. teacher has `needsgrading` filter on,
+         * grades the student, server-side refresh drops the row from the WS
+         * response, and `participants.find(p => p.id === currentUser.id)`
+         * returns undefined for the header lookup. Without this cache the
+         * header rendered '--' for the student name until the next refresh
+         * brought them back; the marking panel itself stayed correct because
+         * it keys on `state.currentUser.id` directly.
+         *
+         * @type {Map<number, object>}
+         */
+        this._participantCache = new Map();
     }
 
     /**
@@ -582,9 +596,11 @@ export default class extends BaseComponent {
             list.appendChild(item);
         });
 
-        // Update counter and header (status may have changed after grading).
+        // Refresh the snapshot cache from this participant list, then resolve
+        // the header student through the helper (cache fallback inside).
+        this._refreshParticipantCache(participants);
         this._updateCounter(state);
-        const current = participants.find(p => p.id === currentId);
+        const current = this._resolveCurrentParticipant(currentId);
         this._updateHeaderStudentInfo(current);
     }
 
@@ -597,7 +613,8 @@ export default class extends BaseComponent {
     _updateCurrentStudent({state}) {
         const nameEl = this.getElement(this.selectors.CURRENT_NAME);
         const participants = [...state.participants.values()];
-        const current = participants.find(p => p.id === state.currentUser?.id);
+        this._refreshParticipantCache(participants);
+        const current = this._resolveCurrentParticipant(state.currentUser?.id);
 
         if (nameEl) {
             nameEl.textContent = current ? current.fullname : '--';
@@ -613,6 +630,44 @@ export default class extends BaseComponent {
 
         this._updateCounter(state);
         this._updateHeaderStudentInfo(current);
+    }
+
+    /**
+     * Update the snapshot cache from the latest participants list. Each
+     * participant we see — keyed by userid — gets remembered so the header
+     * can still render their name/avatar after a filter change evicts them
+     * from the active list.
+     *
+     * @param {object[]} participants Latest participants array.
+     */
+    _refreshParticipantCache(participants) {
+        for (const p of participants) {
+            if (p && p.id !== undefined && p.id !== null) {
+                this._participantCache.set(Number(p.id), p);
+            }
+        }
+    }
+
+    /**
+     * Resolve the current student record. Prefers the live participants list
+     * (so any status / grade / late changes propagate immediately) and falls
+     * back to the snapshot cache when the active filter has evicted them.
+     * Returns undefined if neither source has them — that's a genuine
+     * "no student selected" state.
+     *
+     * @param {number|undefined} userid The current user's id.
+     * @return {object|undefined}
+     */
+    _resolveCurrentParticipant(userid) {
+        if (userid === undefined || userid === null) {
+            return undefined;
+        }
+        const live = [...this.reactive.state.participants.values()]
+            .find(p => Number(p.id) === Number(userid));
+        if (live) {
+            return live;
+        }
+        return this._participantCache.get(Number(userid));
     }
 
     /**
@@ -716,8 +771,7 @@ export default class extends BaseComponent {
      * @param {object} args.state Current state.
      */
     _onSubmissionUpdated({state}) {
-        const participants = [...state.participants.values()];
-        const current = participants.find(p => p.id === state.currentUser?.id);
+        const current = this._resolveCurrentParticipant(state.currentUser?.id);
 
         // Rebuild the status dropdown first (it clears the wrapper),
         // then add the override indicator after.
@@ -800,8 +854,7 @@ export default class extends BaseComponent {
         }
 
         const state = this.reactive.state;
-        const participants = [...state.participants.values()];
-        const student = participants.find(p => p.id === state.currentUser?.id);
+        const student = this._resolveCurrentParticipant(state.currentUser?.id);
         if (!student) {
             return;
         }

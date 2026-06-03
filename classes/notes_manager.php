@@ -46,8 +46,30 @@ class notes_manager {
             'userid' => $userid,
         ], 'timecreated DESC');
 
-        return array_values(array_map(function ($note) {
-            $author = \core_user::get_user($note->authorid);
+        // Batch-fetch all authors in a single query to avoid the N+1 pattern
+        // that the previous \core_user::get_user() loop incurred on cold renders.
+        $authorids = array_values(array_unique(array_map(
+            fn($n) => (int) $n->authorid,
+            $notes,
+        )));
+        $authors = [];
+        if (!empty($authorids)) {
+            // Use the name+userpic fields so fullname() and any future avatar
+            // rendering have everything they need (firstname, lastname,
+            // alternatename fields per site config, plus picture/imagealt/email/id).
+            $userfields = \core_user\fields::for_name()->with_userpic()->get_required_fields();
+            [$insql, $inparams] = $DB->get_in_or_equal($authorids, SQL_PARAMS_NAMED, 'uid');
+            $authors = $DB->get_records_select(
+                'user',
+                "id {$insql}",
+                $inparams,
+                '',
+                implode(',', $userfields),
+            );
+        }
+
+        return array_values(array_map(function ($note) use ($authors) {
+            $author = $authors[(int) $note->authorid] ?? null;
             return [
                 'id' => (int) $note->id,
                 'cmid' => (int) $note->cmid,

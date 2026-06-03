@@ -311,8 +311,10 @@ function createBubble(comment, cmid, userid, listEl) {
     // Content body bubble.
     const body = document.createElement('div');
     body.className = 'comment-body';
-    // Trust boundary: comment.content is sanitized server-side by Moodle core's
-    // comment API (format_text). innerHTML is intentional to preserve formatting.
+    // Trust boundary: comment.content is sanitized server-side in
+    // get_submission_comments / add_submission_comment via format_text()
+    // with FORMAT_MOODLE before being returned. innerHTML is intentional
+    // to preserve the resulting safe formatting.
     body.innerHTML = comment.content;
     bubble.appendChild(body);
 

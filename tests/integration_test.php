@@ -490,7 +490,7 @@ class integration_test extends \advanced_testcase {
         $result = feedback_data_helper::parse_grading_data([
             'gradingdefinition' => $definition,
             'rubricdata' => $rubricdata,
-        ]);
+        ], \context_system::instance());
 
         $this->assertTrue($result['hasrubric']);
         $this->assertFalse($result['hasguide']);
@@ -532,7 +532,7 @@ class integration_test extends \advanced_testcase {
         $result = feedback_data_helper::parse_grading_data([
             'gradingdefinition' => $definition,
             'rubricdata' => $rubricdata,
-        ]);
+        ], \context_system::instance());
 
         $this->assertFalse($result['hasrubric']);
         $this->assertTrue($result['hasguide']);

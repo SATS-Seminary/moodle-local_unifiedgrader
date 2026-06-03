@@ -71,7 +71,7 @@ $activityinfo = $adapter->get_activity_info();
 // Parse grade, penalties, and rubric/guide data via shared helper.
 $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
 $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
-$gradinginfo = feedback_data_helper::parse_grading_data($gradedata);
+$gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
 
 // Get feedback text with rewritten pluginfile URLs.
 $feedback = '';

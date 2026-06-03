@@ -67,8 +67,10 @@ class comment_library_manager {
 
         $comments = $DB->get_records_sql($sql, $params);
 
-        return array_values(array_map(function ($c) {
-            return self::format_comment($c);
+        [$tagsbycomment, $propsbycomment] = self::prefetch_comment_metadata(array_keys($comments));
+
+        return array_values(array_map(function ($c) use ($tagsbycomment, $propsbycomment) {
+            return self::format_comment($c, $tagsbycomment, $propsbycomment);
         }, $comments));
     }
 
@@ -86,8 +88,9 @@ class comment_library_manager {
             ['userid' => 0],
             'sortorder ASC, timecreated DESC',
         );
-        return array_values(array_map(function ($c) {
-            return self::format_comment($c);
+        [$tagsbycomment, $propsbycomment] = self::prefetch_comment_metadata(array_keys($records));
+        return array_values(array_map(function ($c) use ($tagsbycomment, $propsbycomment) {
+            return self::format_comment($c, $tagsbycomment, $propsbycomment);
         }, $records));
     }
 
@@ -383,8 +386,10 @@ class comment_library_manager {
 
         $comments = $DB->get_records_sql($sql, $params);
 
-        return array_values(array_map(function ($c) {
-            $formatted = self::format_comment($c);
+        [$tagsbycomment, $propsbycomment] = self::prefetch_comment_metadata(array_keys($comments));
+
+        return array_values(array_map(function ($c) use ($tagsbycomment, $propsbycomment) {
+            $formatted = self::format_comment($c, $tagsbycomment, $propsbycomment);
             $formatted['ownername'] = fullname($c);
             return $formatted;
         }, $comments));
@@ -446,18 +451,81 @@ class comment_library_manager {
     }
 
     /**
-     * Format a comment record with its tags for API output.
+     * Batch-fetch tag mappings and latest proposals for a set of comment IDs.
      *
-     * @param object $record The DB record.
-     * @return array Formatted comment.
+     * Returns a tuple of two maps keyed by comment id:
+     *   - tags:  commentid => int[] tag ids
+     *   - props: commentid => stdClass {status, decisionreason} (latest only)
+     *
+     * Replaces the per-comment DB hits previously done inside format_comment()
+     * — turns N+1 queries into 2 queries regardless of the number of comments.
+     *
+     * @param int[] $commentids
+     * @return array{0: array<int,int[]>, 1: array<int,\stdClass>}
      */
-    private static function format_comment(object $record): array {
+    private static function prefetch_comment_metadata(array $commentids): array {
         global $DB;
 
-        $tagids = $DB->get_fieldset_select('local_unifiedgrader_clmap', 'tagid', 'commentid = ?', [$record->id]);
+        if (empty($commentids)) {
+            return [[], []];
+        }
+
+        // Tag mappings.
+        [$insql, $inparams] = $DB->get_in_or_equal($commentids, SQL_PARAMS_NAMED, 'cid');
+        $maps = $DB->get_records_select(
+            'local_unifiedgrader_clmap',
+            "commentid {$insql}",
+            $inparams,
+            '',
+            'id, commentid, tagid',
+        );
+        $tagsbycomment = [];
+        foreach ($maps as $m) {
+            $tagsbycomment[(int) $m->commentid][] = (int) $m->tagid;
+        }
+
+        // Latest proposal per comment — ORDER BY timecreated DESC, then keep
+        // the first occurrence we see for each commentid.
+        [$insql2, $inparams2] = $DB->get_in_or_equal($commentids, SQL_PARAMS_NAMED, 'cidp');
+        $props = $DB->get_records_select(
+            'local_unifiedgrader_clibprop',
+            "commentid {$insql2}",
+            $inparams2,
+            'timecreated DESC',
+            'id, commentid, status, decisionreason',
+        );
+        $propsbycomment = [];
+        foreach ($props as $p) {
+            $cid = (int) $p->commentid;
+            if (!isset($propsbycomment[$cid])) {
+                $propsbycomment[$cid] = $p;
+            }
+        }
+
+        return [$tagsbycomment, $propsbycomment];
+    }
+
+    /**
+     * Format a comment record with its tags for API output.
+     *
+     * Tag and proposal data must be pre-fetched by the caller via
+     * prefetch_comment_metadata() so this method does no DB I/O per row.
+     *
+     * @param object $record The DB record.
+     * @param array $tagsbycomment Map of commentid to list of tag ids.
+     * @param array $propsbycomment Map of commentid to latest proposal row (stdClass).
+     * @return array Formatted comment.
+     */
+    private static function format_comment(
+        object $record,
+        array $tagsbycomment,
+        array $propsbycomment,
+    ): array {
+        $id = (int) $record->id;
+        $tagids = $tagsbycomment[$id] ?? [];
 
         $out = [
-            'id' => (int) $record->id,
+            'id' => $id,
             'userid' => (int) $record->userid,
             'coursecode' => $record->coursecode,
             'content' => $record->content,
@@ -474,18 +542,10 @@ class comment_library_manager {
         // "Pending review" / "Rejected" badge on the proposer's own card.
         // System-default rows (userid = 0) never have proposals.
         if ((int) $record->userid !== 0) {
-            $latest = $DB->get_records(
-                'local_unifiedgrader_clibprop',
-                ['commentid' => (int) $record->id],
-                'timecreated DESC',
-                'status, decisionreason',
-                0,
-                1,
-            );
-            if (!empty($latest)) {
-                $first = reset($latest);
-                $out['proposalstatus'] = (string) $first->status;
-                $out['proposalreason'] = (string) ($first->decisionreason ?? '');
+            $latest = $propsbycomment[$id] ?? null;
+            if ($latest !== null) {
+                $out['proposalstatus'] = (string) $latest->status;
+                $out['proposalreason'] = (string) ($latest->decisionreason ?? '');
             }
         }
 

@@ -1585,14 +1585,25 @@ SCRIPT;
                         $levels[] = [
                             'id' => (int) $levelid,
                             'score' => (float) ($level['score'] ?? 0),
-                            'definition' => $level['definition'] ?? '',
+                            // Teacher-authored HTML — format before emitting to the client to
+                            // prevent stored-XSS via Mustache triple-stache rendering.
+                            'definition' => format_text(
+                                $level['definition'] ?? '',
+                                FORMAT_HTML,
+                                ['context' => $this->context],
+                            ),
                         ];
                     }
                     usort($levels, fn($a, $b) => $a['score'] <=> $b['score']);
                 }
                 $criteria[] = [
                     'id' => (int) $criterionid,
-                    'description' => $criterion['description'] ?? '',
+                    // Teacher-authored HTML — see note above.
+                    'description' => format_text(
+                        $criterion['description'] ?? '',
+                        FORMAT_HTML,
+                        ['context' => $this->context],
+                    ),
                     'levels' => $levels,
                 ];
             }
@@ -1603,7 +1614,13 @@ SCRIPT;
                 $criteria[] = [
                     'id' => (int) $criterionid,
                     'shortname' => $criterion['shortname'] ?? '',
-                    'description' => $criterion['description'] ?? '',
+                    // Teacher-authored HTML — format before emitting to the client to
+                    // prevent stored-XSS via Mustache triple-stache rendering.
+                    'description' => format_text(
+                        $criterion['description'] ?? '',
+                        FORMAT_HTML,
+                        ['context' => $this->context],
+                    ),
                     'descriptionmarkers' => format_text(
                         $criterion['descriptionmarkers'] ?? '',
                         FORMAT_HTML,

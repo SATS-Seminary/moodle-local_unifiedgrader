@@ -263,7 +263,10 @@ function createBubble(comment, cmid, userid, listEl) {
 
     const body = document.createElement('div');
     body.className = 'comment-body';
-    // Trust boundary: content is sanitized server-side.
+    // Trust boundary: comment.content is sanitized server-side in
+    // get_submission_comments / add_submission_comment via format_text()
+    // with FORMAT_MOODLE before being returned. innerHTML is intentional
+    // to preserve the resulting safe formatting.
     body.innerHTML = comment.content;
     bubble.appendChild(body);
 

@@ -126,14 +126,22 @@ class feedback_data_helper {
     /**
      * Parse rubric/marking guide data for display.
      *
-     * @param array $gradedata From adapter get_grade_data()
+     * The teacher-authored HTML fields (`description`, `definition`, `remark`)
+     * are run through `format_text()` before being returned because the student
+     * feedback view renders them via Mustache triple-stache (`{{{ ... }}}`).
+     * Without formatting, a teacher with edit rights could store XSS that fires
+     * in the student's browser.
+     *
+     * @param array $gradedata From adapter get_grade_data().
+     * @param \context $context Module context — required for media filters /
+     *                          pluginfile rewrites in the formatted HTML.
      * @return array {
      *     hasrubric: bool, rubriccriteria: array, rubrictotal: float,
      *     hasguide: bool, guidecriteria: array, guidetotal: float, guidemaxtotal: float,
      *     hasadvancedgrading: bool, gradingmethod: string, gradingmethodname: string
      * }
      */
-    public static function parse_grading_data(array $gradedata): array {
+    public static function parse_grading_data(array $gradedata, \context $context): array {
         $gradingdefinition = null;
         $rubricdata = null;
         $hasrubric = false;
@@ -151,6 +159,8 @@ class feedback_data_helper {
         if (!empty($gradedata['rubricdata'])) {
             $rubricdata = json_decode($gradedata['rubricdata'], true);
         }
+
+        $formatopts = ['context' => $context];
 
         if ($gradingdefinition && !empty($gradingdefinition['criteria'])) {
             $gradingmethod = $gradingdefinition['method'] ?? 'simple';
@@ -174,7 +184,7 @@ class feedback_data_helper {
                         $isselected = $fill['levelid'] && $fill['levelid'] === $level['id'];
                         $levels[] = [
                             'score' => $level['score'],
-                            'definition' => $level['definition'],
+                            'definition' => format_text($level['definition'] ?? '', FORMAT_HTML, $formatopts),
                             'selected' => $isselected,
                         ];
                         if ($isselected) {
@@ -182,11 +192,11 @@ class feedback_data_helper {
                         }
                     }
                     $rubriccriteria[] = [
-                        'description' => $criterion['description'],
+                        'description' => format_text($criterion['description'] ?? '', FORMAT_HTML, $formatopts),
                         'levels' => $levels,
                         'selectedscore' => $selectedscore,
                         'hasselection' => $selectedscore !== null,
-                        'remark' => $fill['remark'],
+                        'remark' => format_text($fill['remark'] ?? '', FORMAT_HTML, $formatopts),
                         'hasremark' => !empty($fill['remark']),
                     ];
                     if ($selectedscore !== null) {
@@ -209,11 +219,11 @@ class feedback_data_helper {
                     $score = $fill['score'] !== '' ? (float) $fill['score'] : null;
                     $guidecriteria[] = [
                         'shortname' => $criterion['shortname'],
-                        'description' => $criterion['description'] ?? '',
+                        'description' => format_text($criterion['description'] ?? '', FORMAT_HTML, $formatopts),
                         'maxscore' => $criterion['maxscore'],
                         'score' => $score,
                         'hasscore' => $score !== null,
-                        'remark' => $fill['remark'],
+                        'remark' => format_text($fill['remark'] ?? '', FORMAT_HTML, $formatopts),
                         'hasremark' => !empty($fill['remark']),
                     ];
                     if ($score !== null) {

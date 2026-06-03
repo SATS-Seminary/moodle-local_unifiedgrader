@@ -161,10 +161,71 @@ class assign_adapter extends base_adapter {
 
         $globalduedate = (int) $instance->duedate;
 
+        // Batch-load the latest submission, grade, and flags for every participant.
+        // The non-batched code path called assign::get_user_submission(), get_user_grade(),
+        // and get_user_flags() per user — 3N round-trips for the marking dashboard's
+        // main use case. Team submissions still go through the per-user path because
+        // assign_submission rows are keyed by groupid, not userid.
+        $submissionsbyuser = [];
+        $gradesbyuser = [];
+        $flagsbyuser = [];
+
+        if (empty($instance->teamsubmission)) {
+            // Latest submission per user (groupid=0 for individual submissions).
+            $subsql = "SELECT s.*
+                         FROM {assign_submission} s
+                         JOIN (SELECT userid, MAX(attemptnumber) AS maxa
+                                 FROM {assign_submission}
+                                WHERE assignment = :aid AND groupid = 0
+                                GROUP BY userid) m
+                           ON m.userid = s.userid AND m.maxa = s.attemptnumber
+                        WHERE s.assignment = :aid2 AND s.groupid = 0";
+            $subrows = $DB->get_records_sql($subsql, [
+                'aid' => $instance->id,
+                'aid2' => $instance->id,
+            ]);
+            // Re-key by userid because get_records_sql keys by the first column (id).
+            foreach ($subrows as $sub) {
+                $submissionsbyuser[(int) $sub->userid] = $sub;
+            }
+
+            // Latest grade per user — mirrors assign::get_user_grade() which sorts
+            // assign_grades by attemptnumber DESC and takes the first row.
+            $gradesql = "SELECT g.*
+                           FROM {assign_grades} g
+                           JOIN (SELECT userid, MAX(attemptnumber) AS maxa
+                                   FROM {assign_grades}
+                                  WHERE assignment = :aid
+                                  GROUP BY userid) m
+                             ON m.userid = g.userid AND m.maxa = g.attemptnumber
+                          WHERE g.assignment = :aid2";
+            $graderows = $DB->get_records_sql($gradesql, [
+                'aid' => $instance->id,
+                'aid2' => $instance->id,
+            ]);
+            foreach ($graderows as $g) {
+                $gradesbyuser[(int) $g->userid] = $g;
+            }
+        }
+
+        // User flags don't vary by attempt, so a flat lookup is always safe.
+        $flagrows = $DB->get_records('assign_user_flags', ['assignment' => $instance->id]);
+        foreach ($flagrows as $f) {
+            $flagsbyuser[(int) $f->userid] = $f;
+        }
+
         $result = [];
         foreach ($participants as $participant) {
-            $submission = $this->get_submission($participant->id) ?: null;
-            $grade = $this->assign->get_user_grade($participant->id, false) ?: null;
+            $uidlookup = (int) $participant->id;
+            if (!empty($instance->teamsubmission)) {
+                // Team submissions are keyed by group — fall back to the per-user
+                // helper so we don't have to reimplement get_group_submission().
+                $submission = $this->get_submission($participant->id) ?: null;
+                $grade = $this->assign->get_user_grade($participant->id, false) ?: null;
+            } else {
+                $submission = $submissionsbyuser[$uidlookup] ?? null;
+                $grade = $gradesbyuser[$uidlookup] ?? null;
+            }
             $status = $this->resolve_status($submission, $grade);
 
             // Build display name (handle blind marking).
@@ -177,7 +238,7 @@ class assign_adapter extends base_adapter {
             $userpicture->size = 64;
             $profileimageurl = $userpicture->get_url($PAGE)->out(false);
 
-            $flags = $this->assign->get_user_flags($participant->id, false);
+            $flags = $flagsbyuser[$uidlookup] ?? null;
             $locked = ($flags && !empty($flags->locked));
 
             // Effective due date: override duedate > extension duedate > global duedate.
@@ -1796,7 +1857,13 @@ class assign_adapter extends base_adapter {
                         $levels[] = [
                             'id' => (int) $levelid,
                             'score' => (float) ($level['score'] ?? 0),
-                            'definition' => $level['definition'] ?? '',
+                            // Teacher-authored HTML — format before emitting to the client to
+                            // prevent stored-XSS via Mustache triple-stache rendering.
+                            'definition' => format_text(
+                                $level['definition'] ?? '',
+                                FORMAT_HTML,
+                                ['context' => $this->context],
+                            ),
                         ];
                     }
                     // Sort levels by score ascending.
@@ -1804,7 +1871,12 @@ class assign_adapter extends base_adapter {
                 }
                 $criteria[] = [
                     'id' => (int) $criterionid,
-                    'description' => $criterion['description'] ?? '',
+                    // Teacher-authored HTML — see note above.
+                    'description' => format_text(
+                        $criterion['description'] ?? '',
+                        FORMAT_HTML,
+                        ['context' => $this->context],
+                    ),
                     'levels' => $levels,
                 ];
             }
@@ -1815,7 +1887,13 @@ class assign_adapter extends base_adapter {
                 $criteria[] = [
                     'id' => (int) $criterionid,
                     'shortname' => $criterion['shortname'] ?? '',
-                    'description' => $criterion['description'] ?? '',
+                    // Teacher-authored HTML — format before emitting to the client to
+                    // prevent stored-XSS via Mustache triple-stache rendering.
+                    'description' => format_text(
+                        $criterion['description'] ?? '',
+                        FORMAT_HTML,
+                        ['context' => $this->context],
+                    ),
                     'descriptionmarkers' => format_text(
                         $criterion['descriptionmarkers'] ?? '',
                         FORMAT_HTML,

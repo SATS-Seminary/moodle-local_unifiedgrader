@@ -297,5 +297,60 @@ function xmldb_local_unifiedgrader_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026051203, 'local', 'unifiedgrader');
     }
 
+    if ($oldversion < 2026052900) {
+        // Replace the non-unique (cmid, userid, fileid) index on local_unifiedgrader_annot
+        // with a UNIQUE index over (cmid, userid, authorid, fileid, pagenum). This closes a
+        // race condition where two overlapping autosave web service calls could both observe
+        // "no row" via get_record and both insert, producing duplicate annotation rows that
+        // corrupted subsequent reads.
+
+        $table = new xmldb_table('local_unifiedgrader_annot');
+
+        // 1. De-duplicate any existing rows that share the new composite key. Keep the row
+        // with the highest id (most recently inserted), delete the older losers. We must do
+        // this BEFORE adding the unique index, otherwise the index add will fail on any
+        // install that has already been bitten by the race.
+        $duplicatesql = "SELECT cmid, userid, authorid, fileid, pagenum, MAX(id) AS keepid, COUNT(*) AS dupes
+                           FROM {local_unifiedgrader_annot}
+                          GROUP BY cmid, userid, authorid, fileid, pagenum
+                         HAVING COUNT(*) > 1";
+        $duplicategroups = $DB->get_records_sql($duplicatesql);
+        foreach ($duplicategroups as $group) {
+            $DB->delete_records_select(
+                'local_unifiedgrader_annot',
+                'cmid = :cmid AND userid = :userid AND authorid = :authorid
+                 AND fileid = :fileid AND pagenum = :pagenum AND id <> :keepid',
+                [
+                    'cmid' => $group->cmid,
+                    'userid' => $group->userid,
+                    'authorid' => $group->authorid,
+                    'fileid' => $group->fileid,
+                    'pagenum' => $group->pagenum,
+                    'keepid' => $group->keepid,
+                ]
+            );
+        }
+
+        // 2. Drop the old non-unique index if it exists. The new unique index strictly
+        // covers more columns (and includes cmid+userid as a left-prefix), so the old
+        // partial-prefix index is fully subsumed.
+        $oldindex = new xmldb_index('ix_cmid_userid_fileid', XMLDB_INDEX_NOTUNIQUE, ['cmid', 'userid', 'fileid']);
+        if ($dbman->index_exists($table, $oldindex)) {
+            $dbman->drop_index($table, $oldindex);
+        }
+
+        // 3. Add the new unique index.
+        $newindex = new xmldb_index(
+            'uix_cmid_userid_authorid_fileid_pagenum',
+            XMLDB_INDEX_UNIQUE,
+            ['cmid', 'userid', 'authorid', 'fileid', 'pagenum']
+        );
+        if (!$dbman->index_exists($table, $newindex)) {
+            $dbman->add_index($table, $newindex);
+        }
+
+        upgrade_plugin_savepoint(true, 2026052900, 'local', 'unifiedgrader');
+    }
+
     return true;
 }

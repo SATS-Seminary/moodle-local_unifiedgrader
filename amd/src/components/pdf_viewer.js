@@ -469,10 +469,14 @@ export default class PdfViewer extends BaseComponent {
             this._pdfBytes = pdfData.slice(0);
 
             // Load the PDF document.
+            // isEvalSupported: false — defense-in-depth against eval-based PDF.js exploits.
+            // Current PDF.js (4.10.38) no longer has an eval sink in the font loader, but
+            // explicitly disabling eval is cheap insurance against future regressions.
             this._pdfDoc = await this._pdfjsLib.getDocument({
                 data: pdfData,
                 disableRange: true,
                 disableStream: true,
+                isEvalSupported: false,
             }).promise;
 
             this._currentUrl = url;

@@ -247,6 +247,52 @@ final class submission_comment_webservices_test extends \advanced_testcase {
     }
 
     /**
+     * Stored XSS guard: an attacker posting a comment with a script payload
+     * must not have that payload survive the round-trip through the WS layer.
+     * The format_text(FORMAT_MOODLE) wrapper on add_submission_comment and
+     * get_submission_comments is what neutralises this; this test pins that
+     * behaviour so a future regression that re-exposes the raw content
+     * fails loudly instead of silently re-enabling stored XSS.
+     */
+    public function test_submission_comment_strips_script_payload(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+
+        // Post a comment with an inline <script> + an event handler payload.
+        $payload = 'innocent text<script>alert(1)</script>'
+            . '<img src=x onerror="alert(2)">'
+            . '<a href="javascript:alert(3)">click</a>';
+        $addresult = add_submission_comment::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+            $payload,
+        );
+
+        // The returned content from add_submission_comment must not contain
+        // the unescaped <script>, the inline onerror handler, or the
+        // javascript: URI scheme. The innocent prefix should survive.
+        $this->assertStringContainsString('innocent text', $addresult['content']);
+        $this->assertStringNotContainsString('<script', $addresult['content']);
+        $this->assertStringNotContainsString('onerror=', $addresult['content']);
+        $this->assertStringNotContainsString('javascript:', $addresult['content']);
+
+        // Same check on the read path: get_submission_comments must filter
+        // stored content with the same hand, otherwise an attacker could
+        // bypass via the read endpoint.
+        $listresult = \local_unifiedgrader\external\get_submission_comments::execute(
+            $scenario->cm->id,
+            $scenario->students[0]->id,
+        );
+        $this->assertCount(1, $listresult['comments']);
+        $stored = $listresult['comments'][0]['content'];
+        $this->assertStringContainsString('innocent text', $stored);
+        $this->assertStringNotContainsString('<script', $stored);
+        $this->assertStringNotContainsString('onerror=', $stored);
+        $this->assertStringNotContainsString('javascript:', $stored);
+    }
+
+    /**
      * Test add_submission_comment throws when user lacks both grade and viewfeedback capabilities.
      */
     public function test_add_submission_comment_no_capability(): void {

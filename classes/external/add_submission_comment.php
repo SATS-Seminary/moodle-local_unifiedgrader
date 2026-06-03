@@ -109,7 +109,14 @@ class add_submission_comment extends external_api {
 
         return [
             'id' => (int) $record->id,
-            'content' => $record->content,
+            // Filter the just-stored content the same way get_submission_comments
+            // does on read so the client renders sanitized HTML uniformly,
+            // whether it just posted the comment or fetched it later.
+            'content' => format_text(
+                $record->content,
+                FORMAT_MOODLE,
+                ['context' => $context, 'para' => false]
+            ),
             'fullname' => fullname($USER),
             'time' => userdate($record->timecreated),
             'count' => $count,

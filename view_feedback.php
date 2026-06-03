@@ -149,7 +149,7 @@ if ($cm->modname === 'forum') {
     // Parse grade, penalties, and rubric/guide data via shared helper.
     $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
     $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
-    $gradinginfo = feedback_data_helper::parse_grading_data($gradedata);
+    $gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
     $gradedisplay = $gradeinfo['gradedisplay'];
 
     // Feedback text (from gradebook for forums). Already formatted by get_grade_data()
@@ -487,7 +487,7 @@ $PAGE->add_body_class('local-unifiedgrader-feedback-page');
 // Parse grade, penalties, and rubric/guide data via shared helper.
 $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
 $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
-$gradinginfo = feedback_data_helper::parse_grading_data($gradedata);
+$gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
 $gradedisplay = $gradeinfo['gradedisplay'];
 
 // Create assign object (needed for feedback file rewriting and submission comments).

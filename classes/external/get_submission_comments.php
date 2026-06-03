@@ -100,7 +100,16 @@ class get_submission_comments extends external_api {
 
             $result[] = [
                 'id' => (int) $c->id,
-                'content' => $c->content,
+                // Run user-supplied content through Moodle's standard XSS filter.
+                // The content column is PARAM_RAW on the way in — any tags the
+                // poster typed survive the WS. We rely on format_text() at
+                // render time to strip scripts and dangerous attributes; the
+                // returned HTML is safe to assign to innerHTML on the client.
+                'content' => format_text(
+                    $c->content,
+                    FORMAT_MOODLE,
+                    ['context' => $context, 'para' => false]
+                ),
                 'fullname' => $author ? fullname($author) : '',
                 'avatar' => $avatar,
                 'time' => userdate($c->timecreated),
