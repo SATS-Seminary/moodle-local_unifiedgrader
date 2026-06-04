@@ -830,15 +830,43 @@ export default class PdfViewer extends BaseComponent {
                     return;
                 }
                 this._currentTool = tool;
-                this._setTextSelectableAll(tool === 'textselect');
-                // Propagate tool to all other layers.
+                // Text-driven tools (plain select, highlight, strikethrough) all
+                // need PDF.js's text layer interactable so the browser can build
+                // a Selection. The text-line annotation tools also need our
+                // mouseup capture wired up — see _toggleTextAnnotationListeners.
+                const textTools = ['textselect', 'texthighlight', 'strikethrough'];
+                this._setTextSelectableAll(textTools.includes(tool));
+                this._toggleTextAnnotationListeners(
+                    tool === 'texthighlight' || tool === 'strikethrough'
+                );
+                // Propagate tool to all other layers. try/finally is
+                // load-bearing: if any otherSlot.annotationLayer.setTool throws
+                // synchronously (Fabric DOM access on a half-disposed canvas,
+                // for instance), without it _propagating would stay pinned to
+                // true for the lifetime of the page — every subsequent tool
+                // click would silently early-return at the top of this
+                // callback, leaving the toolbar visually "active" but the
+                // active page's tool state unmoved. A page refresh would
+                // appear to "fix it" because the constructor reinitialises
+                // the flag. We log the underlying error so it stays visible
+                // during dev/CI even when the user-facing symptom is masked.
                 this._propagating = true;
-                for (const [otherNum, otherSlot] of this._pageSlots) {
-                    if (otherNum !== pageNum && otherSlot.annotationLayer) {
-                        otherSlot.annotationLayer.setTool(tool);
+                try {
+                    for (const [otherNum, otherSlot] of this._pageSlots) {
+                        if (otherNum !== pageNum && otherSlot.annotationLayer) {
+                            try {
+                                otherSlot.annotationLayer.setTool(tool);
+                            } catch (e) {
+                                window.console.error(
+                                    '[pdf_viewer] setTool propagation failed for page '
+                                    + otherNum + ':', e
+                                );
+                            }
+                        }
                     }
+                } finally {
+                    this._propagating = false;
                 }
-                this._propagating = false;
             });
         }
 
@@ -864,13 +892,28 @@ export default class PdfViewer extends BaseComponent {
                 original(value);
                 if (!viewer._propagating) {
                     viewer[stateKey] = value;
+                    // try/finally for the same reason as the onToolChange
+                    // propagation loop: a synchronous throw on any one slot
+                    // must not pin _propagating to true and silently disable
+                    // every subsequent state change.
                     viewer._propagating = true;
-                    for (const [otherNum, otherSlot] of viewer._pageSlots) {
-                        if (otherNum !== pageNum && otherSlot.annotationLayer) {
-                            otherSlot.annotationLayer[methodName](value);
+                    try {
+                        for (const [otherNum, otherSlot] of viewer._pageSlots) {
+                            if (otherNum !== pageNum && otherSlot.annotationLayer) {
+                                try {
+                                    otherSlot.annotationLayer[methodName](value);
+                                } catch (e) {
+                                    window.console.error(
+                                        '[pdf_viewer] ' + methodName
+                                        + ' propagation failed for page '
+                                        + otherNum + ':', e
+                                    );
+                                }
+                            }
                         }
+                    } finally {
+                        viewer._propagating = false;
                     }
-                    viewer._propagating = false;
                 }
             };
         };
@@ -966,6 +1009,14 @@ export default class PdfViewer extends BaseComponent {
 
         this._pageSlots.clear();
         this._activeAnnotationLayer = null;
+        // The annotation toolbar still holds a reference to whichever layer
+        // was active when _destroyAllSlots ran (typically from a zoom). Drop
+        // it explicitly so the next tool click can't route into a disposed
+        // layer; the next _renderPageIfNeeded -> _initAnnotationLayer for
+        // page 1 will re-link the toolbar.
+        if (this._annotationToolbar) {
+            this._annotationToolbar.setLayer(null);
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -1605,11 +1656,108 @@ export default class PdfViewer extends BaseComponent {
     }
 
     /**
+     * Toggle the mouseup capture used by text-highlight and strikethrough
+     * tools. Wired in parallel to the word-count tooltip listener — both
+     * fire on the same gesture, with different effects depending on the
+     * active tool.
+     *
+     * @param {boolean} enabled True when a text-annotation tool is active.
+     */
+    _toggleTextAnnotationListeners(enabled) {
+        const container = this.getElement(this.selectors.PAGE_CONTAINER);
+        if (!container) {
+            return;
+        }
+        if (enabled) {
+            if (!this._onTextAnnotMouseUp) {
+                this._onTextAnnotMouseUp = () => this._handleTextAnnotationMouseUp();
+            }
+            container.addEventListener('mouseup', this._onTextAnnotMouseUp);
+        } else if (this._onTextAnnotMouseUp) {
+            container.removeEventListener('mouseup', this._onTextAnnotMouseUp);
+        }
+    }
+
+    /**
+     * Handle mouseup in a text-annotation tool — capture the live Selection,
+     * find which page's text layer it lives in, translate each client-rect
+     * to that page's canvas coordinates, and ask the page's annotation_layer
+     * to materialise the annotation.
+     *
+     * Browsers return one DOMRect per visual line from Range.getClientRects().
+     * For selections that span multiple pages we honour the page the range
+     * STARTED on — annotations are page-scoped in storage and the user's
+     * mental model rarely crosses pages anyway.
+     */
+    _handleTextAnnotationMouseUp() {
+        const tool = this._currentTool;
+        if (tool !== 'texthighlight' && tool !== 'strikethrough') {
+            return;
+        }
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+            return;
+        }
+        const range = sel.getRangeAt(0);
+        if (!range || range.collapsed) {
+            return;
+        }
+
+        // Find the text-layer the range starts in, so we can pick the right page.
+        let startNode = range.startContainer;
+        if (startNode.nodeType === Node.TEXT_NODE) {
+            startNode = startNode.parentNode;
+        }
+        let owningSlot = null;
+        for (const [, slot] of this._pageSlots) {
+            if (slot.textLayerDiv && slot.textLayerDiv.contains(startNode)) {
+                owningSlot = slot;
+                break;
+            }
+        }
+        if (!owningSlot || !owningSlot.annotationLayer) {
+            return;
+        }
+
+        // Translate the range's client rects into the text layer's coordinate
+        // space (= the annotation canvas's coordinate space — both layers are
+        // positioned at the same origin with the same CSS dimensions).
+        const layerRect = owningSlot.textLayerDiv.getBoundingClientRect();
+        const rawRects = Array.from(range.getClientRects());
+        const rects = rawRects
+            .map(r => ({
+                left: r.left - layerRect.left,
+                top: r.top - layerRect.top,
+                width: r.width,
+                height: r.height,
+            }))
+            .filter(r => r.width > 0.5 && r.height > 0.5);
+        if (rects.length === 0) {
+            return;
+        }
+
+        owningSlot.annotationLayer.applyTextSelection(tool, rects);
+
+        // Drop the native selection so the highlight stands alone visually.
+        sel.removeAllRanges();
+        // Suppress the word-count tooltip that the parallel word-count
+        // listener may have queued — its mouseup runs in the same tick.
+        this._hideWordCountTooltip();
+    }
+
+    /**
      * Handle mouseup in text-select mode — show word count if text is selected.
      *
      * @param {MouseEvent} e The mouseup event.
      */
     _handleTextSelectMouseUp(e) {
+        // Suppress the tooltip when a text-annotation tool is the active one
+        // — the parallel _handleTextAnnotationMouseUp will consume the
+        // selection and the tooltip would flash for a frame before being
+        // cleared. The plain text-select tool still gets it.
+        if (this._currentTool === 'texthighlight' || this._currentTool === 'strikethrough') {
+            return;
+        }
         const sel = window.getSelection();
         const text = sel ? sel.toString().trim() : '';
         if (!text) {

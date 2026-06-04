@@ -31,6 +31,8 @@ export const TOOLS = {
     TEXT_SELECT: 'textselect',
     COMMENT: 'comment',
     HIGHLIGHT: 'highlight',
+    TEXT_HIGHLIGHT: 'texthighlight',
+    STRIKETHROUGH: 'strikethrough',
     PEN: 'pen',
     STAMP: 'stamp',
     SHAPE: 'shape',
@@ -190,6 +192,94 @@ export function createHighlight(fabric, left, top, width, height, color) {
     });
     rect.annotationType = 'highlight';
     return rect;
+}
+
+/**
+ * Create a text-line highlight annotation from a selection's client rects.
+ *
+ * The caller passes one rect per visual line of selected text — typically
+ * obtained from `Range.getClientRects()` after a text-tool mouseup, then
+ * translated into canvas coordinates relative to the PDF page. We render
+ * one translucent Fabric.Rect per line and bundle them into a single
+ * Group so the whole highlight selects/deletes/drags as a unit.
+ *
+ * Resize and rotate are locked because the geometry is bound to the
+ * underlying text — letting the user stretch it would just visually
+ * detach the annotation from the words it marks. Drag is allowed so a
+ * mis-placed highlight can be nudged.
+ *
+ * @param {object} fabric The Fabric.js library namespace.
+ * @param {Array<{left:number, top:number, width:number, height:number}>} rects One per line.
+ * @param {string} color Fill colour for the highlight rectangles.
+ * @returns {?object} Fabric.js Group, or null if no usable rects were passed.
+ */
+export function createTextHighlight(fabric, rects, color) {
+    const usable = rects.filter(r => r.width > 0 && r.height > 0);
+    if (usable.length === 0) {
+        return null;
+    }
+    const shapes = usable.map(r => new fabric.Rect({
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+        fill: color,
+        opacity: 0.35,
+        originX: 'left',
+        originY: 'top',
+    }));
+    const group = new fabric.Group(shapes, {
+        selectable: true,
+        hasControls: false,
+        lockRotation: true,
+        lockScalingX: true,
+        lockScalingY: true,
+    });
+    group.annotationType = 'texthighlight';
+    return group;
+}
+
+/**
+ * Create a strikethrough annotation from a selection's client rects.
+ *
+ * One thin horizontal Fabric.Line per visual line of selected text,
+ * positioned at each rect's vertical centre. Same resize-locked /
+ * drag-enabled posture as `createTextHighlight` — the geometry is
+ * meaningful relative to the underlying words.
+ *
+ * @param {object} fabric The Fabric.js library namespace.
+ * @param {Array<{left:number, top:number, width:number, height:number}>} rects One per line.
+ * @param {string} color Stroke colour for the strikethrough lines.
+ * @returns {?object} Fabric.js Group, or null if no usable rects were passed.
+ */
+export function createTextStrikethrough(fabric, rects, color) {
+    const usable = rects.filter(r => r.width > 0 && r.height > 0);
+    if (usable.length === 0) {
+        return null;
+    }
+    const lines = usable.map((r) => {
+        const midY = r.top + (r.height / 2);
+        return new fabric.Line(
+            [r.left, midY, r.left + r.width, midY],
+            {
+                stroke: color,
+                strokeWidth: 2,
+                strokeLineCap: 'round',
+                opacity: 0.85,
+                originX: 'left',
+                originY: 'top',
+            }
+        );
+    });
+    const group = new fabric.Group(lines, {
+        selectable: true,
+        hasControls: false,
+        lockRotation: true,
+        lockScalingX: true,
+        lockScalingY: true,
+    });
+    group.annotationType = 'strikethrough';
+    return group;
 }
 
 /**

@@ -130,6 +130,15 @@ export default class AnnotationToolbar {
         const stamp = btn.dataset.stamp || null;
         const shape = btn.dataset.shape || null;
 
+        // Layer can be null briefly during a zoom (pdf_viewer destroys all
+        // slots before re-initialising page 1). Silently ignore — the tool's
+        // visual active state is intentionally still updated below so the
+        // user's selection persists until the new layer arrives.
+        if (!this._layer) {
+            this._activeTool = stamp ? 'stamp' : (shape ? 'shape' : tool);
+            return;
+        }
+
         // If clicking the same stamp, or a different tool, update.
         // For stamps, also set the stamp type.
         if (stamp) {
@@ -471,6 +480,14 @@ export default class AnnotationToolbar {
      */
     setLayer(layer) {
         this._layer = layer;
+        // null clears the link — used by pdf_viewer._destroyAllSlots() so a
+        // subsequent tool click can't route into a disposed layer between
+        // teardown and the next page's _initAnnotationLayer. The button
+        // states stay frozen on what they were last; the next setLayer with
+        // a real instance will refresh them.
+        if (!layer) {
+            return;
+        }
         // Register callbacks only once per layer instance (avoid accumulation
         // when the user scrolls back and forth between pages).
         if (!this._registeredLayers) {

@@ -33,6 +33,7 @@
 import {
     TOOLS, CUSTOM_PROPS, DEFAULT_COLOR, SHAPES,
     createCommentMarker, createHighlight, createStamp,
+    createTextHighlight, createTextStrikethrough,
     createShapeRect, createShapeEllipse, createShapeLine, createShapeArrow,
     validateAnnotationJson,
 } from 'local_unifiedgrader/annotation/types';
@@ -219,57 +220,80 @@ export default class AnnotationLayer {
         }
         this._closeCommentPicker();
         this._currentTool = tool;
-        if (!this._canvas) {
+        if (!this._canvas || !this._canvas.upperCanvasEl) {
+            // The Fabric canvas is either not yet initialised or has been
+            // disposed by destroy(). The latter case can race with the
+            // pdf_viewer's per-page propagation loop — a synchronous throw
+            // here would otherwise leave the viewer's _propagating flag
+            // pinned and silently break every subsequent tool change. The
+            // outer loop now wraps each setTool in try/catch as
+            // belt-and-braces; the bail-out here keeps the failure mode
+            // contained.
             return;
         }
 
-        // Text-select mode: make Fabric.js canvas fully transparent to events
-        // so the PDF.js text layer underneath can handle text selection.
-        if (tool === TOOLS.TEXT_SELECT) {
-            this._canvas.isDrawingMode = false;
-            this._canvas.discardActiveObject();
-            this._canvas.forEachObject((obj) => {
-                obj.selectable = false;
-                obj.evented = false;
-            });
-            // Let pointer events pass through the Fabric.js upper canvas.
+        // From here on the canvas may still get disposed by a sibling
+        // destroy() while we iterate its objects, so wrap the Fabric calls
+        // in a single try/catch that logs and returns rather than letting
+        // a Fabric-internal exception bubble into the propagation loop.
+        try {
+            // Text-driven tools: make Fabric.js canvas fully transparent to
+            // events so the PDF.js text layer underneath can handle text
+            // selection. The pdf_viewer's mouseup handler then captures the
+            // selection rects and calls applyTextSelection() on the active
+            // layer with the chosen tool.
+            if (tool === TOOLS.TEXT_SELECT
+                || tool === TOOLS.TEXT_HIGHLIGHT
+                || tool === TOOLS.STRIKETHROUGH) {
+                this._canvas.isDrawingMode = false;
+                this._canvas.discardActiveObject();
+                this._canvas.forEachObject((obj) => {
+                    obj.selectable = false;
+                    obj.evented = false;
+                });
+                // Let pointer events pass through the Fabric.js upper canvas.
+                const upper = this._canvas.upperCanvasEl;
+                if (upper) {
+                    upper.style.pointerEvents = 'none';
+                }
+                this._canvas.requestRenderAll();
+                this._notifyToolChange(tool);
+                return;
+            }
+
+            // Re-enable pointer events on the Fabric upper canvas for all other tools.
             const upper = this._canvas.upperCanvasEl;
             if (upper) {
-                upper.style.pointerEvents = 'none';
+                upper.style.pointerEvents = 'auto';
+            }
+
+            // Toggle Fabric.js drawing mode for pen tool.
+            if (tool === TOOLS.PEN) {
+                this._canvas.isDrawingMode = true;
+                this._canvas.freeDrawingBrush = new this._fabric.PencilBrush(this._canvas);
+                this._canvas.freeDrawingBrush.color = this._currentColor;
+                this._canvas.freeDrawingBrush.width = this._brushWidth;
+            } else {
+                this._canvas.isDrawingMode = false;
+            }
+
+            // In select and comment modes, allow object selection so existing
+            // annotations can be moved. Other tools disable selection entirely.
+            const allowSelect = (tool === TOOLS.SELECT || tool === TOOLS.COMMENT);
+            this._canvas.forEachObject((obj) => {
+                obj.selectable = allowSelect;
+                obj.evented = allowSelect;
+            });
+            if (!allowSelect) {
+                this._canvas.discardActiveObject();
             }
             this._canvas.requestRenderAll();
             this._notifyToolChange(tool);
-            return;
+        } catch (e) {
+            window.console.warn(
+                '[annotation_layer] setTool aborted on half-disposed canvas:', e
+            );
         }
-
-        // Re-enable pointer events on the Fabric upper canvas for all other tools.
-        const upper = this._canvas.upperCanvasEl;
-        if (upper) {
-            upper.style.pointerEvents = 'auto';
-        }
-
-        // Toggle Fabric.js drawing mode for pen tool.
-        if (tool === TOOLS.PEN) {
-            this._canvas.isDrawingMode = true;
-            this._canvas.freeDrawingBrush = new this._fabric.PencilBrush(this._canvas);
-            this._canvas.freeDrawingBrush.color = this._currentColor;
-            this._canvas.freeDrawingBrush.width = this._brushWidth;
-        } else {
-            this._canvas.isDrawingMode = false;
-        }
-
-        // In select and comment modes, allow object selection so existing
-        // annotations can be moved. Other tools disable selection entirely.
-        const allowSelect = (tool === TOOLS.SELECT || tool === TOOLS.COMMENT);
-        this._canvas.forEachObject((obj) => {
-            obj.selectable = allowSelect;
-            obj.evented = allowSelect;
-        });
-        if (!allowSelect) {
-            this._canvas.discardActiveObject();
-        }
-        this._canvas.requestRenderAll();
-        this._notifyToolChange(tool);
     }
 
     /**
@@ -509,6 +533,33 @@ export default class AnnotationLayer {
      */
     hasSelection() {
         return !!this._canvas && !!this._canvas.getActiveObject();
+    }
+
+    /**
+     * Apply the user's text selection as an annotation. Called by pdf_viewer
+     * after the text-tool mouseup capture, with rects already translated
+     * into this canvas's coordinate space (one rect per visual line of the
+     * selection). The active text-tool determines the annotation shape.
+     *
+     * @param {string} tool One of TOOLS.TEXT_HIGHLIGHT / TOOLS.STRIKETHROUGH.
+     * @param {Array<{left:number, top:number, width:number, height:number}>} rects
+     */
+    applyTextSelection(tool, rects) {
+        if (this._readOnly || !this._canvas || !Array.isArray(rects) || rects.length === 0) {
+            return;
+        }
+        let obj = null;
+        if (tool === TOOLS.TEXT_HIGHLIGHT) {
+            obj = createTextHighlight(this._fabric, rects, this._currentColor);
+        } else if (tool === TOOLS.STRIKETHROUGH) {
+            obj = createTextStrikethrough(this._fabric, rects, this._currentColor);
+        }
+        if (!obj) {
+            return;
+        }
+        this._canvas.add(obj);
+        this._canvas.requestRenderAll();
+        this._notifyChange();
     }
 
     /**
