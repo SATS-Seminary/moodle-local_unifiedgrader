@@ -1,4 +1,4 @@
-@local_unifiedgrader @local_unifiedgrader_critical @javascript
+@local @local_unifiedgrader @local_unifiedgrader_critical @javascript
 Feature: Annotation tools stay responsive after a PDF zoom
   In order to keep marking after I zoom the PDF preview
   As a teacher with annotation rights
