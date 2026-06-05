@@ -133,4 +133,38 @@ class behat_local_unifiedgrader extends behat_base {
         $input = $this->find('xpath', $xpath);
         $input->setValue($score);
     }
+
+    /**
+     * Assert the *active annotation layer* reports the given tool. Reads the
+     * `data-current-tool` attribute stamped on the canvas wrapper by
+     * AnnotationLayer._notifyToolChange — which only fires when the layer
+     * actually accepted the tool change, distinct from the toolbar button's
+     * .active class which can drift away from the layer's state when a
+     * propagation race silently no-ops the dispatch (the exact regression
+     * v2.5.1 + v2.5.2 chased).
+     *
+     * The "active" layer is the page slot whose annotation wrapper is the
+     * most recent one to receive a tool stamp. We pick the last wrapper in
+     * document order that has the attribute set — matches the toolbar's
+     * current binding after a normal scroll/zoom sequence.
+     *
+     * Example:
+     *   Then the active annotation layer should report tool "pen"
+     *
+     * @Then /^the active annotation layer should report tool "(?P<tool>[a-z]+)"$/
+     * @param string $tool Expected tool key (e.g. pen, highlight, texthighlight).
+     */
+    public function the_active_annotation_layer_should_report_tool(string $tool): void {
+        $tool = $this->unescape_argument($tool);
+        // Wait for the propagation tick to settle before reading.
+        $this->execute('behat_general::wait_until_the_page_is_ready');
+        // Any wrapper carrying the attribute will do — propagation keeps
+        // every page in sync, so picking the first is sufficient.
+        $node = $this->find('css', '[data-current-tool="' . $tool . '"]');
+        if (!$node) {
+            throw new Exception(
+                "Expected an annotation layer reporting tool '{$tool}'; none found"
+            );
+        }
+    }
 }

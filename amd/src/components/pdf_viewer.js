@@ -755,15 +755,28 @@ export default class PdfViewer extends BaseComponent {
 
             slot.rendered = true;
 
-            // Create toolbar when first annotation layer is ready.
-            if (!this._readOnly && !this._annotationToolbar && slot.annotationLayer) {
-                const toolbarEl = this.getElement(this.selectors.ANNOTATION_TOOLBAR);
-                if (toolbarEl) {
-                    this._annotationToolbar = new AnnotationToolbar(toolbarEl, slot.annotationLayer);
-                    this._annotationToolbar.show();
+            // Create toolbar when the first annotation layer is ready, or
+            // re-link it to the freshly-initialised layer if a prior
+            // _destroyAllSlots cleared the reference (zoom path). Without
+            // the re-link branch the toolbar would sit with _layer=null
+            // until the user happened to scroll and trigger _setActiveSlot
+            // — every tool click in the interim would silently no-op.
+            if (!this._readOnly && slot.annotationLayer) {
+                if (!this._annotationToolbar) {
+                    const toolbarEl = this.getElement(this.selectors.ANNOTATION_TOOLBAR);
+                    if (toolbarEl) {
+                        this._annotationToolbar = new AnnotationToolbar(
+                            toolbarEl, slot.annotationLayer
+                        );
+                        this._annotationToolbar.show();
+                    }
+                    this._activeAnnotationLayer = slot.annotationLayer;
+                    this._pushDocumentInfo();
+                } else if (!this._activeAnnotationLayer) {
+                    this._activeAnnotationLayer = slot.annotationLayer;
+                    this._annotationToolbar.setLayer(slot.annotationLayer);
+                    this._pushDocumentInfo();
                 }
-                this._activeAnnotationLayer = slot.annotationLayer;
-                this._pushDocumentInfo();
             }
 
         } catch (err) {

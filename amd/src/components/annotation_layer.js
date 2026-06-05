@@ -1632,11 +1632,18 @@ export default class AnnotationLayer {
     }
 
     /**
-     * Notify all tool change callbacks.
+     * Notify all tool change callbacks. Also stamps the wrapper element
+     * with `data-current-tool` so Behat (and DevTools) can verify the
+     * LAYER's tool has actually moved — distinct from the toolbar's
+     * button-active class, which can drift away from the layer's state
+     * when a propagation race silently no-ops the tool dispatch.
      *
      * @param {string} tool The new active tool name.
      */
     _notifyToolChange(tool) {
+        if (this._wrapperEl && this._wrapperEl.setAttribute) {
+            this._wrapperEl.setAttribute('data-current-tool', tool);
+        }
         this._onToolChangeCallbacks.forEach((cb) => cb(tool));
     }
 }
