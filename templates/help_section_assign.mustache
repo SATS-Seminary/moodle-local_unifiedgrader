@@ -24,14 +24,22 @@ annotation and a comment library.</p>
     <li><strong>Byblos portfolio</strong> submissions render in an iframe with a pop-out button (see <a href="#plugin-byblos">Byblos portfolio</a>).</li>
 </ul>
 
+<p>If the document converter (unoconv, Google Drive, etc.) is offline when a
+file is previewed, Moodle caches the failure and later previews show a
+<em>conversion failed</em> overlay. A <em>Retry conversion</em> button on that
+overlay drops the cached failed row and re-fires the load, triggering a fresh
+attempt — so you don't have to wait for the converter's own cache to expire. It
+handles both regular file conversions and online-text-to-PDF.</p>
+
 <h4>Marking</h4>
 <ul>
     <li><strong>Numeric grade or scale</strong> — input or dropdown depending on activity config.</li>
     <li><strong>Feedback comments</strong> via TinyMCE, with embedded image/audio/video uploads (see <a href="#feature-feedback">Rich feedback</a>).</li>
     <li><strong>Feedback files</strong> via standard Moodle filemanager when the <em>assignfeedback_file</em> plugin is enabled.</li>
     <li><strong>Marking guides and rubrics</strong> render with metric-driven suggestions where applicable (see <a href="#feature-rubrics">Marking guides &amp; rubrics</a>).</li>
-    <li><strong>Manual grade override</strong> when a marking guide / rubric is configured, gated by the admin setting <code>allow_manual_grade_override</code>.</li>
-    <li><strong>Submission status actions</strong> — lock/unlock submission, revert to draft, remove submission.</li>
+    <li><strong>Manual grade override</strong> when a marking guide / rubric is configured, gated by the admin setting <code>allow_manual_grade_override</code>. An <em>Overridden</em> badge surfaces the discrepancy (see <a href="#feature-rubrics">Marking guides &amp; rubrics</a>).</li>
+    <li><strong>Clearing &amp; resetting</strong> — type <code>-</code> in the grade box for "no grade", or <code>--</code> for a deeper reset that also lifts a stuck gradebook override (see <a href="#feature-grades">Grade input, clearing &amp; resets</a>).</li>
+    <li><strong>Submission status actions</strong> — lock/unlock submission, revert to draft, remove submission. A submission reverted to draft correctly shows <em>Draft</em> in both the participant list and the marking panel, even though the previous grade is preserved.</li>
 </ul>
 
 <h4>Multi-attempt support</h4>

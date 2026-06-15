@@ -135,6 +135,21 @@ marking pane the same way assignment / forum rubrics are rendered.</p>
     <li>The grading instance id is reused across saves (looked up from the previous <code>bbbext_advgrd_grade</code> row) so consecutive saves update the same fillings rather than minting a new <code>grading_instances</code> row each time.</li>
 </ul>
 
+<h4>Annotation overlay in the preview <span class="badge bg-secondary">v2.6.2</span></h4>
+<p>When <code>bbbext_advgrd</code> exposes an annotation overlay for the student,
+the Unified Grader renders it <em>in place of</em> the BBB recording iframe in
+the preview and student feedback panes — an own-player with an engagement
+timeline, per-moment comments, and an audio/video feedback callout. The coupling
+is deliberately loose: the adapter probes
+<code>mod/bigbluebuttonbn/extension/advgrd/lib.php</code> and calls
+<code>bbbext_advgrd_render_overlay($cmid, $userid)</code> only if that function
+exists, falling back to the standard iframe when the extension is absent or
+returns nothing. The preview page buffers its body output so the extension's
+editor / AMD head requirements land in <code>&lt;head&gt;</code> before the page
+header is flushed, and the fullscreen control targets the overlay's
+<code>.advgrd-player-wrapper</code> so fullscreen works on the embedded feedback
+view too.</p>
+
 <p>For full BBB context see <a href="#integration-bigbluebuttonbn">BigBlueButton</a>.
 For general rubric / marking-guide UX see
 <a href="#feature-rubrics">Marking guides &amp; rubrics</a>.</p>
@@ -203,12 +218,21 @@ the API and renders whatever comes back.</p>
     <li>Click the shield to open a popout with the plagiarism plugin's full widget — match percentage, originality breakdown, etc. — and a click-through to the plugin's full report.</li>
 </ul>
 
-<h4>Academic impropriety report</h4>
+<p>On graded <strong>forums</strong>, per-attachment plagiarism reports are also
+collected into the marking-panel <em>Plagiarism</em> card (post-body shields
+keep rendering inline in the preview), so attachment results sit alongside the
+grade without a duplicate display — the same card assignments use.</p>
+
+<h4>Academic impropriety report &amp; referral</h4>
 <p>If the admin has set <code>enable_report_form</code> +
-<code>report_form_url</code>, the popout exposes a <em>Report academic
-impropriety</em> button that opens a configurable external form (e.g. a
-Google Form or LMS-internal workflow). The URL template supports these
-placeholders:</p>
+<code>report_form_url</code>, the marking-panel <em>Plagiarism</em> card carries
+a <em>Report academic impropriety</em> button. For markers with the
+<code>local/unifiedgrader:refer</code> capability this is the <strong>combined
+integrity control</strong>: one click flags the submission for review
+<em>and</em> opens the report form (see <a href="#feature-referral">Academic-integrity
+referral</a>). Markers without that capability get a plain link that just opens
+the form. The form is a configurable external URL (e.g. a Microsoft / Google
+Form or an LMS-internal workflow) whose template supports these placeholders:</p>
 
 <ul>
     <li><code>{studentname}</code>, <code>{studentid}</code></li>
@@ -217,8 +241,9 @@ placeholders:</p>
     <li><code>{gradername}</code>, <code>{graderurl}</code></li>
 </ul>
 
-<p>Without <code>$CFG->enableplagiarism</code> on, no shields appear and
-the report-form button is hidden.</p>
+<p>Without <code>$CFG->enableplagiarism</code> on, no shields appear and there
+is no plagiarism card; the integrity button (for markers who can refer) then
+falls back to the grade card.</p>
 </section>
 
 {{! ----- TinyMCE recorder ----- }}

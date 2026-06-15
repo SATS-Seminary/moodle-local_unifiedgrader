@@ -248,8 +248,24 @@ export default class extends BaseComponent {
         // Keyboard navigation.
         const SCROLL_STEP = 80;
         document.addEventListener('keydown', (e) => {
-            // Only handle if no input is focused.
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            // Arrow keys only navigate/scroll when the user is NOT interacting
+            // with an editor, form control, or dialog. The old guard checked
+            // e.target.tagName for INPUT/TEXTAREA/SELECT only, which missed:
+            // contenteditable surfaces, the whole TinyMCE UI (toolbar buttons,
+            // the source-code dialog and its chrome), and any open modal. While
+            // editing overall feedback — especially via the source-code editor —
+            // focus lands on those non-input elements constantly, so a stray
+            // arrow keypress silently switched students; the teacher's edits and
+            // the next save then landed on the wrong submission. Bail whenever
+            // the event target OR the active element is in any editing context.
+            const inEditingContext = (el) => !!el && (
+                el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+                || el.isContentEditable
+                || (typeof el.closest === 'function' && el.closest(
+                    'input, textarea, select, [contenteditable="true"], .tox, .modal, [role="dialog"]'
+                ))
+            );
+            if (inEditingContext(e.target) || inEditingContext(document.activeElement)) {
                 return;
             }
             if (e.key === 'ArrowLeft') {

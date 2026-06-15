@@ -640,18 +640,23 @@ class assign_adapter extends base_adapter {
         $attemptnumber = $submission ? (int) $submission->attemptnumber : 0;
 
         // When the gradebook entry for this user is locked or overridden,
-        // mod_assign's apply_grade_to_user() silently skips the entire
-        // advanced-grading save block (see mod/assign/locallib.php:8690 —
-        // the submit_and_get_grade call is wrapped in `if (!$gradingdisabled)`).
-        // That looks like a successful save to the client (HTTP 200, feedback
-        // files persist) but rubric / marking-guide fillings are never
-        // touched. The teacher's symptom is "I typed values, refresh, marks
-        // are gone." Handle the recoverable case (overridden, not locked,
-        // no marking-workflow block) automatically by clearing the override
-        // — that mirrors what a teacher would do in the gradebook UI before
-        // re-grading. Hard-block (locked / workflow) still surfaces a clear
-        // error so the teacher knows to deal with it explicitly.
-        if (!empty($advancedgradingdata) && $this->assign->grading_disabled($userid)) {
+        // mod_assign's apply_grade_to_user() silently skips the grade write
+        // (see mod/assign/locallib.php — the submit_and_get_grade call is
+        // wrapped in `if (!$gradingdisabled)`). This swallows BOTH rubric /
+        // marking-guide fillings AND a plain numeric grade: the save looks
+        // successful (HTTP 200, feedback files persist) but the grade itself is
+        // never written. The teacher's symptom is "I typed a mark, refresh,
+        // it's gone." The most common trigger is gradepenalty_duedate applying
+        // a late penalty, which leaves grade_grades.overridden set. Handle the
+        // recoverable case (overridden, not locked) automatically by clearing
+        // the override — that mirrors what a teacher would do in the gradebook
+        // UI before re-grading; the penalty subsystem re-applies afterwards.
+        // Run it whenever we are about to write a grade value — by plain input
+        // ($grade) or via advanced grading ($advancedgradingdata) — but not for
+        // a pure "no grade" clear, which must not silently lift a penalty.
+        // Hard-block (locked) still surfaces a clear error so the teacher knows
+        // to deal with it explicitly.
+        if (($grade !== null || !empty($advancedgradingdata)) && $this->assign->grading_disabled($userid)) {
             $cleared = $this->clear_recoverable_gradebook_block($userid);
             // Re-checking via $this->assign->grading_disabled() would call
             // grade_get_grades() again, which reads from grade_item::fetch_all()

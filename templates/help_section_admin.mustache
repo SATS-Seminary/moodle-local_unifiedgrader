@@ -63,14 +63,19 @@
             <td>Regular expression applied to <code>course.shortname</code> to extract a course code; used by the comment library for course-scoped comments.</td>
         </tr>
         <tr>
+            <td><code>require_systemdefault_approval</code></td>
+            <td>On</td>
+            <td>When on, a teacher's suggestion to promote one of their comment-library entries to a system default queues for manager approval on the <em>Manage comment library</em> page. When off, suggestions are promoted immediately (still recorded for audit). See <a href="#feature-comment-library">Comment library</a>.</td>
+        </tr>
+        <tr>
             <td><code>enable_report_form</code></td>
             <td>Off</td>
-            <td>Surfaces a <em>Report academic impropriety</em> button in the plagiarism shield popout.</td>
+            <td>When set together with <code>report_form_url</code>, the single academic-integrity button (<em>Report academic impropriety</em>) opens the report form in addition to flagging the submission. See <a href="#feature-referral">Academic-integrity referral</a>.</td>
         </tr>
         <tr>
             <td><code>report_form_url</code></td>
             <td>(empty)</td>
-            <td>Target URL for the impropriety report form. Supports placeholders: <code>{studentname}</code>, <code>{studentid}</code>, <code>{coursecode}</code>, <code>{coursename}</code>, <code>{activityname}</code>, <code>{activitytype}</code>, <code>{gradername}</code>, <code>{graderurl}</code>.</td>
+            <td>Target URL for the impropriety report form (e.g. a Microsoft / Google Form or an LMS-internal workflow). Supports placeholders: <code>{studentname}</code>, <code>{studentid}</code>, <code>{coursecode}</code>, <code>{coursename}</code>, <code>{activityname}</code>, <code>{activitytype}</code>, <code>{gradername}</code>, <code>{graderurl}</code>.</td>
         </tr>
     </tbody>
 </table>
@@ -86,9 +91,13 @@
         <tr><td><code>local/unifiedgrader:viewnotes</code></td><td>Read, personal</td><td>teacher, editingteacher, manager</td><td>See private teacher notes (any author)</td></tr>
         <tr><td><code>local/unifiedgrader:managenotes</code></td><td>Write, personal</td><td>editingteacher, manager</td><td>Create / edit / delete own notes</td></tr>
         <tr><td><code>local/unifiedgrader:sharecomments</code></td><td>Write</td><td>editingteacher, manager</td><td>Share comment library entries with other markers</td></tr>
+        <tr><td><code>local/unifiedgrader:refer</code></td><td>Write, personal</td><td>editingteacher, manager</td><td>Flag a submission for academic-integrity review and resolve referrals (see <a href="#feature-referral">Academic-integrity referral</a>)</td></tr>
+        <tr><td><code>local/unifiedgrader:managesystemdefaults</code></td><td>Write, XSS</td><td>manager</td><td>Curate site-wide system-default comment-library tags / comments and approve or reject teacher proposals</td></tr>
     </tbody>
 </table>
 
-<p>All capabilities are scoped at <code>CONTEXT_MODULE</code> level so they
-can be tuned per-activity if needed.</p>
+<p>Most capabilities are scoped at <code>CONTEXT_MODULE</code> level so they
+can be tuned per-activity if needed. The exception is
+<code>local/unifiedgrader:managesystemdefaults</code>, which governs a
+site-wide library and is checked at <code>CONTEXT_SYSTEM</code>.</p>
 </section>

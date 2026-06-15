@@ -98,6 +98,11 @@ export default class extends BaseComponent {
             MARK_GRADED_TOGGLE: '[data-action="mark-graded-toggle"]',
         };
         this._editingFeedback = false;
+        // One-shot: set when a save is dispatched while the teacher is
+        // re-editing existing feedback, so the post-save render collapses the
+        // editor back to the read-only "saved" card (see _handleSaveGrade /
+        // _renderFeedbackAndSnapshot).
+        this._collapseFeedbackAfterSave = false;
         this._penaltyPopout = null;
         this._gradingDefinition = null;
         this._rubricSelections = {};
@@ -661,8 +666,17 @@ export default class extends BaseComponent {
             // switch / initial load). Post-save refreshes leave the teacher's
             // selection alone.
             const scaleInput = this.getElement(this.selectors.SCALE_INPUT);
-            if (scaleInput && state.grade && isFreshRender) {
-                scaleInput.value = state.grade.grade !== null ? String(Math.round(state.grade.grade)) : '';
+            if (scaleInput && state.grade) {
+                // Same "fill a blank, untouched field from the server" recovery
+                // as the numeric input below — covers the first-student-blank
+                // case for scale-graded activities too.
+                const fillBlank = !isFreshRender
+                    && scaleInput.value === ''
+                    && !DirtyTracker.isDirty('grade')
+                    && state.grade.grade !== null;
+                if (isFreshRender || fillBlank) {
+                    scaleInput.value = state.grade.grade !== null ? String(Math.round(state.grade.grade)) : '';
+                }
             }
         } else {
             // Points: set the numeric input value on a fresh render only.
@@ -679,9 +693,24 @@ export default class extends BaseComponent {
                         displayGrade = Math.round(displayGrade * 100) / 100;
                     }
                 }
-                if (isFreshRender) {
+                // Write the saved grade on a fresh render (student / attempt
+                // switch). Also fill it when the input is blank and the teacher
+                // hasn't touched it: this recovers the "first student shows blank
+                // on open until you navigate away and back" case, where the
+                // initial server load lands but the navigation-boundary gate has
+                // already been consumed for this student, so this render counts
+                // as non-fresh and the value write is skipped. Safe because it
+                // only ever fills an EMPTY, CLEAN input — a value the teacher has
+                // typed (dirty) or any existing value is never overwritten here,
+                // so it cannot reintroduce the edit-clobbering the gate prevents.
+                const fillBlankFromServer = !isFreshRender
+                    && gradeInput.value === ''
+                    && !DirtyTracker.isDirty('grade')
+                    && displayGrade !== null;
+                if (isFreshRender || fillBlankFromServer) {
                     gradeInput.value = displayGrade !== null ? String(displayGrade) : '';
-
+                }
+                if (isFreshRender) {
                     // If the saved grade differs from what the rubric/guide
                     // would compute, this is a returning teacher's prior
                     // override — restore the locked state and surface the
@@ -749,7 +778,19 @@ export default class extends BaseComponent {
         // Reset editing flag — _renderGrade fires on student switch and after save.
         if (isFreshRender) {
             this._editingFeedback = false;
+        } else if (this._collapseFeedbackAfterSave && !this._isFeedbackEditorFocused()) {
+            // A save the teacher started while re-editing existing feedback has
+            // landed (state now holds the freshly-saved feedback) and they are
+            // no longer typing — collapse the editor back to the read-only
+            // "saved" card so a re-edit gets the same confirmation a first-time
+            // save does. Without this the editor stayed open and the save looked
+            // like it had failed. The focus guard keeps the editor open if a
+            // background save (e.g. a debounced rubric save) lands while the
+            // teacher is still typing feedback.
+            this._editingFeedback = false;
         }
+        // One-shot — consumed by the first render after the save dispatch.
+        this._collapseFeedbackAfterSave = false;
         this._toggleFeedbackMode(state);
 
         // Auto-expand the overall feedback section:
@@ -823,6 +864,22 @@ export default class extends BaseComponent {
         // Strip HTML tags and check for non-whitespace content.
         const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
         return text.length > 0;
+    }
+
+    /**
+     * Whether the TinyMCE overall-feedback editor currently has focus. Used to
+     * avoid collapsing the editor to the saved card while the teacher is still
+     * typing (e.g. a background rubric save lands mid-edit).
+     *
+     * @return {boolean} True when the feedback editor is focused.
+     */
+    _isFeedbackEditorFocused() {
+        const textarea = this.getElement(this.selectors.FEEDBACK_INPUT);
+        if (!textarea) {
+            return false;
+        }
+        const editor = getInstanceForElementId(textarea.id);
+        return !!(editor && editor.hasFocus());
     }
 
     /**
@@ -2761,6 +2818,12 @@ export default class extends BaseComponent {
         // cleared so the next save reverts to normal behaviour.
         const reset = !!this._fullResetRequested;
         this._fullResetRequested = false;
+
+        // If this save was started while re-editing existing feedback, arm the
+        // post-save render to collapse the editor back to the saved card (see
+        // _renderFeedbackAndSnapshot). Captured here, past every early return,
+        // so only a genuinely dispatched save arms it.
+        this._collapseFeedbackAfterSave = this._editingFeedback;
 
         this.reactive.dispatch(
             'saveGrade',

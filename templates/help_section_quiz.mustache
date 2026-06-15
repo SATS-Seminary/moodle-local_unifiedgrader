@@ -24,7 +24,7 @@ Moodle's question engine.</p>
 
 <h4>Marking</h4>
 <ul>
-    <li><strong>Per-question manual grade and comment</strong> with the same UI as a marking guide. Each manually-gradable question becomes a row.</li>
+    <li><strong>Per-question manual grade and comment</strong> with the same UI as a marking guide. Each manually-gradable question becomes a row, and each mark is validated against the question's maximum — an out-of-range value blocks the save, just like marking-guide criteria.</li>
     <li><strong>Zero-mark questions</strong> (e.g. information-only essay items) have their score input disabled to avoid the question engine's division-by-zero — comments are still allowed.</li>
     <li><strong>Per-attempt feedback</strong> is stored in <code>local_unifiedgrader_qfb</code> keyed on <code>(cmid, userid, attemptnumber)</code>. Each attempt can carry its own feedback narrative.</li>
     <li><strong>Attempt switcher</strong> appears in the marking panel header when a student has more than one finished attempt.</li>

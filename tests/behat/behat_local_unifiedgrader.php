@@ -167,4 +167,172 @@ class behat_local_unifiedgrader extends behat_base {
             );
         }
     }
+
+    /** @var string|null Current student recorded for change/unchanged assertions. */
+    protected $notedstudent = null;
+
+    /**
+     * Record the Unified Grader's current student so a later step can assert it
+     * did (or did not) change. Avoids depending on participant sort order.
+     *
+     * @Given /^I note the current Unified Grader student$/
+     */
+    public function i_note_the_current_unified_grader_student(): void {
+        $this->notedstudent = $this->current_unifiedgrader_student();
+    }
+
+    /**
+     * Fire an arrow keydown originating from either the feedback editor surface
+     * (a parent-document .tox element — an editing context the navigator must
+     * ignore) or the page body (a legitimate navigation context). This is the
+     * regression behind feedback / grades landing on the wrong submission: a
+     * stray arrow while editing used to switch students because the guard only
+     * excluded INPUT/TEXTAREA/SELECT by tag name and missed editor chrome.
+     *
+     * The "where" picks the keydown origin: an editing context the navigator
+     * must ignore (the editor toolbar = a .tox surface; the grade input = an
+     * INPUT — representative of every rubric score box, remark and comment
+     * textarea), or the page body (a legitimate navigation gesture).
+     *
+     * @When /^I press the (?P<dir>left|right) arrow key from the (?P<where>editor toolbar|grade input|page body)$/
+     * @param string $dir
+     * @param string $where
+     */
+    public function i_press_arrow_key_from(string $dir, string $where): void {
+        $key = $dir === 'left' ? 'ArrowLeft' : 'ArrowRight';
+        if ($where === 'page body') {
+            // Neutralise focus so the active element is not an editor, then fire
+            // from the body — the genuine "I want to navigate" gesture.
+            $js = "(function(){"
+                . "if (document.activeElement && document.activeElement.blur) "
+                . "{ try { document.activeElement.blur(); } catch (e) {} }"
+                . "document.body.dispatchEvent(new KeyboardEvent('keydown', "
+                . "{key: '{$key}', bubbles: true, cancelable: true}));"
+                . "})();";
+        } else {
+            $selector = $where === 'grade input' ? '[data-action=grade-input]' : '.tox';
+            $this->execute('behat_general::wait_until_exists', [$selector, 'css_element']);
+            $js = "(function(){"
+                . "var el = document.querySelector('{$selector}') || document.body;"
+                . "if (el.focus) { try { el.focus(); } catch (e) {} }"
+                . "el.dispatchEvent(new KeyboardEvent('keydown', "
+                . "{key: '{$key}', bubbles: true, cancelable: true}));"
+                . "})();";
+        }
+        $this->execute_script($js);
+        $this->execute('behat_general::wait_until_the_page_is_ready');
+    }
+
+    /**
+     * Assert the Unified Grader's current student changed / stayed put relative
+     * to the one recorded by "I note the current Unified Grader student". The
+     * "changed" case waits, since a real navigation loads asynchronously.
+     *
+     * @Then /^the Unified Grader student should be (?P<state>unchanged|changed)$/
+     * @param string $state
+     */
+    public function the_unified_grader_student_should_be(string $state): void {
+        $region = '[data-region="current-student-name"]';
+        if ($state === 'changed') {
+            $noted = addslashes($this->notedstudent ?? '');
+            $this->getSession()->wait(
+                self::get_timeout() * 1000,
+                "((document.querySelector('{$region}')||{}).textContent||'').trim() !== '{$noted}'"
+            );
+            $now = $this->current_unifiedgrader_student();
+            if ($now === $this->notedstudent) {
+                throw new Exception(
+                    "Expected the student to change from '{$this->notedstudent}' but it stayed"
+                );
+            }
+            return;
+        }
+        $now = $this->current_unifiedgrader_student();
+        if ($now !== $this->notedstudent) {
+            throw new Exception(
+                "Expected the student to stay '{$this->notedstudent}' but it became '{$now}'"
+            );
+        }
+    }
+
+    /**
+     * Read the Unified Grader's current student fullname from the navigator's
+     * current-student region (updated on every student switch).
+     *
+     * @return string
+     */
+    protected function current_unifiedgrader_student(): string {
+        return trim((string) $this->evaluate_script(
+            "(document.querySelector('[data-region=\"current-student-name\"]') || {}).textContent || ''"
+        ));
+    }
+
+    /**
+     * Seed a saved grade + overall feedback for a student on an assignment, so a
+     * scenario can start from the "already graded, feedback shows as a card"
+     * state without driving the (TinyMCE) first-save through the browser. Done
+     * server-side via the adapter so it is deterministic.
+     *
+     * @Given /^"(?P<student>[^"]+)" has been graded with feedback "(?P<feedback>[^"]+)" on "(?P<activity>[^"]+)"$/
+     * @param string $student Student username.
+     * @param string $feedback Feedback text (wrapped in a paragraph).
+     * @param string $activity Assignment name.
+     */
+    public function user_has_been_graded_with_feedback(string $student, string $feedback, string $activity): void {
+        global $DB;
+        $activity = $this->unescape_argument($activity);
+        $feedback = $this->unescape_argument($feedback);
+        $cm = $DB->get_record_sql(
+            "SELECT cm.id
+               FROM {course_modules} cm
+               JOIN {modules} m ON m.id = cm.module AND m.name = 'assign'
+               JOIN {assign} a ON a.id = cm.instance
+              WHERE a.name = :name",
+            ['name' => $activity],
+        );
+        if (!$cm) {
+            throw new Exception("No assignment named '{$activity}' found");
+        }
+        $studentrec = $DB->get_record('user', ['username' => $student], '*', MUST_EXIST);
+        // Grade as the site admin (has the capability). The grader identity is
+        // irrelevant to how the saved feedback renders for the teacher.
+        \core\session\manager::set_user(get_admin());
+        $adapter = \local_unifiedgrader\adapter\adapter_factory::create((int) $cm->id);
+        $adapter->save_grade((int) $studentrec->id, 15.0, '<p>' . s($feedback) . '</p>');
+    }
+
+    /**
+     * Wait until the overall feedback is shown as the read-only saved card
+     * (display visible, editor hidden). The post-save collapse is async (AJAX
+     * save + reactive re-render), so this spins rather than checking once.
+     *
+     * @Then /^the overall feedback is shown as a saved card$/
+     */
+    public function the_overall_feedback_is_shown_as_a_saved_card(): void {
+        $js = "(function(){"
+            . "var d=document.querySelector('[data-region=\"feedback-display\"]');"
+            . "var e=document.querySelector('[data-region=\"feedback-editor-wrapper\"]');"
+            . "return !!(d && !d.classList.contains('d-none') && e && e.classList.contains('d-none'));"
+            . "})()";
+        if (!$this->getSession()->wait(self::get_timeout() * 1000, $js)) {
+            throw new Exception('The overall feedback did not collapse to the saved card.');
+        }
+    }
+
+    /**
+     * Wait until the overall feedback is open for editing (editor visible,
+     * saved card hidden).
+     *
+     * @Then /^the overall feedback is open for editing$/
+     */
+    public function the_overall_feedback_is_open_for_editing(): void {
+        $js = "(function(){"
+            . "var d=document.querySelector('[data-region=\"feedback-display\"]');"
+            . "var e=document.querySelector('[data-region=\"feedback-editor-wrapper\"]');"
+            . "return !!(e && !e.classList.contains('d-none') && d && d.classList.contains('d-none'));"
+            . "})()";
+        if (!$this->getSession()->wait(self::get_timeout() * 1000, $js)) {
+            throw new Exception('The overall feedback editor did not open.');
+        }
+    }
 }

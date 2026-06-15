@@ -23,6 +23,8 @@ dependency.</p>
     <li><strong>Freehand pencil</strong> with adjustable width and colour.</li>
     <li><strong>Text annotations</strong> placed directly on the page.</li>
     <li><strong>Shapes</strong> — rectangle and circle outlines/fills.</li>
+    <li><strong>Area highlight</strong> — drag a translucent box over any region (charts, diagrams, whitespace) where text selection won't reach.</li>
+    <li><strong>Text highlight &amp; strikethrough</strong> — select the text itself, the way any PDF reader works, and on release each visual line of the selection becomes a translucent highlight box or a thin strike-through line. The colour picker drives both (yellow for the classic highlighter look, red for strikethrough). Per-line shapes group so the whole mark selects, drags, and deletes as one unit; resize and rotate are locked because the geometry is bound to the underlying words, while drag stays enabled for nudging.</li>
     <li><strong>Eraser</strong> for individual annotations.</li>
 </ul>
 
@@ -138,12 +140,15 @@ attempt or posts alongside the marker's commentary.</p>
 <section id="feature-comment-library">
 <h3>Comment library</h3>
 
-<p>A library of canned feedback comments with tags. Comments can be:</p>
+<p>A library of canned feedback comments with tags. Each comment falls into
+one of these scopes:</p>
 
 <ul>
     <li><strong>Personal</strong> — visible only to the marker who created them.</li>
     <li><strong>Course-scoped</strong> — automatically scoped via a regex extracting a course code from the course shortname (admin setting <code>coursecode_regex</code>).</li>
+    <li><strong>Universal</strong> — your own comments with an empty course code, visible across every course you grade. Tick <em>Universal</em> on the new / edit form; a dedicated <em>Universal</em> sidebar bucket surfaces them and their tags appear in every course's pill row.</li>
     <li><strong>Shared</strong> — visible to other markers, with optional import to make a personal copy.</li>
+    <li><strong>System defaults</strong> — curated by a manager and visible read-only to every teacher in every course. They carry a yellow star badge and live in their own <em>System defaults</em> sidebar bucket (see below).</li>
 </ul>
 
 <h4>Where it shows up</h4>
@@ -153,15 +158,32 @@ attempt or posts alongside the marker's commentary.</p>
     <li>An autocomplete suggester in marking-guide remark textareas (start typing to see matching library entries).</li>
 </ul>
 
-<h4>Tags</h4>
-<p>Comments can carry multiple tags. Tags are managed in a dedicated
-modal (<em>Manage</em> link in the popout footer) and shown as filter
-chips at the top of the popout list.</p>
+<h4>Finding comments</h4>
+<ul>
+    <li><strong>Tag pills</strong> at the top of the popout filter the list. The pill row shows only system-default tags plus tags actually attached to a comment in the <em>current</em> course (or to a universal comment) — not every tag you have ever created.</li>
+    <li><strong>Search box</strong> in the manage-library toolbar — case-insensitive substring match on comment text, combined with the active course and tag filters.</li>
+    <li>Comments can carry multiple tags; manage them from the <em>Manage</em> link in the popout footer.</li>
+</ul>
 
 <h4>Quick add</h4>
 <p>The popout footer has a quick-add input. Whatever you type is saved as
 a new comment under the current course code, instantly available the
 next time you open the library.</p>
+
+<h4>System defaults &amp; the proposal workflow</h4>
+<p>Managers with <code>local/unifiedgrader:managesystemdefaults</code> curate
+a site-wide set of default tags and comments at <em>Site administration →
+Plugins → Local plugins → Unified Grader → Manage comment library</em>. These
+appear to every teacher with a star badge and are read-only for them.</p>
+
+<p>Teachers can <strong>suggest</strong> one of their own comments for promotion
+to a system default via the star icon on the comment card (an optional
+rationale is prompted). What happens next depends on the
+<code>require_systemdefault_approval</code> admin setting:</p>
+<ul>
+    <li><strong>On (default):</strong> the suggestion queues under <em>Pending submissions</em> on the admin page. A manager approves it (creating a system-default copy that preserves system tags and leaves the teacher's original untouched) or rejects it with an optional reason. The teacher's card shows a <em>Pending review</em> badge until decided, then a <em>Rejected</em> badge (reason on hover) if declined.</li>
+    <li><strong>Off:</strong> the suggestion is promoted to a system default immediately, inheriting only system tags; the proposal is still recorded for audit.</li>
+</ul>
 </section>
 
 {{! ----- Notes ----- }}
@@ -198,6 +220,40 @@ the student, gated by the admin setting <code>enable_submission_comments</code>.
 remain accessible after grading is finalised.</p>
 </section>
 
+{{! ----- Grade input, clearing & resets ----- }}
+<section id="feature-grades">
+<h3>Grade input, clearing &amp; resets</h3>
+
+<p>The overall grade box takes a plain number, and also understands two dash
+shortcuts that mirror how Moodle's gradebook lets you clear a cell.</p>
+
+<h4>Entering a grade</h4>
+<ul>
+    <li>Type the mark directly, or let a marking guide / rubric compute it. A live percentage shows next to the field.</li>
+    <li>The value is <strong>capped at the activity's maximum mark</strong> — typing 40 in a 20-mark assignment shows an inline error and refuses to save (the server rejects it too, as belt-and-braces). Over-100% / extra-credit marks aren't supported. Scale grading uses a dropdown that can't exceed, and quiz marks are clamped by the question engine instead.</li>
+    <li>A comma decimal separator is accepted (<code>3,5</code> becomes <code>3.5</code>) so markers in comma-decimal locales round-trip correctly.</li>
+</ul>
+
+<h4><code>-</code> — clear the grade ("no grade")</h4>
+<p>Typing a single <code>-</code> in the grade box <strong>resets the grade to
+"no grade"</strong> — the same gesture Moodle's gradebook accepts to empty a
+cell. The field clears immediately, any manual-override lock drops, and the save
+sends a "no grade" value to the server. The student reverts to ungraded (and
+re-appears under the <em>Ungraded</em> filter). Feedback, annotations, and the
+submission itself are untouched — only the numeric grade is removed. (Any other
+non-numeric stray input is normalised the same way rather than erroring.)</p>
+
+<h4><code>--</code> — deliberate reset</h4>
+<p>Typing a double <code>--</code> does everything <code>-</code> does, plus two
+clean-up steps for recovering from a messy gradebook state:</p>
+<ul>
+    <li><strong>Removes an orphan submission row</strong> whose status isn't <code>submitted</code> — i.e. one created by accidental teacher interaction with the marking panel, never a real student submission. Genuinely submitted work is left intact.</li>
+    <li><strong>Lifts a stuck gradebook override.</strong> It clears the <code>grade_grades.overridden</code> flag, so a column pinned to a previously-applied value (typically from <code>gradepenalty_duedate</code> or a manual gradebook edit) reverts to genuinely ungraded rather than staying frozen at the old number.</li>
+</ul>
+<p>Both shortcuts behave the same for <strong>forums</strong> as for
+assignments, and never touch the student's posts or submission content.</p>
+</section>
+
 {{! ----- Penalties ----- }}
 <section id="feature-penalties">
 <h3>Penalties</h3>
@@ -213,8 +269,50 @@ remain accessible after grading is finalised.</p>
 to open the penalty details popout, where you can add, edit, or remove
 manual penalties.</p>
 
+<p>When any penalty is active and a grade has been entered, a <em>Final grade
+after penalties</em> line shows the net mark and percentage below the badges,
+so you can see the value the gradebook will store without opening the gradebook.
+The automatic <code>-X% Late</code> badge is derived from the activity's
+effective due date and the student's actual <em>submit</em> time (not draft-start
+time), so it stays visible for already-graded submissions — a returning marker
+or moderator can see at a glance that the saved grade was reduced.</p>
+
 <p>For <strong>scale-based grading</strong>, manual penalties are hidden
 (percentage deductions don't make sense on a discrete scale).</p>
+</section>
+
+{{! ----- Academic-integrity referral ----- }}
+<section id="feature-referral">
+<h3>Academic-integrity referral</h3>
+
+<p>When a marker decides a submission must be escalated for an
+academic-integrity / plagiarism review, they can <strong>flag it for
+review</strong> straight from the marking panel. Gated by the
+<code>local/unifiedgrader:refer</code> capability.</p>
+
+<h4>What the flag does</h4>
+<ul>
+    <li>Records an <strong>open referral</strong> for the student on this activity (one open referral per student + activity; clicking again reuses the existing open row rather than stacking duplicates).</li>
+    <li><strong>Pauses the grading-turnaround clock.</strong> Consumers such as the CoIFish reports read the open status and stop counting turnaround time while the review is pending, so the marker isn't penalised for the review delay.</li>
+    <li>Once open, the control shows a <em>Referred for integrity review</em> badge with a <em>Mark resolved</em> affordance. Resolving records an outcome (cleared / upheld) and the resolution time.</li>
+</ul>
+
+<h4>Where the button lives</h4>
+<p>The action is logically part of the plagiarism report, so <strong>whenever a
+plagiarism card is shown</strong> for the submission the single button is hosted
+there, below the file shields. When there is no plagiarism card (no plagiarism
+plugin produced a result), the button appears in the grade card instead. You
+never see it in two places at once.</p>
+
+<h4>Behaviour with and without a report form</h4>
+<ul>
+    <li><strong>With a report form configured</strong> (<code>enable_report_form</code> + <code>report_form_url</code>): the button reads <em>Report academic impropriety</em>. A single click flags the submission <em>and</em> opens the prefilled report form in a new tab — guarded by a confirmation so an accidental click can be cancelled. (See <a href="#plugin-plagiarism">Plagiarism plugins</a> for the form's placeholder URL.)</li>
+    <li><strong>Without a report form:</strong> the button reads <em>Refer for integrity review</em> and opens a short note field — the note is recorded with the referral, and confirming flags it.</li>
+</ul>
+
+<p>Markers who can open the report form but lack the <code>refer</code>
+capability still get a plain <em>Report academic impropriety</em> link in the
+plagiarism card — they get the form, just not the flag.</p>
 </section>
 
 {{! ----- Overrides & extensions ----- }}
@@ -258,6 +356,27 @@ allows) and computed totals from criteria. Switching activity types is
 seamless — assignment / forum / quiz / BBB-via-<code>bbbext_advgrd</code>
 all flow through the same code path.</p>
 
+<h4>Score validation &amp; rounding</h4>
+<p>Marking-guide criterion scores are validated against the criterion's
+allocated maximum: a negative value, or one above the cap, flags inline with a
+red border and a <em>"Score for "X" must be between 0 and Y"</em> message, and
+autosave / manual save refuse to fire while any criterion is flagged. The same
+widget and validation drive per-question marks in quiz manual grading. The total
+badge is rounded at source to the gradebook item's configured decimal places
+(with a floor of 2dp), so it never shows floating-point artefacts like
+<code>13.899999999999999&nbsp;/&nbsp;25</code>.</p>
+
+<h4>Override indicator</h4>
+<p>When the displayed grade differs from what the rubric / marking guide
+computes — because a marker typed a manual override (allowed by
+<code>allow_manual_grade_override</code>) — a yellow <em>Overridden</em> badge
+appears below the grade input, showing the rubric total and a <em>Reset to
+rubric total</em> link. The badge persists across sessions, so a returning
+marker or moderator immediately sees the score was hand-adjusted; clicking
+<em>Reset</em> re-syncs the input to the rubric value and autosaves. Once a
+marker edits the top-level grade, subsequent rubric edits no longer overwrite it
+(the lock clears on student switch), and the override is autosaved on focus-out.</p>
+
 <h4>Save lifecycle (race protection)</h4>
 <p>Auto-save fires after a 1.5 s debounce when focus leaves the rubric
 body. Without protection, the post-save state refresh would arrive while
@@ -295,6 +414,12 @@ group modes (<em>No groups</em>, <em>Separate groups</em>, <em>Visible
 groups</em>). When the teacher belongs to multiple groups, an
 <em>"All my groups"</em> pseudo-option fans out to a multi-select
 checkbox dropdown.</p>
+
+<p>By default the selector opens on the teacher's <em>own</em> group(s) rather
+than "All groups" — "All my groups" when they belong to several, the specific
+group when they belong to one — and this now applies to course managers and
+admins too, not just capability-restricted users. The choice is remembered per
+activity (keyed by course-module) so it survives refreshes and revisits.</p>
 
 <p>Filtering is delegated to each adapter — the adapter knows how to
 intersect its native participant set with the active group filter.</p>

@@ -18,7 +18,7 @@ Moodle subsystem and are not handled here.</p>
     <li><strong>All of a student's posts</strong> across every discussion in the forum, grouped by discussion, oldest first.</li>
     <li><strong>Embedded media</strong> (video, audio, images) are rewritten through Moodle's media filter so they play inline — no broken <code>@@PLUGINFILE@@</code> URLs.</li>
     <li><strong>Wordcount badge</strong> on each post header.</li>
-    <li><strong>Plagiarism shield</strong> appears next to each post when a plagiarism plugin (Copyleaks, Turnitin, etc.) is configured (see <a href="#plugin-plagiarism">Plagiarism plugins</a>).</li>
+    <li><strong>Plagiarism shield</strong> appears next to each post when a plagiarism plugin (Copyleaks, Turnitin, etc.) is configured. Per-attachment results are additionally listed in the marking-panel <em>Plagiarism</em> card — the same card assignments use (see <a href="#plugin-plagiarism">Plagiarism plugins</a>).</li>
     <li><strong>Attachments</strong> render in the right-rail file selector exactly like assignment attachments.</li>
 </ul>
 
@@ -27,6 +27,7 @@ Moodle subsystem and are not handled here.</p>
     <li>Whole-forum grades are written to <code>forum_grades</code> with <code>itemnumber = 1</code>.</li>
     <li>Forum has no native feedback table; comments are stored in the gradebook's <code>grade_grades.feedback</code>, with file attachments living in a plugin-owned filearea (<code>local_unifiedgrader/forumfeedback</code>).</li>
     <li>The <em>"Mark as graded"</em> toggle replaces the grade input for forums with grade type <em>None</em>.</li>
+    <li>The <code>-</code> / <code>--</code> grade-clearing shortcuts apply here too — a light reset nulls the <code>forum_grades</code> row, a deliberate reset deletes it and lifts a stuck gradebook override (see <a href="#feature-grades">Grade input, clearing &amp; resets</a>). The student's posts are never touched.</li>
 </ul>
 
 <h4>Forum extensions</h4>

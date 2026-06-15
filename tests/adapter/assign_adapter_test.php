@@ -300,6 +300,64 @@ final class assign_adapter_test extends \advanced_testcase {
     }
 
     /**
+     * A plain numeric grade must still persist when the gradebook entry is
+     * overridden — the state gradepenalty_duedate leaves behind after applying
+     * a late penalty (grade_grades.overridden set, assign::grading_disabled()
+     * returns true). Before the fix the override-clearing recovery was gated
+     * behind advanced-grading data, so a plain grade was silently dropped:
+     * apply_grade_to_user() skipped the write and the teacher's mark "vanished"
+     * on refresh. This is the regression guard for that data-loss path.
+     */
+    public function test_save_grade_persists_when_gradebook_overridden(): void {
+        global $CFG;
+        require_once($CFG->libdir . '/gradelib.php');
+        $this->resetAfterTest();
+
+        $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $s = $this->create_scenario();
+        $student = $s->scenario->students[0];
+
+        // Submission + an initial grade so a gradebook row exists.
+        $this->setUser($student);
+        $plugingen->create_assign_submission($s->scenario->activity, $student->id);
+        $this->setUser($s->scenario->teacher);
+        $s->adapter->save_grade($student->id, 50.0, '<p>First pass.</p>');
+
+        // Simulate a late-penalty deduction by overriding the gradebook entry,
+        // which is exactly what makes assign::grading_disabled() return true.
+        $gradeitem = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => 'assign',
+            'iteminstance' => $s->scenario->activity->id,
+            'itemnumber' => 0,
+            'courseid' => $s->scenario->course->id,
+        ]);
+        $this->assertNotEmpty($gradeitem);
+        $gradegrade = \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $student->id]);
+        $this->assertNotEmpty($gradegrade);
+        $gradegrade->set_overridden(true);
+        $this->assertNotEmpty(
+            \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $student->id])->overridden,
+            'Precondition: the gradebook entry should be overridden.',
+        );
+
+        // Re-grade through a fresh adapter, as a new request would. Before the
+        // fix this plain grade was silently skipped and the mark stayed at 50;
+        // it must now persist as 85.
+        $adapter = adapter_factory::create($s->scenario->cm->id);
+        $result = $adapter->save_grade($student->id, 85.0, '<p>Second pass.</p>');
+        $this->assertTrue($result);
+
+        $data = $adapter->get_grade_data($student->id);
+        $this->assertEquals(85.0, $data['grade'], 'The re-grade must persist despite the gradebook override.');
+
+        // The recovery should have lifted the recoverable override so the grade
+        // could land (the penalty subsystem would re-apply it in production).
+        $after = \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $student->id]);
+        $this->assertEmpty($after->overridden, 'The recoverable override should have been cleared.');
+    }
+
+    /**
      * Test is_grade_released with no grade returns false.
      */
     public function test_is_grade_released_no_grade(): void {

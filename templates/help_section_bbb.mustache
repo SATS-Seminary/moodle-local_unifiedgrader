@@ -34,6 +34,15 @@ assignment / forum rubrics are.</p>
     <li><strong>Open in new tab</strong> button next to fullscreen for cases where the embedded player is constrained.</li>
 </ul>
 
+<p>When the <code>bbbext_advgrd</code> extension is installed and has overlay
+content for the student, its <strong>own-player annotation overlay</strong>
+(player + engagement timeline + per-moment comments + an audio/video feedback
+callout) renders <em>in place of</em> the BBB iframe. Fullscreen and the rest of
+the preview controls still apply — fullscreen targets the overlay's player
+wrapper. When the extension isn't installed, or returns nothing for this
+student, the view falls back to the standard iframe described above. See
+<a href="#plugin-advgrd">bbbext_advgrd</a> for how the integration is wired.</p>
+
 <h4>Activity Points card</h4>
 <p>The card shows BBB's engagement breakdown for the current student. It has
 two views, toggled by the recording switcher:</p>
@@ -91,6 +100,7 @@ rubric or marking guide on a BBB activity. When present and configured:</p>
     <li>Grades are saved through <code>\bbbext_advgrd\local\grader::record_grade</code> — this writes the per-user evidence snapshot, pushes the score to the gradebook (with optional passthrough), and emits per-presence sub-scores in analytic mode.</li>
     <li>Metric-driven level suggestions (<code>grader::suggest_levels</code>) are passed into the grading definition so rubric cells could be highlighted based on the student's engagement profile.</li>
     <li>The grading instance is reused across saves rather than minted fresh each time, so consecutive saves update the same fillings rather than orphaning prior ones.</li>
+    <li>In the preview pane, the extension's own-player annotation overlay replaces the recording iframe when it has content for the student (see <em>Recording playback</em> above).</li>
 </ul>
 
 <h4>Attendance status</h4>

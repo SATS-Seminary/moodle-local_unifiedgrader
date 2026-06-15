@@ -114,6 +114,21 @@ export default class {
             const [submissionData, gradeData, notes, penalties, referrals] = results;
             const feedbackDraft = (draftitemid ? results[5] : null) || {feedbackhtml: ''};
 
+            // Stale-response guard. loadStudent is dispatched from several places
+            // (initial load, the student list, prev/next, the penalty-recalc
+            // reload), so two loads can overlap and resolve out of order. If the
+            // active student changed while these requests were in flight, writing
+            // this response now would render the WRONG student's grade and
+            // feedback into the current panel — and because the marking panel
+            // applies server values only on a "fresh" render, the correct data
+            // that lands next is then skipped, leaving the wrong mark (or a
+            // blank) stuck. Discard the stale response before it touches state so
+            // the fresh-render gate stays armed for the in-flight load. Mirrors
+            // the savedForUser guard in saveGrade.
+            if (stateManager.state.currentUser?.id !== userid) {
+                return;
+            }
+
             stateManager.setReadOnly(false);
             // Use Object.assign to update properties on the existing proxy.
             // This fires submission:updated / grade:updated events that watchers expect.
@@ -191,6 +206,13 @@ export default class {
             const results = await Promise.all(calls);
             const [submissionData, gradeData] = results;
             const feedbackDraft = (draftitemid ? results[2] : null) || {feedbackhtml: ''};
+
+            // Stale-response guard — see loadStudent. If the teacher navigated to
+            // a different student while this attempt load was in flight, drop the
+            // response rather than render one student's attempt under another.
+            if (stateManager.state.currentUser?.id !== userid) {
+                return;
+            }
 
             stateManager.setReadOnly(false);
             Object.assign(stateManager.state.submission, submissionData);
