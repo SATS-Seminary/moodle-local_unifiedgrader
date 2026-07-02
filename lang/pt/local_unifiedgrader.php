@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'Foram recuperadas alterações não guarda
 $string['restore'] = 'Restaurar';
 $string['discard'] = 'Descartar';
 $string['mark_as_graded'] = 'Marcar como avaliado';
+$string['manuallymarkedquestions'] = 'Perguntas avaliadas manualmente';

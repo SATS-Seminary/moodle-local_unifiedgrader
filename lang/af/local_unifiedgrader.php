@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'Ongestoorde veranderings van jou vorige se
 $string['restore'] = 'Herstel';
 $string['discard'] = 'Gooi weg';
 $string['mark_as_graded'] = 'Merk as bepunt';
+$string['manuallymarkedquestions'] = 'Handmatig nagesiene vrae';

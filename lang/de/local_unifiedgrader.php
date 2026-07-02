@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'Nicht gespeicherte Änderungen aus Ihrer l
 $string['restore'] = 'Wiederherstellen';
 $string['discard'] = 'Verwerfen';
 $string['mark_as_graded'] = 'Als bewertet markieren';
+$string['manuallymarkedquestions'] = 'Manuell bewertete Fragen';

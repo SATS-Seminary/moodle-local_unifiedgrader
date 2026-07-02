@@ -135,6 +135,7 @@ $string['expandfilters'] = 'Show filters';
 $string['backtocourse'] = 'Back to course';
 $string['rubric'] = 'Rubric';
 $string['markingguide'] = 'Marking guide';
+$string['manuallymarkedquestions'] = 'Manually marked questions';
 $string['criterion'] = 'Criterion';
 $string['score'] = 'Score';
 $string['remark'] = 'Remark';

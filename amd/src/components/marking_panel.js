@@ -637,6 +637,24 @@ export default class extends BaseComponent {
         // _updateRubricTotal/_updateGuideTotal which sync a computed total
         // into the grade input. We then overwrite with the server-authoritative
         // grade value so manual overrides are not lost.
+        //
+        // For quiz manual grading the guide shows only the manually-marked
+        // questions, so _updateGuideTotal computes the grade as a delta on the
+        // full quiz grade held in _quizBaseGrade. That base must reflect the
+        // CURRENT student here — before _renderAdvancedGrading computes the guide
+        // total and the override indicator below — otherwise both are derived
+        // from the previous student's grade, producing the spurious "Overridden"
+        // badge and stale "Rubric total" teachers reported on quizzes.
+        if (state.activity?.type === 'quiz' && state.grade) {
+            if (state.grade.grade === null) {
+                this._quizBaseGrade = 0;
+            } else {
+                const deduction = this._getTotalPenaltyDeduction(state);
+                this._quizBaseGrade = deduction > 0
+                    ? Math.round((parseFloat(state.grade.grade) + deduction) * 100) / 100
+                    : parseFloat(state.grade.grade);
+            }
+        }
         this._renderAdvancedGrading(state, isFreshRender);
 
         const usescale = state.activity?.usescale || false;
@@ -721,13 +739,6 @@ export default class extends BaseComponent {
                         this._gradeManuallyOverridden = true;
                     }
                     this._updateOverrideIndicator(this._lastRubricGrade);
-                }
-
-                // Store the full quiz grade as the base for quizmanual delta calculations.
-                // _updateGuideTotal uses this so manual question edits adjust the full
-                // quiz grade (auto + manual) rather than replacing it with just the manual total.
-                if (this._gradingDefinition?.method === 'quizmanual') {
-                    this._quizBaseGrade = displayGrade !== null ? parseFloat(displayGrade) : 0;
                 }
 
                 // When advanced grading is active and manual override is not allowed,
@@ -1786,10 +1797,25 @@ export default class extends BaseComponent {
             }
         }
 
-        // Set title.
+        // Set title. Quizzes don't use a rubric/marking guide as such — the
+        // pane just lists the manually-marked questions — so label it plainly
+        // for quizmanual rather than the misleading "Marking guide".
         const titleEl = this.getElement(this.selectors.RUBRIC_TITLE);
         if (titleEl) {
-            titleEl.textContent = definition.method === 'rubric' ? 'Rubric' : 'Marking guide';
+            const titlekey = definition.method === 'rubric'
+                ? 'rubric'
+                : (definition.method === 'quizmanual' ? 'manuallymarkedquestions' : 'markingguide');
+            const titlefallback = definition.method === 'rubric'
+                ? 'Rubric'
+                : (definition.method === 'quizmanual' ? 'Manually marked questions' : 'Marking guide');
+            getString(titlekey, 'local_unifiedgrader')
+                .then((s) => {
+                    titleEl.textContent = s;
+                    return s;
+                })
+                .catch(() => {
+                    titleEl.textContent = titlefallback;
+                });
         }
 
         // Render based on method.
@@ -2260,21 +2286,10 @@ export default class extends BaseComponent {
             body.appendChild(row);
         });
 
+        // Capture the quizmanual base total BEFORE _updateGuideTotal so its
+        // delta (current total − base) is zero at render — see the helper.
+        this._recomputeGuideBaseTotal();
         this._updateGuideTotal();
-
-        // Store the initial manual-question total so _updateGuideTotal can
-        // compute deltas for quizmanual mode (where the guide only shows a
-        // subset of the quiz questions, not the full grade).
-        if (this._gradingDefinition?.method === 'quizmanual') {
-            let baseTotal = 0;
-            for (const val of Object.values(this._guideScores)) {
-                const num = parseFloat(val);
-                if (!isNaN(num)) {
-                    baseTotal += num;
-                }
-            }
-            this._guideBaseTotal = baseTotal;
-        }
     }
 
     /**
@@ -2310,7 +2325,34 @@ export default class extends BaseComponent {
                 this._guideRemarks[id] = newRemark;
             }
         });
+        // Recompute the quizmanual base total on this fill-only fast path too,
+        // so navigating between students of the same quiz recalculates the grade
+        // without a hard refresh (the full-rebuild path in _renderGuide does the
+        // same before its _updateGuideTotal).
+        this._recomputeGuideBaseTotal();
         this._updateGuideTotal();
+    }
+
+    /**
+     * Recompute the quizmanual base total — the sum of the manually-marked
+     * question scores as loaded — so _updateGuideTotal's delta (current total −
+     * base total) is zero at render. Must run on every fresh render, via both
+     * _renderGuide (full rebuild) and _updateGuideValues (the same-structure
+     * fast path used when navigating between students of one quiz). No-op for
+     * non-quizmanual grading methods.
+     */
+    _recomputeGuideBaseTotal() {
+        if (this._gradingDefinition?.method !== 'quizmanual') {
+            return;
+        }
+        let baseTotal = 0;
+        for (const val of Object.values(this._guideScores)) {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+                baseTotal += num;
+            }
+        }
+        this._guideBaseTotal = baseTotal;
     }
 
     /**

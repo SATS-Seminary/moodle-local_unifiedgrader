@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'שוחזרו שינויים שלא נשמ�
 $string['restore'] = 'שחזר';
 $string['discard'] = 'בטל';
 $string['mark_as_graded'] = 'סמן כמצוין';
+$string['manuallymarkedquestions'] = 'שאלות המדורגות ידנית';

@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'Kubuyiswe iinguqu ezingagcinwanga kwisesho
 $string['restore'] = 'Buyisela';
 $string['discard'] = 'Lahla';
 $string['mark_as_graded'] = 'Phawula njengokuklasisiweyo';
+$string['manuallymarkedquestions'] = 'Imibuzo eklasiswe ngesandla';

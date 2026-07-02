@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'Modifications non enregistrées récupér�
 $string['restore'] = 'Restaurer';
 $string['discard'] = 'Abandonner';
 $string['mark_as_graded'] = 'Marquer comme noté';
+$string['manuallymarkedquestions'] = 'Questions notées manuellement';

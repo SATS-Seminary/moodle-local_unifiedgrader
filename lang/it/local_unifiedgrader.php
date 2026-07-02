@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'Recuperate modifiche non salvate dalla ses
 $string['restore'] = 'Ripristina';
 $string['discard'] = 'Scarta';
 $string['mark_as_graded'] = 'Segna come valutato';
+$string['manuallymarkedquestions'] = 'Domande valutate manualmente';

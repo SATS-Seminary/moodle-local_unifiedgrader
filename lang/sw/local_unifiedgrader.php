@@ -388,3 +388,4 @@ $string['recoveredunsavedchanges'] = 'Mabadiliko ambayo hayakuhifadhiwa kutoka k
 $string['restore'] = 'Rejesha';
 $string['discard'] = 'Tupa';
 $string['mark_as_graded'] = 'Weka alama kama imewekewa alama';
+$string['manuallymarkedquestions'] = 'Maswali yaliyowekwa alama kwa mkono';

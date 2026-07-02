@@ -455,3 +455,4 @@ $string['recoveredunsavedchanges'] = 'Ανακτήθηκαν μη αποθηκε
 $string['restore'] = 'Επαναφορά';
 $string['discard'] = 'Απόρριψη';
 $string['mark_as_graded'] = 'Σήμανση ως βαθμολογημένο';
+$string['manuallymarkedquestions'] = 'Χειροκίνητα βαθμολογημένες ερωτήσεις';
