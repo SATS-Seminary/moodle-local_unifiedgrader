@@ -48,6 +48,12 @@ class get_student_annotations extends external_api {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
             'fileid' => new external_value(PARAM_INT, 'File ID'),
+            'attempt' => new external_value(
+                PARAM_INT,
+                'Attempt number the viewer is currently displaying, or -1 for latest',
+                VALUE_DEFAULT,
+                -1,
+            ),
         ]);
     }
 
@@ -56,14 +62,16 @@ class get_student_annotations extends external_api {
      *
      * @param int $cmid
      * @param int $fileid
+     * @param int $attempt Attempt number the feedback view is currently displaying, or -1 for latest.
      * @return array
      */
-    public static function execute(int $cmid, int $fileid): array {
+    public static function execute(int $cmid, int $fileid, int $attempt = -1): array {
         global $USER;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'fileid' => $fileid,
+            'attempt' => $attempt,
         ]);
 
         $context = \context_module::instance($params['cmid']);
@@ -96,8 +104,18 @@ class get_student_annotations extends external_api {
             return [];
         }
 
-        // Verify the file is part of this student's submission.
-        $submissionfiles = $adapter->get_submission_files($userid);
+        // Verify the file is part of this student's submission — for the
+        // specific attempt the feedback view is currently displaying, not
+        // unconditionally the latest attempt. view_feedback.php may resolve
+        // and display an older attempt (e.g. the latest *graded* one, when a
+        // student resubmitted after grading), and the student's own attempt
+        // selector can navigate to any attempt explicitly. Checking only
+        // against get_submission_files() (always latest-attempt) would
+        // silently reject a valid, currently-displayed file whose attempt
+        // isn't the newest, dropping the annotations with no error.
+        $submissionfiles = ($params['attempt'] >= 0 && method_exists($adapter, 'get_submission_files_for_attempt'))
+            ? $adapter->get_submission_files_for_attempt($userid, $params['attempt'])
+            : $adapter->get_submission_files($userid);
         $fileids = array_column($submissionfiles, 'fileid');
         if (!in_array($params['fileid'], $fileids)) {
             return [];

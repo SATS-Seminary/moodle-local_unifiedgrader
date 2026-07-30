@@ -423,4 +423,120 @@ final class annotation_webservices_test extends \advanced_testcase {
         $this->assertIsArray($result);
         $this->assertEmpty($result);
     }
+
+    /**
+     * Test get_student_annotations validates the file against the attempt
+     * actually being viewed, not unconditionally the latest attempt.
+     *
+     * Reproduces a real scenario: a student submits (attempt 0), the teacher
+     * grades and annotates that file, the student resubmits (attempt 1), and
+     * the resubmission is also graded — making attempt 1 the latest *graded*
+     * attempt that view_feedback.php now shows by default. Without an attempt
+     * parameter, the endpoint always checked file ownership against
+     * get_submission_files() (always latest attempt), so a file from attempt 0
+     * would never validate and its annotations would silently vanish for the
+     * student — even when the student explicitly navigates back to attempt 0
+     * via the attempt selector.
+     */
+    public function test_get_student_annotations_respects_selected_attempt(): void {
+        global $DB, $CFG;
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario([
+            'modparams' => [
+                'assignsubmission_file_enabled' => 1,
+                'assignsubmission_file_maxfiles' => 2,
+                'assignsubmission_file_maxsizebytes' => 1024 * 1024,
+            ],
+        ]);
+        $studentid = $scenario->students[0]->id;
+        $context = $scenario->context;
+        $assign = new \assign($context, $scenario->cm, $scenario->course);
+
+        // Attempt 0: submit a file, grade it.
+        $submission0 = $assign->get_user_submission($studentid, true, 0);
+        $fileid0 = $this->create_submission_file($context, $submission0->id, 'attempt0.pdf');
+        $submission0->status = ASSIGN_SUBMISSION_STATUS_SUBMITTED;
+        $submission0->timemodified = time();
+        $submission0->latest = 0;
+        $DB->update_record('assign_submission', $submission0);
+
+        $grade0 = $assign->get_user_grade($studentid, true, 0);
+        $grade0->grade = 18;
+        $grade0->grader = $scenario->teacher->id;
+        $grade0->timemodified = time();
+        $DB->update_record('assign_grades', $grade0);
+
+        // Attempt 1: a resubmission made after attempt 0 was graded, itself
+        // also graded — so it becomes the latest *graded* attempt.
+        $submission1 = clone $submission0;
+        unset($submission1->id);
+        $submission1->attemptnumber = 1;
+        $submission1->timecreated = time();
+        $submission1->timemodified = time();
+        $submission1->latest = 1;
+        $submission1->id = $DB->insert_record('assign_submission', $submission1);
+        $fileid1 = $this->create_submission_file($context, $submission1->id, 'attempt1.pdf');
+
+        $grade1 = $assign->get_user_grade($studentid, true, 1);
+        $grade1->grade = 27;
+        $grade1->grader = $scenario->teacher->id;
+        $grade1->timemodified = time() + 10;
+        $DB->update_record('assign_grades', $grade1);
+
+        // Teacher annotates the attempt-0 file (the one they were marking).
+        $this->setUser($scenario->teacher);
+        save_annotations::execute(
+            $scenario->cm->id,
+            $studentid,
+            $fileid0,
+            [['pagenum' => 1, 'annotationdata' => '{"objects":[{"type":"rect"}]}']],
+        );
+
+        $this->setUser($scenario->students[0]);
+
+        // Explicitly viewing attempt 0 (e.g. via the attempt selector) must
+        // surface the annotations left on attempt 0's file.
+        $result = get_student_annotations::execute($scenario->cm->id, $fileid0, 0);
+        $this->assertCount(
+            1,
+            $result,
+            'Annotations on an older attempt must be visible when that attempt is explicitly selected.',
+        );
+
+        // Attempt 1's own file was never annotated.
+        $result1 = get_student_annotations::execute($scenario->cm->id, $fileid1, 1);
+        $this->assertEmpty($result1);
+
+        // The attempt-0 file must NOT validate against attempt 1 — proves the
+        // check is scoped to the requested attempt, not "any attempt at all".
+        $crossresult = get_student_annotations::execute($scenario->cm->id, $fileid0, 1);
+        $this->assertEmpty(
+            $crossresult,
+            'A file belonging to a different attempt must not validate against attempt 1.',
+        );
+    }
+
+    /**
+     * Create a stored file in the assignsubmission_file submission area.
+     *
+     * @param \context_module $context The activity context.
+     * @param int $submissionid The assign_submission.id to attach the file to.
+     * @param string $filename Filename for the created file.
+     * @return int The created file's ID.
+     */
+    private function create_submission_file(\context_module $context, int $submissionid, string $filename): int {
+        $fs = get_file_storage();
+        $file = $fs->create_file_from_string([
+            'contextid' => $context->id,
+            'component' => 'assignsubmission_file',
+            'filearea' => 'submission_files',
+            'itemid' => $submissionid,
+            'filepath' => '/',
+            'filename' => $filename,
+        ], '%PDF-1.4 test file content');
+        return (int) $file->get_id();
+    }
 }

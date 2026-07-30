@@ -2982,8 +2982,6 @@ export default class extends BaseComponent {
             return;
         }
 
-        const maxattempts = state.activity?.maxattempts ?? 1;
-
         // Get attempts list — may be a StateMap (has .values()) or an array.
         let attemptList = [];
         const attempts = state.submission?.attempts;
@@ -2995,9 +2993,14 @@ export default class extends BaseComponent {
             }
         }
 
-        // Hide if single-attempt activity or only one attempt exists.
-        // maxattempts: 0 = unlimited (quiz), -1 = unlimited (assign), 1 = single attempt.
-        if (maxattempts === 1 || attemptList.length <= 1) {
+        // Hide unless more than one attempt actually exists. Do NOT gate this
+        // on activity.maxattempts — that setting only limits how many attempts
+        // a *student* can trigger automatically. A teacher can still manually
+        // reopen a submission (attemptreopenmethod: manual) regardless of the
+        // configured cap, which produces a real second attempt even when
+        // maxattempts is 1. The attempt count actually returned by the server
+        // is the only reliable signal.
+        if (attemptList.length <= 1) {
             wrapper.classList.add('d-none');
             return;
         }

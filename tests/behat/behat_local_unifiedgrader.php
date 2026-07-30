@@ -335,4 +335,85 @@ class behat_local_unifiedgrader extends behat_base {
             throw new Exception('The overall feedback editor did not open.');
         }
     }
+
+    /**
+     * Seed N submitted-and-graded submission attempts (0-based) for a student
+     * on an assignment, each with its own file.
+     *
+     * Written directly against the DB/assign API (bypassing the browser
+     * submit-resubmit flow) rather than via the core "mod_assign > submissions"
+     * generator, because that generator has no attempt-number control — it
+     * always writes to the student's current attempt. It also deliberately
+     * does NOT touch the activity's maxattempts / attemptreopenmethod
+     * settings: a teacher can manually reopen a submission (attemptreopenmethod:
+     * manual) regardless of the configured maxattempts cap, so real multi-attempt
+     * data can exist even when maxattempts is 1 — exactly the scenario this
+     * step exists to reproduce (see attempt_selector_ignores_maxattempts.feature).
+     *
+     * @Given /^"(?P<student>[^"]+)" has (?P<n>\d+) graded submission attempts on "(?P<activity>[^"]+)"$/
+     * @param string $student Student username.
+     * @param int $n Number of attempts to create (0-based attempt numbers 0..n-1).
+     * @param string $activity Assignment name.
+     */
+    public function user_has_n_graded_attempts(string $student, int $n, string $activity): void {
+        global $DB, $CFG;
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+
+        $activity = $this->unescape_argument($activity);
+        $cmrow = $DB->get_record_sql(
+            "SELECT cm.id
+               FROM {course_modules} cm
+               JOIN {modules} m ON m.id = cm.module AND m.name = 'assign'
+               JOIN {assign} a ON a.id = cm.instance
+              WHERE a.name = :name",
+            ['name' => $activity],
+        );
+        if (!$cmrow) {
+            throw new Exception("No assignment named '{$activity}' found");
+        }
+        $studentrec = $DB->get_record('user', ['username' => $student], '*', MUST_EXIST);
+
+        [$course, $cm] = get_course_and_cm_from_cmid((int) $cmrow->id, 'assign');
+        $context = context_module::instance($cm->id);
+        $assign = new assign($context, $cm, $course);
+        $fs = get_file_storage();
+
+        $previous = null;
+        for ($attempt = 0; $attempt < $n; $attempt++) {
+            if ($attempt === 0) {
+                $submission = $assign->get_user_submission($studentrec->id, true, 0);
+            } else {
+                // Directly insert the next attempt row — mirrors what a manual
+                // reopen produces, without driving the actual reopen UI.
+                $submission = clone $previous;
+                unset($submission->id);
+                $submission->attemptnumber = $attempt;
+                $submission->timecreated = time();
+                $submission->id = $DB->insert_record('assign_submission', $submission);
+                $previous->latest = 0;
+                $DB->update_record('assign_submission', $previous);
+            }
+            $submission->status = ASSIGN_SUBMISSION_STATUS_SUBMITTED;
+            $submission->timemodified = time();
+            $submission->latest = 1;
+            $DB->update_record('assign_submission', $submission);
+
+            $fs->create_file_from_string([
+                'contextid' => $context->id,
+                'component' => 'assignsubmission_file',
+                'filearea' => 'submission_files',
+                'itemid' => $submission->id,
+                'filepath' => '/',
+                'filename' => "attempt{$attempt}.pdf",
+            ], '%PDF-1.4 test file content');
+
+            $grade = $assign->get_user_grade($studentrec->id, true, $attempt);
+            $grade->grade = 10 + $attempt;
+            $grade->grader = get_admin()->id;
+            $grade->timemodified = time() + $attempt;
+            $DB->update_record('assign_grades', $grade);
+
+            $previous = $submission;
+        }
+    }
 }

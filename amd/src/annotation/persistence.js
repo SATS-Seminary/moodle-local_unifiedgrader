@@ -78,16 +78,17 @@ export async function deleteAnnotations(cmid, userid, fileid) {
  * Load annotations for the current student's own file (read-only student view).
  *
  * Uses the student-safe web service which forces userid to $USER->id server-side,
- * validates grade release, and checks file ownership.
+ * validates grade release, and checks file ownership against the given attempt.
  *
  * @param {number} cmid Course module ID.
  * @param {number} fileid File ID.
+ * @param {number} attempt Attempt number currently displayed, or -1 for latest.
  * @returns {Promise<Array>} Array of annotation records.
  */
-export async function loadStudentAnnotations(cmid, fileid) {
+export async function loadStudentAnnotations(cmid, fileid, attempt = -1) {
     return Ajax.call([{
         methodname: 'local_unifiedgrader_get_student_annotations',
-        args: {cmid, fileid},
+        args: {cmid, fileid, attempt},
     }])[0];
 }
 

@@ -99,7 +99,7 @@ export const init = async() => {
 
     // Always load annotation overlays for the interactive viewer —
     // comment markers display as icons with hover tooltips for the text.
-    await loadAnnotationsForFile(pdfViewer, cmid, fileid);
+    await loadAnnotationsForFile(pdfViewer, cmid, fileid, attempt);
 
     // Render the grader's segment comments read-only in the margin (column) view —
     // the SAME component the grader uses (highlights, strikethroughs, numbered
@@ -119,8 +119,9 @@ export const init = async() => {
             pdfViewer.setFileContext(cmid, userid, newFileId);
             await pdfViewer.loadPdf(url);
 
-            // Always load annotation overlays for hover tooltips.
-            await loadAnnotationsForFile(pdfViewer, cmid, newFileId);
+            // Always load annotation overlays for hover tooltips. The file
+            // selector only switches files within the same attempt.
+            await loadAnnotationsForFile(pdfViewer, cmid, newFileId, attempt);
         });
     }
 };
@@ -167,10 +168,11 @@ function mountSegComments(container, reactive) {
  * @param {PdfViewer} pdfViewer The PDF viewer instance.
  * @param {number} cmid Course module ID.
  * @param {number} fileid File ID.
+ * @param {number} attempt Attempt number currently displayed, or -1 for latest.
  */
-async function loadAnnotationsForFile(pdfViewer, cmid, fileid) {
+async function loadAnnotationsForFile(pdfViewer, cmid, fileid, attempt) {
     try {
-        const annotations = await loadStudentAnnotations(cmid, fileid);
+        const annotations = await loadStudentAnnotations(cmid, fileid, attempt);
 
         annotations.forEach((annot) => {
             try {
