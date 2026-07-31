@@ -44,13 +44,17 @@ $assign = new assign($context, $cm, $course);
 $instance = clone $assign->get_instance();
 $instance->cmidnumber = $cm->idnumber;
 
-// Full gradebook recalculation.
+// Full gradebook recalculation. This resets the raw grade from assign_grades and
+// then applies the late penalty exactly once: assign_update_grades() ends up in
+// assign_grade_item_update(), which itself calls
+// \mod_assign\penalty\helper::apply_penalty_to_user() for each user.
+//
+// Do NOT call apply_penalty_to_user() again here. gradepenalty_duedate deducts a
+// FIXED number of marks (max grade × penalty%, see its penalty_calculator), and
+// core has no "already penalised" guard — is_penalty_enabled_for_grade() only
+// checks for minimum/overridden/locked grades. A second call therefore subtracts
+// the full penalty a second time: a 35% rule took 70% off the grade.
 assign_update_grades($instance, $userid);
-
-// Also update the penalty field in assign_grades.
-if (class_exists('\mod_assign\penalty\helper')) {
-    \mod_assign\penalty\helper::apply_penalty_to_user($cm->instance, $userid);
-}
 
 header('Content-Type: application/json');
 echo json_encode(['success' => true]);

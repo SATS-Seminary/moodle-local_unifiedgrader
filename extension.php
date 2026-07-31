@@ -95,8 +95,13 @@ if ($fromform) {
 
     if ($result) {
         // Recalculate the late penalty now that the effective due date has changed.
-        // Call assign_update_grades() first to do a full gradebook recalculation,
-        // then apply_penalty_to_user() to update the penalty field in assign_grades.
+        // assign_update_grades() is enough on its own: it resets the raw grade from
+        // assign_grades and then applies the penalty exactly once (via
+        // assign_grade_item_update() → apply_penalty_to_user()).
+        //
+        // Do NOT call apply_penalty_to_user() again afterwards — the deduction is a
+        // fixed number of marks (max grade × penalty%) and core has no
+        // "already penalised" guard, so a second call takes the penalty off twice.
         if (
             class_exists('\mod_assign\penalty\helper')
                 && \mod_assign\penalty\helper::is_penalty_enabled($cm->instance)
@@ -105,7 +110,6 @@ if ($fromform) {
             $assigninstance = clone $assign->get_instance();
             $assigninstance->cmidnumber = $cm->idnumber;
             assign_update_grades($assigninstance, $userid);
-            \mod_assign\penalty\helper::apply_penalty_to_user($cm->instance, $userid);
         }
 
         echo $OUTPUT->header();

@@ -655,8 +655,11 @@ $string['segtool_confirm'] = 'Confirm?';
 $string['segtool_move'] = 'Select / move annotations';
 $string['segtool_viewcolumn'] = 'Comments in the margin — click for hover popups';
 $string['segtool_viewpopup'] = 'Comments as hover popups — click for the margin column';
-$string['segmark_tick'] = 'Affirm (tick)';
-$string['segmark_cross'] = 'Correct (cross)';
+// The tick/cross labels are written as a matched pair and must each make sense
+// read on their own. "Correct (cross)" relied on the reader taking "correct" as a
+// verb — on a ✗ it can be read as "this is correct", the opposite of the mark.
+$string['segmark_tick'] = 'Good point (tick)';
+$string['segmark_cross'] = 'Needs correction (cross)';
 $string['segmark_highlight'] = 'Highlight';
 $string['segmark_query'] = 'Query';
 $string['segmark_strike'] = 'Strike out';

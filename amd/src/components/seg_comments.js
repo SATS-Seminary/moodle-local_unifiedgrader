@@ -60,8 +60,10 @@ const SVGNS = 'http://www.w3.org/2000/svg';
  * line through the marked text rather than adding a badge.
  */
 const STAMPS = {
-    tick: {glyph: '✓', cls: 'local-unifiedgrader-mark-tick', key: 'segmark_tick', fallback: 'Affirm'},
-    cross: {glyph: '✗', cls: 'local-unifiedgrader-mark-cross', key: 'segmark_cross', fallback: 'Correct'},
+    // Tick/cross labels are a matched pair, each readable on its own: a bare
+    // "Correct" on a ✗ can be taken as "this is correct" (see segmark_cross).
+    tick: {glyph: '✓', cls: 'local-unifiedgrader-mark-tick', key: 'segmark_tick', fallback: 'Good point'},
+    cross: {glyph: '✗', cls: 'local-unifiedgrader-mark-cross', key: 'segmark_cross', fallback: 'Needs correction'},
     highlight: {glyph: '▨', cls: 'local-unifiedgrader-mark-highlight', key: 'segmark_highlight', fallback: 'Highlight'},
     query: {glyph: '?', cls: 'local-unifiedgrader-mark-query', key: 'segmark_query', fallback: 'Query'},
     strikethrough: {glyph: '', cls: 'local-unifiedgrader-mark-strike', key: 'segmark_strike', fallback: 'Strike out'},
@@ -104,8 +106,8 @@ const TOOLS = [
     {tool: 'comment', icon: 'fa-comment', key: 'segtool_comment', fallback: 'Comment'},
     {tool: 'highlight', icon: 'fa-paint-brush', key: 'segmark_highlight', fallback: 'Highlight'},
     {tool: 'strikethrough', icon: 'fa-strikethrough', key: 'segmark_strike', fallback: 'Strike out'},
-    {tool: 'tick', icon: 'fa-check', key: 'segmark_tick', fallback: 'Affirm'},
-    {tool: 'cross', icon: 'fa-times', key: 'segmark_cross', fallback: 'Correct'},
+    {tool: 'tick', icon: 'fa-check', key: 'segmark_tick', fallback: 'Good point'},
+    {tool: 'cross', icon: 'fa-times', key: 'segmark_cross', fallback: 'Needs correction'},
     {tool: 'query', icon: 'fa-question', key: 'segmark_query', fallback: 'Query'},
 ];
 
