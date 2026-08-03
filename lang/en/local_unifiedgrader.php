@@ -144,6 +144,19 @@ $string['viewallsubmissions'] = 'View all submissions';
 $string['layout_both'] = 'Split view';
 $string['layout_preview'] = 'Preview only';
 $string['layout_grade'] = 'Grading only';
+// Named "Dual file" rather than "split": layout_both already owns the word
+// "Split" for the preview/grading arrangement, and the two controls sit together.
+$string['layout_multiview'] = 'Dual file view';
+$string['multiview_active_pane'] = 'Marking here';
+$string['multiview_choose_file'] = 'Choose a file to show here';
+$string['multiview_drag_hint'] = 'Drag to resize the panes; double-click to reset';
+$string['multiview_pick_top'] = 'Top pane';
+$string['multiview_pick_bottom'] = 'Bottom pane';
+$string['multiview_pick_heading'] = 'Show two files together';
+$string['multiview_none'] = 'None';
+$string['multiview_needs_two_files'] = 'This submission has only one file, so there is nothing to pair it with.';
+$string['multiview_hide_tools'] = 'Hide annotation tools';
+$string['multiview_hide_tools_help'] = 'Hide the marking tools for this pane — useful for a recording, which cannot be annotated.';
 $string['manualquestions'] = 'Manual questions';
 $string['response'] = 'Response';
 $string['informationforgraders'] = 'Information for graders';
@@ -232,6 +245,10 @@ $string['annotate_shape'] = 'Shapes';
 $string['annotate_shape_rect'] = 'Rectangle';
 $string['annotate_shape_circle'] = 'Circle';
 $string['annotate_shape_arrow'] = 'Arrow';
+// Free-floating stamps, for marking a cover page or diagram where there is no
+// text to anchor a comment to. Named for what they mean, like the anchored marks.
+$string['annotate_stamp_tick'] = 'Tick stamp (place anywhere)';
+$string['annotate_stamp_cross'] = 'Cross stamp (place anywhere)';
 $string['annotate_shape_line'] = 'Line';
 $string['annotate_undo'] = 'Undo';
 $string['annotate_redo'] = 'Redo';

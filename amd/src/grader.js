@@ -220,8 +220,9 @@ export const init = (containerId) => {
 
     // Register reactive components.
     const previewEl = container.querySelector('[data-region="preview-panel"]');
+    let previewPanel = null;
     if (previewEl) {
-        new PreviewPanel({
+        previewPanel = new PreviewPanel({
             element: previewEl,
             reactive: reactiveInstance,
         });
@@ -303,6 +304,17 @@ export const init = (containerId) => {
             }
             const action = btn.dataset.action;
 
+            // Dual file view is a toggle that composes with the three layout
+            // choices (it changes what the preview pane holds, not the page
+            // layout), so it neither clears nor joins their active state.
+            if (action === 'layout-multiview') {
+                const on = btn.getAttribute('aria-pressed') !== 'true';
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                btn.classList.toggle('active', on);
+                previewPanel?.setMultiview(on);
+                return;
+            }
+
             // Remove existing layout classes.
             container.classList.remove('layout-preview-only', 'layout-grade-only');
 
@@ -313,8 +325,10 @@ export const init = (containerId) => {
                 container.classList.add('layout-grade-only');
             }
 
-            // Update active button state.
-            layoutToggle.querySelectorAll('.btn').forEach((b) => b.classList.remove('active'));
+            // Update active button state. The dual-file toggle is excluded: it is
+            // an independent on/off, so picking a layout must not switch it off.
+            layoutToggle.querySelectorAll('.btn:not([data-action="layout-multiview"])')
+                .forEach((b) => b.classList.remove('active'));
             btn.classList.add('active');
         });
     }

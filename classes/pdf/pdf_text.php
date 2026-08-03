@@ -107,6 +107,14 @@ class pdf_text {
             return '';
         }
         $flat = self::flatten($html);
+        // Drop <script>/<style> blocks INCLUDING their contents first. strip_tags()
+        // removes the tags but keeps the text between them, so a plugin that ships
+        // an inline helper alongside its markup would print raw JavaScript into the
+        // PDF — as the plagiarism panel did with Copyleaks' copy-to-clipboard
+        // function, which appeared verbatim in the student's feedback.
+        $flat = preg_replace('#<(script|style)\b[^>]*>.*?</\1\s*>#is', ' ', $flat);
+        // An unclosed <script> would otherwise leak everything after it.
+        $flat = preg_replace('#<(script|style)\b[^>]*>.*$#is', ' ', $flat);
         // Space out block/line boundaries before stripping tags.
         $flat = preg_replace('#</(p|div|li|h[1-6]|tr)\s*>#i', ' ', $flat);
         $flat = preg_replace('#<br\s*/?\s*>#i', ' ', $flat);

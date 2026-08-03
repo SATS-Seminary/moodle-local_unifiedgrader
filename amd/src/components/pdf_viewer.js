@@ -330,6 +330,13 @@ export default class PdfViewer extends BaseComponent {
             if (!this._pdfDoc) {
                 return;
             }
+            // Tool events are dispatched on `document`, so in the dual-file view
+            // every viewer hears them. Only the focused pane may act, or selecting
+            // the pen would arm it in both documents at once and a stroke could
+            // land in whichever pane the teacher happened to touch next.
+            if (this._inUnfocusedSplitPane()) {
+                return;
+            }
             // Undo/redo target one specific page's layer (the unified history in
             // the marks strip records which page each Fabric action was on).
             if (d.action === 'undo' || d.action === 'redo') {
@@ -384,8 +391,19 @@ export default class PdfViewer extends BaseComponent {
                     this._currentShape = d.shape;
                 }
             }
+            // Free-floating tick/cross stamps: placed anywhere on the page rather
+            // than bound to words, for marking a cover page or a diagram where
+            // there is no text to anchor to.
+            if (d.stamp) {
+                if (layer) {
+                    layer.setStampType(d.stamp);
+                } else {
+                    this._currentStamp = d.stamp;
+                }
+            }
             if (d.tool) {
-                const tool = (d.tool === 'shape' || d.tool === 'pen') ? d.tool : 'select';
+                const known = ['shape', 'pen', 'stamp'];
+                const tool = known.includes(d.tool) ? d.tool : 'select';
                 if (layer) {
                     layer.setTool(tool);
                 } else {
@@ -500,6 +518,19 @@ export default class PdfViewer extends BaseComponent {
     // ──────────────────────────────────────────────
     //  File context and annotation persistence
     // ──────────────────────────────────────────────
+
+    /**
+     * Whether this viewer sits in a dual-file pane that is not the focused one.
+     *
+     * Always false in the normal single-viewer layout (there are no split panes),
+     * so this only ever gates the dual-file case.
+     *
+     * @return {boolean}
+     */
+    _inUnfocusedSplitPane() {
+        const pane = this.element?.closest?.('[data-region="split-pane"]');
+        return !!pane && !pane.classList.contains('is-active');
+    }
 
     /**
      * Set the file context for annotation persistence.

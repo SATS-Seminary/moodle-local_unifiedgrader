@@ -213,6 +213,21 @@
 
         <div class="d-flex align-items-center px-2 border-start">
             <div class="btn-group btn-group-sm" role="group" data-region="layout-toggle">
+                {{! Dual file view — show two of the submission's files at once
+                    (e.g. a recording above its manuscript). A separate toggle, not
+                    one of the three layout choices, because it composes with them:
+                    it changes what the preview pane holds, not the page layout.
+                    Shown by preview_panel only when there are 2+ previewable files. }}
+                <button type="button" class="btn btn-outline-secondary d-none"
+                        data-action="layout-multiview" aria-pressed="false"
+                        title="{{#str}} layout_multiview, local_unifiedgrader {{/str}}">
+                    <svg width="16" height="12" viewBox="0 0 16 12">
+                        <rect x="0.5" y="0.5" width="15" height="5" rx="1"
+                              fill="none" stroke="currentColor" stroke-width="1.2"/>
+                        <rect x="0.5" y="6.5" width="15" height="5" rx="1"
+                              fill="none" stroke="currentColor" stroke-width="1.2"/>
+                    </svg>
+                </button>
                 <button type="button" class="btn btn-outline-secondary active"
                         data-action="layout-both"
                         title="{{#str}} layout_both, local_unifiedgrader {{/str}}">

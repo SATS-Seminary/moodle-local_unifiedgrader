@@ -122,4 +122,38 @@ final class pdf_text_test extends \basic_testcase {
         $this->assertSame('', pdf_text::flatten(''));
         $this->assertSame('', pdf_text::plain(''));
     }
+
+    /**
+     * Script and style contents must not survive into the PDF.
+     *
+     * strip_tags() removes the tags but keeps the text between them, so a
+     * plagiarism plugin that ships an inline helper next to its scores printed the
+     * raw JavaScript into the student's feedback PDF. The scores around it still
+     * have to come through.
+     */
+    public function test_plain_drops_script_and_style_contents(): void {
+        $html = 'AI content score <span>0%</span> Similarity Score <b>18%</b>'
+            . '<script type="text/javascript">function cl_copy_to_clipboard26631()'
+            . '{var copyText = document.getElementById(\'clsreporturlinput_5df\');'
+            . 'navigator.clipboard.writeText(copyText.value);}</script>'
+            . '<style>.cl-badge { color: red; }</style> Report';
+
+        $text = pdf_text::plain($html);
+
+        $this->assertStringNotContainsString('cl_copy_to_clipboard', $text);
+        $this->assertStringNotContainsString('getElementById', $text);
+        $this->assertStringNotContainsString('navigator.clipboard', $text);
+        $this->assertStringNotContainsString('color: red', $text);
+        // The information the teacher and student actually want is preserved.
+        $this->assertStringContainsString('AI content score', $text);
+        $this->assertStringContainsString('18%', $text);
+        $this->assertStringContainsString('Report', $text);
+    }
+
+    /**
+     * An unclosed script tag must not leak everything that follows it.
+     */
+    public function test_plain_contains_unclosed_script(): void {
+        $this->assertSame('Score 5%', pdf_text::plain('Score 5% <script>var a = 1; tail'));
+    }
 }

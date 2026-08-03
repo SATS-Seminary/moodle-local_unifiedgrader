@@ -103,4 +103,101 @@
         anchored by character offset. Shown instead of the iframe for online text. }}
     <div data-region="text-annot-view" class="d-none flex-grow-1 overflow-auto" style="min-height: 0;"></div>
 
+    {{! Split view — two submissions at once, stacked with a draggable divider.
+        Built for "watch the recording while marking the manuscript": the video
+        sits in one pane while the document keeps FULL width in the other, so the
+        comment margin isn't squeezed (it would be, side by side).
+
+        Each pane carries its own PDF viewer and its own iframe; whichever the
+        assigned file needs is shown. Annotation follows the focused pane — only
+        one pane is active at a time, so a mark can never land in the wrong
+        document. Hidden entirely unless the teacher turns multi-view on. }}
+    <div data-region="split-view" class="d-none flex-grow-1 flex-column" style="min-height: 0;">
+
+        {{! Top pane — typically the recording. }}
+        <div data-region="split-pane" data-pane="a"
+             class="d-flex flex-column position-relative border rounded-top"
+             style="min-height: 60px; flex: 0 0 45%;" tabindex="0">
+            <div class="d-flex align-items-center gap-2 px-2 py-1 border-bottom bg-light small">
+                <i data-region="split-pane-icon" class="fa fa-file-alt" aria-hidden="true"></i>
+                {{! Per-pane file chooser — this is how more than two attachments are
+                    handled: each pane picks any file independently. }}
+                <select data-region="split-pane-select"
+                        class="form-select form-select-sm border-0 bg-transparent fw-semibold w-auto"
+                        style="max-width: 55%;"
+                        aria-label="{{#str}} multiview_choose_file, local_unifiedgrader {{/str}}"></select>
+                <span data-region="split-pane-active"
+                      class="badge rounded-pill text-bg-primary ms-auto d-none">
+                    {{#str}} multiview_active_pane, local_unifiedgrader {{/str}}
+                </span>
+            </div>
+            <div data-region="split-pdf" class="d-none flex-grow-1" style="min-height: 0;">
+                {{> local_unifiedgrader/pdf_viewer }}
+            </div>
+            <div data-region="split-doc" class="d-none flex-grow-1" style="min-height: 0;">
+                <iframe data-region="split-iframe"
+                        class="w-100 h-100 border-0"
+                        src="about:blank"
+                        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                        allowfullscreen
+                        title="{{#str}} previewpanel, local_unifiedgrader {{/str}}">
+                </iframe>
+            </div>
+            {{! Online text rendered inline (assignments), so a recording embedded
+                in the submission by the TinyMCE recorder plays here and the text
+                stays annotatable — the same treatment the single view gives it. }}
+            <div data-region="split-text" class="d-none flex-grow-1 overflow-auto" style="min-height: 0;"></div>
+            <div data-region="split-pane-empty"
+                 class="flex-grow-1 d-flex align-items-center justify-content-center text-muted small">
+                {{#str}} multiview_choose_file, local_unifiedgrader {{/str}}
+            </div>
+        </div>
+
+        {{! Drag to give the document more room; double-click resets to even. }}
+        <div data-region="split-divider" role="separator" aria-orientation="horizontal"
+             tabindex="0" class="local-unifiedgrader-split-divider"
+             title="{{#str}} multiview_drag_hint, local_unifiedgrader {{/str}}">
+            <span class="local-unifiedgrader-split-grip" aria-hidden="true"></span>
+        </div>
+
+        {{! Bottom pane — typically the manuscript being marked up. }}
+        <div data-region="split-pane" data-pane="b"
+             class="d-flex flex-column position-relative border rounded-bottom"
+             style="min-height: 60px; flex: 1 1 auto;" tabindex="0">
+            <div class="d-flex align-items-center gap-2 px-2 py-1 border-bottom bg-light small">
+                <i data-region="split-pane-icon" class="fa fa-file-alt" aria-hidden="true"></i>
+                {{! Per-pane file chooser — this is how more than two attachments are
+                    handled: each pane picks any file independently. }}
+                <select data-region="split-pane-select"
+                        class="form-select form-select-sm border-0 bg-transparent fw-semibold w-auto"
+                        style="max-width: 55%;"
+                        aria-label="{{#str}} multiview_choose_file, local_unifiedgrader {{/str}}"></select>
+                <span data-region="split-pane-active"
+                      class="badge rounded-pill text-bg-primary ms-auto d-none">
+                    {{#str}} multiview_active_pane, local_unifiedgrader {{/str}}
+                </span>
+            </div>
+            <div data-region="split-pdf" class="d-none flex-grow-1" style="min-height: 0;">
+                {{> local_unifiedgrader/pdf_viewer }}
+            </div>
+            <div data-region="split-doc" class="d-none flex-grow-1" style="min-height: 0;">
+                <iframe data-region="split-iframe"
+                        class="w-100 h-100 border-0"
+                        src="about:blank"
+                        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                        allowfullscreen
+                        title="{{#str}} previewpanel, local_unifiedgrader {{/str}}">
+                </iframe>
+            </div>
+            {{! Online text rendered inline (assignments), so a recording embedded
+                in the submission by the TinyMCE recorder plays here and the text
+                stays annotatable — the same treatment the single view gives it. }}
+            <div data-region="split-text" class="d-none flex-grow-1 overflow-auto" style="min-height: 0;"></div>
+            <div data-region="split-pane-empty"
+                 class="flex-grow-1 d-flex align-items-center justify-content-center text-muted small">
+                {{#str}} multiview_choose_file, local_unifiedgrader {{/str}}
+            </div>
+        </div>
+    </div>
+
 </div>

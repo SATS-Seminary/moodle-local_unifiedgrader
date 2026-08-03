@@ -69,12 +69,22 @@ const STAMPS = {
     strikethrough: {glyph: '', cls: 'local-unifiedgrader-mark-strike', key: 'segmark_strike', fallback: 'Strike out'},
 };
 
-/** Fabric shape tools (PDF only), in popout order. */
+/**
+ * Fabric shape tools (PDF only), in popout order.
+ *
+ * The last two are stamps rather than drawn shapes: a tick or cross dropped at a
+ * click, with no text to anchor to. The text-anchored marks in the strip cover
+ * commenting on wording, but a cover page, a diagram or a signature block has
+ * nothing to bind to — so those live here, where a free-floating mark is expected.
+ * An entry carrying `stamp` drives the stamp tool; `shape` drives the shape tool.
+ */
 const SHAPES = [
     {shape: 'rect', icon: 'fa-square-o', key: 'annotate_shape_rect', fallback: 'Rectangle'},
     {shape: 'circle', icon: 'fa-circle-o', key: 'annotate_shape_circle', fallback: 'Ellipse'},
     {shape: 'line', icon: 'fa-minus', key: 'annotate_shape_line', fallback: 'Line'},
     {shape: 'arrow', icon: 'fa-long-arrow-right', key: 'annotate_shape_arrow', fallback: 'Arrow'},
+    {shape: 'stamp-check', stamp: 'CHECK', icon: 'fa-check', key: 'annotate_stamp_tick', fallback: 'Tick stamp'},
+    {shape: 'stamp-cross', stamp: 'CROSS', icon: 'fa-times', key: 'annotate_stamp_cross', fallback: 'Cross stamp'},
 ];
 
 /** Freehand pen brush widths (px), matching the classic annotation toolbar. */
@@ -217,8 +227,10 @@ export default class extends BaseComponent {
         this._hoverHideTimer = 0;
         /** @type {number} Last margin reserve (px) announced to the PDF viewer. */
         this._reserved = -1;
-        /** @type {string} The active Fabric shape type (rect|circle|line|arrow). */
+        /** @type {string} The active shape-popout entry (a shape or a stamp). */
         this._shape = 'rect';
+        /** @type {string} The free-floating stamp glyph to place (CHECK|CROSS). */
+        this._stamp = 'CHECK';
         /** @type {string} The active Fabric drawing colour. */
         this._shapeColor = '#EF4540';
         /** @type {?HTMLButtonElement} The shape tool button (icon reflects _shape). */
@@ -1050,6 +1062,8 @@ export default class extends BaseComponent {
         this._root?.classList.toggle('local-unifiedgrader-canvastool', isCanvas);
         if (tool === 'shape') {
             this._dispatchPdfTool({tool: 'shape', shape: this._shape, color: this._shapeColor});
+        } else if (tool === 'stamp') {
+            this._dispatchPdfTool({tool: 'stamp', stamp: this._stamp, color: this._shapeColor});
         } else if (tool === 'pen') {
             this._dispatchPdfTool({tool: 'pen', width: this._penWidth, color: this._shapeColor});
         } else if (tool === 'annotmove') {
@@ -1071,7 +1085,10 @@ export default class extends BaseComponent {
      * @return {boolean}
      */
     _isCanvasTool() {
-        return this._tool === 'shape' || this._tool === 'pen' || this._tool === 'annotmove';
+        // 'stamp' belongs here too: a free-floating tick/cross is placed on the
+        // Fabric canvas, so the pointer must reach it rather than the text layer.
+        return this._tool === 'shape' || this._tool === 'pen'
+            || this._tool === 'stamp' || this._tool === 'annotmove';
     }
 
     /**
@@ -1809,6 +1826,23 @@ export default class extends BaseComponent {
     }
 
     /**
+     * Whether an event happened in a dual-file pane that isn't the focused one.
+     *
+     * In the dual-file view both panes can hold a document, and both render real,
+     * clickable text layers. Marks are only placed in the pane the teacher focused
+     * (the one badged "Marking here"), so a stray click or selection in the other
+     * pane — most likely while scrolling it for reference — cannot drop a mark into
+     * the wrong document. Reading existing marks is unaffected.
+     *
+     * @param {Event} e The pointer event.
+     * @return {boolean} True when the event should be ignored.
+     */
+    _inUnfocusedPane(e) {
+        const pane = e.target?.closest?.('[data-region="split-pane"]');
+        return !!pane && !pane.classList.contains('is-active');
+    }
+
+    /**
      * A click in the translated body: place a stamp, open an existing mark, or
      * (in select/comment mode) start a comment on the clicked phrase.
      * @param {Event} e The click event.
@@ -1817,6 +1851,9 @@ export default class extends BaseComponent {
         // Buttons (card Edit/Delete) handle their own clicks — don't also treat the
         // click as "open this mark", which would double-open the composer.
         if (e.target.closest('button')) {
+            return;
+        }
+        if (this._inUnfocusedPane(e)) {
             return;
         }
         // The click that ends a mouseup-consumed drag: already handled there.
@@ -1881,6 +1918,9 @@ export default class extends BaseComponent {
      * @param {Event} e The mouseup event.
      */
     _onMouseUp(e) {
+        if (this._inUnfocusedPane(e)) {
+            return;
+        }
         if (this._pop && this._pop.contains(e.target)) {
             return;
         }
@@ -2884,7 +2924,14 @@ export default class extends BaseComponent {
                 });
                 this._updateShapeBtn();
                 pop.classList.add('d-none');
-                this._setTool('shape');
+                // A stamp entry places a glyph at the click; the others drag out a
+                // shape. Both live in this popout, but they are different tools.
+                if (s.stamp) {
+                    this._stamp = s.stamp;
+                    this._setTool('stamp');
+                } else {
+                    this._setTool('shape');
+                }
             });
             pop.appendChild(opt);
         });

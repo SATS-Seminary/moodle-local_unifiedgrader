@@ -769,6 +769,12 @@ class feedback_summary_pdf extends \pdf {
         $cleaned = preg_replace('/\s+on\w+\s*=\s*"[^"]*"/i', '', $cleaned);
         $cleaned = preg_replace("/\s+on\w+\s*=\s*'[^']*'/i", '', $cleaned);
 
+        // Remove <script>/<style> blocks with their contents. The PDF writer has no
+        // notion of them, so the code between the tags would simply be typeset into
+        // the document as text (see pdf_text::plain() for the same hazard).
+        $cleaned = preg_replace('#<(script|style)\b[^>]*>.*?</\1\s*>#is', '', $cleaned);
+        $cleaned = preg_replace('#<(script|style)\b[^>]*>.*$#is', '', $cleaned);
+
         return $cleaned;
     }
 

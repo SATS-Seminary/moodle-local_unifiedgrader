@@ -28,6 +28,7 @@
 import {BaseComponent} from 'core/reactive';
 import {getString} from 'core/str';
 import PdfViewer from 'local_unifiedgrader/components/pdf_viewer';
+import {iconForFile} from 'local_unifiedgrader/lib/file_icons';
 
 export default class extends BaseComponent {
 
@@ -43,11 +44,26 @@ export default class extends BaseComponent {
             PREVIEW_IFRAME: '[data-region="preview-iframe"]',
             TEXT_ANNOT_VIEW: '[data-region="text-annot-view"]',
             ANNOTATION_TOOLBAR: '[data-region="annotation-toolbar"]',
+            SPLIT_VIEW: '[data-region="split-view"]',
+            SPLIT_DIVIDER: '[data-region="split-divider"]',
         };
         this._container = null;
         this._currentFileId = null;
         /** @type {?PdfViewer} */
         this._pdfViewer = null;
+        /**
+         * Dual-file (multi-view) state. Two stacked panes, each showing one of the
+         * submission's files, so a recording can be watched while its manuscript is
+         * marked. Off by default — the single viewer above is the normal path.
+         * @type {boolean}
+         */
+        this._multiview = false;
+        /** @type {Object<string, ?PdfViewer>} Per-pane PDF viewer, keyed 'a'/'b'. */
+        this._panePdf = {a: null, b: null};
+        /** @type {Object<string, number>} File id shown in each pane (0 = none). */
+        this._paneFile = {a: 0, b: 0};
+        /** @type {string} The pane that owns the annotation tools. */
+        this._activePane = 'b';
     }
 
     /**
@@ -137,10 +153,24 @@ export default class extends BaseComponent {
         // present, "Submission" when other content exists, plus each file.
         this._renderFileSelector(files, hasContent, isForum, hasPortfolio);
 
+        // Offer (or withdraw) the dual-file toggle for this submission. Done here,
+        // with the real file list — the reset call above passes an empty array, and
+        // judging availability from that would switch the view off on every render.
+        this._updateMultiviewAvailability(files, hasContent);
+
         // Byblos portfolio submissions take priority — render the portfolio
         // iframe as the default view. Other content remains accessible via pills.
         if (hasPortfolio) {
             this._showPortfolio(submission.portfoliourl);
+            return;
+        }
+
+        // In the dual-file view the panes own the preview. Stop here rather than
+        // auto-previewing into the single viewer: those regions sit ABOVE the split
+        // in the DOM, so showing one would push a clipped third pane above the two
+        // (most visibly with online text, which renders inline).
+        if (this._multiview) {
+            this._seedPanes(files, hasContent);
             return;
         }
 
@@ -274,6 +304,13 @@ export default class extends BaseComponent {
             const previewBtn = document.createElement('button');
             previewBtn.type = 'button';
             previewBtn.className = 'btn btn-sm btn-outline-secondary d-flex align-items-center';
+            // File-type icon: with several attachments (e.g. a recording plus its
+            // manuscript) the kind of file is what the teacher scans for, not the
+            // filename.
+            const typeIcon = document.createElement('i');
+            typeIcon.className = 'fa ' + iconForFile(file) + ' me-1';
+            typeIcon.setAttribute('aria-hidden', 'true');
+            previewBtn.appendChild(typeIcon);
             const name = document.createElement('span');
             name.className = 'small text-truncate';
             name.style.maxWidth = '180px';
@@ -314,6 +351,16 @@ export default class extends BaseComponent {
      * @param {object} file File info object.
      */
     _previewFile(file) {
+        // In the dual-file view the single viewer is not on screen, so a click on a
+        // file pill loads that file into the focused pane instead of tearing the
+        // split down and losing the pairing the teacher set up.
+        if (this._multiview) {
+            this.showFileInPane(file, this._activePane);
+            this._currentFileId = file.fileid;
+            this._highlightFileButton(file.fileid);
+            return;
+        }
+
         const pdfWrapper = this.getElement(this.selectors.PDF_VIEWER_WRAPPER);
         const docPreview = this.getElement(this.selectors.DOCUMENT_PREVIEW);
 
@@ -362,6 +409,572 @@ export default class extends BaseComponent {
 
         // Highlight the active file button in the right-panel selector.
         this._highlightFileButton(file.fileid);
+    }
+
+    // --- Dual file (multi-view) -------------------------------------------------
+
+    /**
+     * Show or hide the dual-file toggle for this submission, and drop out of the
+     * view if the student we just moved to has nothing to pair.
+     *
+     * @param {Array<object>} files The submission's files.
+     * @param {boolean} hasContent Whether the submission also has online text.
+     */
+    _updateMultiviewAvailability(files, hasContent) {
+        const btn = this._container?.querySelector('[data-action="layout-multiview"]');
+        if (!btn) {
+            return;
+        }
+        // Count the submission's own content as a pairable source: a manuscript
+        // attached alongside a TinyMCE-recorded video is one file plus the online
+        // text, which is exactly the case this view is for.
+        const previewable = (files || []).filter((f) => this._isPreviewable(f));
+        const sources = previewable.length + (hasContent ? 1 : 0);
+        const available = sources >= 2;
+        btn.classList.toggle('d-none', !available);
+
+        if (!available && this._multiview) {
+            // Navigating to a student with nothing to pair must not leave a stale
+            // split showing the previous student's documents.
+            btn.setAttribute('aria-pressed', 'false');
+            btn.classList.remove('active');
+            this.setMultiview(false, files);
+            return;
+        }
+        if (this._multiview) {
+            // Same view, new student: clear the pairing so the panes re-seed from
+            // this student's own submission.
+            this._paneFile.a = 0;
+            this._paneFile.b = 0;
+        }
+    }
+
+    /**
+     * One of the two split panes.
+     * @param {string} pane 'a' (top) or 'b' (bottom).
+     * @return {?HTMLElement}
+     */
+    _paneEl(pane) {
+        return this.getElement('[data-region="split-pane"][data-pane="' + pane + '"]');
+    }
+
+    /**
+     * Whether the dual-file view is currently showing.
+     * @return {boolean}
+     */
+    isMultiview() {
+        return this._multiview;
+    }
+
+    /**
+     * Turn the dual-file view on or off.
+     *
+     * On: the single-viewer regions are hidden and the two stacked panes take over.
+     * Off: the panes are blanked (so a video stops playing and a PDF stops holding
+     * its document) and the normal single viewer is restored.
+     *
+     * @param {boolean} on Whether to show two files at once.
+     * @param {Array<object>} [files] The submission's files, used to seed the panes.
+     */
+    setMultiview(on, files = []) {
+        this._multiview = !!on;
+        const split = this.getElement(this.selectors.SPLIT_VIEW);
+        if (!split) {
+            return;
+        }
+
+        const singles = [
+            this.selectors.PDF_VIEWER_WRAPPER,
+            this.selectors.DOCUMENT_PREVIEW,
+            this.selectors.TEXT_ANNOT_VIEW,
+        ];
+
+        if (!this._multiview) {
+            split.classList.add('d-none');
+            split.classList.remove('d-flex');
+            // Blank both panes so media stops playing behind the single view.
+            ['a', 'b'].forEach((p) => this._clearPane(p));
+            // Restore whichever file was last shown singly.
+            const files2 = files.length ? files : (this.reactive.state.submission?.files || []);
+            const previous = files2.find((f) => parseInt(f.fileid, 10) === parseInt(this._currentFileId, 10));
+            if (previous) {
+                this._previewFile(previous);
+            }
+            return;
+        }
+
+        singles.forEach((sel) => this.getElement(sel)?.classList.add('d-none'));
+        this._removePortfolioPopout();
+        split.classList.remove('d-none');
+        split.classList.add('d-flex');
+        this._initDivider();
+
+        const list = files.length ? files : (this.reactive.state.submission?.files || []);
+        this._seedPanes(list, !!this.reactive.state.submission?.hascontent);
+    }
+
+    /**
+     * Fill the panes for the current submission.
+     *
+     * Pairs a recording with a document, which is the case this view exists for.
+     * The recording may be an attached media file OR a clip embedded in the
+     * submission's online text by the TinyMCE recorder — the latter is not a
+     * "file" at all, so submission content is offered as a pane source in its own
+     * right (value 'content').
+     *
+     * @param {Array<object>} files The submission's files.
+     * @param {boolean} hasContent Whether the submission also has online text.
+     */
+    _seedPanes(files, hasContent) {
+        this._populatePaneSelects(files, hasContent);
+
+        if (this._paneFile.a || this._paneFile.b) {
+            // Already paired (e.g. a re-render); leave the teacher's choice alone.
+            this._setActivePane(this._activePane);
+            return;
+        }
+
+        const media = files.find((f) => this._isMediaFile(f));
+        const doc = files.find((f) => !this._isMediaFile(f) && this._isAnnotatable(f))
+            || files.find((f) => !this._isMediaFile(f));
+
+        // Top pane: an attached recording, else the online text (which is where a
+        // TinyMCE-recorded video lives), else whatever the first file is.
+        if (media) {
+            this.showFileInPane(media, 'a');
+        } else if (hasContent) {
+            this.showContentInPane('a');
+        } else if (files[0]) {
+            this.showFileInPane(files[0], 'a');
+        }
+
+        // Bottom pane: the document to mark up.
+        const top = this._paneFile.a;
+        const bottom = doc && String(doc.fileid) !== String(top)
+            ? doc
+            : files.find((f) => String(f.fileid) !== String(top));
+        if (bottom) {
+            this.showFileInPane(bottom, 'b');
+        } else if (hasContent && top !== 'content') {
+            this.showContentInPane('b');
+        }
+
+        // Marks belong to the document, so focus the annotatable pane by default.
+        this._setActivePane(this._paneFile.b ? 'b' : 'a');
+    }
+
+    /**
+     * Show the submission's own content (online text) in a pane.
+     *
+     * For assignments the text is rendered inline, exactly as the single view does
+     * it, so an embedded recording plays and seg_comments can still anchor marks to
+     * the words. Anything else (forum posts, quiz attempts) keeps the iframe so the
+     * submission plugin's own CSS/JS loads.
+     *
+     * @param {string} pane 'a' (top) or 'b' (bottom).
+     */
+    showContentInPane(pane) {
+        const el = this._paneEl(pane);
+        if (!el) {
+            return;
+        }
+        el.querySelector('[data-region="split-pdf"]')?.classList.add('d-none');
+        el.querySelector('[data-region="split-doc"]')?.classList.add('d-none');
+        el.querySelector('[data-region="split-text"]')?.classList.add('d-none');
+        el.querySelector('[data-region="split-pane-empty"]')?.classList.add('d-none');
+
+        const icon = el.querySelector('[data-region="split-pane-icon"]');
+        if (icon) {
+            icon.className = 'fa fa-file-alt';
+        }
+        const select = el.querySelector('[data-region="split-pane-select"]');
+        if (select) {
+            select.value = 'content';
+        }
+
+        const state = this.reactive.state;
+        const isAssign = state.activity?.type === 'assign';
+        const html = state.submission?.onlinetexthtml || '';
+        const textHost = el.querySelector('[data-region="split-text"]');
+
+        if (isAssign && html && textHost) {
+            this._renderInlineText(textHost, html);
+            textHost.classList.remove('d-none');
+            this._trackPaneMediaHeight(textHost);
+        } else {
+            const iframe = el.querySelector('[data-region="split-iframe"]');
+            const cmid = state.activity?.cmid;
+            const userid = state.submission?.userid;
+            if (iframe && cmid && userid) {
+                let url = `${M.cfg.wwwroot}/local/unifiedgrader/preview_submission.php`
+                    + `?cmid=${cmid}&userid=${userid}`;
+                const attemptnumber = state.submission?.attemptnumber;
+                if (attemptnumber !== undefined && attemptnumber !== null && attemptnumber >= 0) {
+                    url += `&attempt=${attemptnumber}`;
+                }
+                iframe.src = url;
+                el.querySelector('[data-region="split-doc"]')?.classList.remove('d-none');
+            }
+        }
+
+        this._paneFile[pane] = 'content';
+    }
+
+    /**
+     * Keep embedded media sized to the pane it sits in.
+     *
+     * A recording in an online-text submission (satsrecorder, or a bare <video>)
+     * carries its own intrinsic size, so dragging the divider would otherwise clip
+     * it instead of shrinking it. The stylesheet caps such media at
+     * --ug-media-max-h; this keeps that value in step with the pane's real height,
+     * on drag and on window resize alike.
+     *
+     * @param {HTMLElement} host The pane's inline-text host.
+     */
+    _trackPaneMediaHeight(host) {
+        const apply = () => {
+            // Leave a little room so the media never fills the pane edge to edge
+            // and the surrounding text stays reachable by scrolling.
+            const available = Math.max(120, host.clientHeight - 24);
+            host.style.setProperty('--ug-media-max-h', available + 'px');
+        };
+        apply();
+
+        if (host.dataset.mediaObserved === '1' || typeof ResizeObserver === 'undefined') {
+            return;
+        }
+        host.dataset.mediaObserved = '1';
+        // The pane's height is set by the flex layout and the divider drag, so
+        // observe the element itself rather than listening for drag events.
+        new ResizeObserver(apply).observe(host);
+    }
+
+    /**
+     * Whether a file plays as media (and so can never carry text annotations).
+     * @param {object} file The submission file.
+     * @return {boolean}
+     */
+    _isMediaFile(file) {
+        const m = (file && file.mimetype) || '';
+        return m.startsWith('audio/') || m.startsWith('video/');
+    }
+
+    /**
+     * Whether a file opens in the annotatable PDF viewer.
+     * @param {object} file The submission file.
+     * @return {boolean}
+     */
+    _isAnnotatable(file) {
+        return !!file && (file.mimetype === 'application/pdf' || !!file.convertible);
+    }
+
+    /**
+     * Empty a pane: stop its media, drop its PDF, and show the placeholder.
+     * @param {string} pane 'a' or 'b'.
+     */
+    _clearPane(pane) {
+        const el = this._paneEl(pane);
+        if (!el) {
+            return;
+        }
+        const iframe = el.querySelector('[data-region="split-iframe"]');
+        if (iframe) {
+            // about:blank rather than removing the node — this is what stops a video
+            // continuing to play once the pane is hidden.
+            iframe.src = 'about:blank';
+        }
+        el.querySelector('[data-region="split-pdf"]')?.classList.add('d-none');
+        el.querySelector('[data-region="split-doc"]')?.classList.add('d-none');
+        const text = el.querySelector('[data-region="split-text"]');
+        if (text) {
+            text.classList.add('d-none');
+            // Drop the inline copy too, so its anchors can't outlive the pane.
+            text.innerHTML = '';
+        }
+        el.querySelector('[data-region="split-pane-empty"]')?.classList.remove('d-none');
+        const select = el.querySelector('[data-region="split-pane-select"]');
+        if (select) {
+            select.value = '0';
+        }
+        this._paneFile[pane] = 0;
+    }
+
+    /**
+     * Fill both panes' file choosers from the submission's files.
+     *
+     * Every file is offered in both panes (plus a "None" entry), which is how more
+     * than two attachments are supported: the teacher pairs whichever two they
+     * want rather than being limited to a fixed first-and-second.
+     *
+     * @param {Array<object>} files The submission files.
+     * @param {boolean} hasContent Whether to offer the submission's online text.
+     */
+    _populatePaneSelects(files, hasContent) {
+        ['a', 'b'].forEach((pane) => {
+            const select = this._paneEl(pane)?.querySelector('[data-region="split-pane-select"]');
+            if (!select) {
+                return;
+            }
+            const current = select.value;
+            select.innerHTML = '';
+            const none = document.createElement('option');
+            none.value = '0';
+            getString('multiview_none', 'local_unifiedgrader')
+                .then((s) => { none.textContent = s; return s; })
+                .catch(() => { none.textContent = '—'; });
+            select.appendChild(none);
+
+            // Submission content is a first-class pane source: a recording made
+            // with the TinyMCE recorder lives inside the online text, not in a file.
+            if (hasContent) {
+                const opt = document.createElement('option');
+                opt.value = 'content';
+                const isForum = this.reactive.state.activity?.type === 'forum';
+                getString(isForum ? 'forum_posts_pill' : 'submission_content_pill', 'local_unifiedgrader')
+                    .then((s) => { opt.textContent = s; return s; })
+                    .catch(() => { opt.textContent = 'Submission'; });
+                select.appendChild(opt);
+            }
+
+            files.forEach((file) => {
+                if (!this._isPreviewable(file)) {
+                    return;
+                }
+                const opt = document.createElement('option');
+                opt.value = String(file.fileid);
+                opt.textContent = file.filename;
+                select.appendChild(opt);
+            });
+            if (current) {
+                select.value = current;
+            }
+
+            if (select.dataset.bound !== '1') {
+                select.dataset.bound = '1';
+                select.addEventListener('change', () => {
+                    const value = select.value;
+                    if (value === 'content') {
+                        this.showContentInPane(pane);
+                        return;
+                    }
+                    const id = parseInt(value, 10) || 0;
+                    if (!id) {
+                        this._clearPane(pane);
+                        return;
+                    }
+                    const chosen = (this.reactive.state.submission?.files || [])
+                        .find((f) => parseInt(f.fileid, 10) === id);
+                    if (chosen) {
+                        this.showFileInPane(chosen, pane);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Show one submission file in one pane, routing it the same way the single
+     * viewer does: the PDF viewer for documents, the media player page for audio
+     * and video, a plain iframe for anything else previewable.
+     *
+     * @param {object} file The submission file.
+     * @param {string} pane 'a' (top) or 'b' (bottom).
+     */
+    showFileInPane(file, pane) {
+        const el = this._paneEl(pane);
+        if (!el || !file) {
+            return;
+        }
+        const pdfHost = el.querySelector('[data-region="split-pdf"]');
+        const docHost = el.querySelector('[data-region="split-doc"]');
+        const empty = el.querySelector('[data-region="split-pane-empty"]');
+        const iframe = el.querySelector('[data-region="split-iframe"]');
+
+        pdfHost?.classList.add('d-none');
+        docHost?.classList.add('d-none');
+        empty?.classList.add('d-none');
+        const textHost = el.querySelector('[data-region="split-text"]');
+        if (textHost) {
+            // Swapping a pane away from online text must remove the inline copy,
+            // or its text would still be in the DOM for seg_comments to anchor to.
+            textHost.classList.add('d-none');
+            textHost.innerHTML = '';
+        }
+
+        // Pane header: type icon + the chooser reflecting what is shown here.
+        const icon = el.querySelector('[data-region="split-pane-icon"]');
+        if (icon) {
+            icon.className = 'fa ' + iconForFile(file);
+        }
+        const select = el.querySelector('[data-region="split-pane-select"]');
+        if (select) {
+            select.value = String(file.fileid);
+        }
+
+        const state = this.reactive.state;
+        if (this._isAnnotatable(file)) {
+            const viewer = this._ensurePaneViewer(pane);
+            if (viewer) {
+                pdfHost.classList.remove('d-none');
+                viewer.setFileContext(
+                    parseInt(state.activity.cmid, 10),
+                    parseInt(state.currentUser.id, 10),
+                    parseInt(file.fileid, 10),
+                );
+                viewer.setFileInfo(file);
+                viewer.loadPdf(file.previewurl || file.url);
+            }
+        } else if (this._isMediaFile(file)) {
+            iframe.src = `${M.cfg.wwwroot}/local/unifiedgrader/preview_media.php`
+                + `?fileid=${file.fileid}&cmid=${state.activity?.cmid}`;
+            docHost.classList.remove('d-none');
+        } else {
+            iframe.src = file.previewurl || file.url;
+            docHost.classList.remove('d-none');
+        }
+
+        this._paneFile[pane] = parseInt(file.fileid, 10) || 0;
+        // A media pane can never take marks, so put the tools on the other one.
+        if (this._isMediaFile(file) && this._activePane === pane) {
+            this._setActivePane(pane === 'a' ? 'b' : 'a');
+        }
+    }
+
+    /**
+     * Create (once) the PDF viewer that backs a pane.
+     *
+     * Each pane owns a separate PdfViewer instance on its own root element, so the
+     * two documents keep independent pages, zoom and annotation layers. PdfViewer
+     * scopes its queries to that element, so the duplicated markup does not clash.
+     *
+     * @param {string} pane 'a' or 'b'.
+     * @return {?PdfViewer}
+     */
+    _ensurePaneViewer(pane) {
+        if (this._panePdf[pane]) {
+            return this._panePdf[pane];
+        }
+        const host = this._paneEl(pane)?.querySelector('[data-region="split-pdf"] [data-region="pdf-viewer"]');
+        if (!host) {
+            return null;
+        }
+        // The legacy pixel toolbar inside the partial is superseded by the marks
+        // strip; keep it hidden so it cannot grab focus in either pane.
+        host.querySelector('[data-region="annotation-toolbar"]')?.classList.add('d-none');
+        this._panePdf[pane] = new PdfViewer({element: host, reactive: this.reactive});
+        return this._panePdf[pane];
+    }
+
+    /**
+     * Focus a pane for marking: it gets the "Marking here" badge and the highlight,
+     * and its document is the one the annotation tools act on.
+     *
+     * @param {string} pane 'a' or 'b'.
+     */
+    _setActivePane(pane) {
+        this._activePane = pane;
+        ['a', 'b'].forEach((p) => {
+            const el = this._paneEl(p);
+            if (!el) {
+                return;
+            }
+            const active = p === pane;
+            el.classList.toggle('is-active', active);
+            // Only badge the pane that can actually take marks.
+            const annotatable = active && !!this._paneFile[p] && this._paneIsAnnotatable(p);
+            el.querySelector('[data-region="split-pane-active"]')?.classList.toggle('d-none', !annotatable);
+        });
+    }
+
+    /**
+     * Whether the file currently in a pane can carry annotations.
+     * @param {string} pane 'a' or 'b'.
+     * @return {boolean}
+     */
+    _paneIsAnnotatable(pane) {
+        // Inline online text takes marks too (seg_comments anchors them by offset),
+        // so a pane showing submission content counts as annotatable.
+        if (this._paneFile[pane] === 'content') {
+            return this.reactive.state.activity?.type === 'assign'
+                && !!this.reactive.state.submission?.onlinetexthtml;
+        }
+        const files = this.reactive.state.submission?.files || [];
+        const file = files.find((f) => parseInt(f.fileid, 10) === this._paneFile[pane]);
+        return this._isAnnotatable(file);
+    }
+
+    /**
+     * Wire the divider: drag to trade height between the panes, double-click to
+     * reset to an even split. Bound once.
+     */
+    _initDivider() {
+        const divider = this.getElement(this.selectors.SPLIT_DIVIDER);
+        const split = this.getElement(this.selectors.SPLIT_VIEW);
+        const top = this._paneEl('a');
+        if (!divider || !split || !top || divider.dataset.bound === '1') {
+            return;
+        }
+        divider.dataset.bound = '1';
+
+        const MIN = 60;
+        let dragging = false;
+
+        const onMove = (e) => {
+            if (!dragging) {
+                return;
+            }
+            const rect = split.getBoundingClientRect();
+            const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+            // Leave room for the other pane and the divider itself.
+            const max = rect.height - MIN - divider.offsetHeight;
+            const height = Math.max(MIN, Math.min(y, max));
+            top.style.flex = '0 0 ' + height + 'px';
+        };
+        const stop = () => {
+            if (!dragging) {
+                return;
+            }
+            dragging = false;
+            divider.classList.remove('is-dragging');
+            split.classList.remove('local-unifiedgrader-split-dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('touchmove', onMove);
+        };
+        const start = (e) => {
+            dragging = true;
+            divider.classList.add('is-dragging');
+            // Suppress iframe/canvas pointer capture, or dragging over a video or
+            // PDF page loses the mouse and the divider sticks mid-drag.
+            split.classList.add('local-unifiedgrader-split-dragging');
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('touchmove', onMove, {passive: true});
+            e.preventDefault();
+        };
+
+        divider.addEventListener('mousedown', start);
+        divider.addEventListener('touchstart', start, {passive: false});
+        document.addEventListener('mouseup', stop);
+        document.addEventListener('touchend', stop);
+        divider.addEventListener('dblclick', () => {
+            top.style.flex = '0 0 45%';
+        });
+        // Keyboard: the divider is focusable, so let arrows nudge it too.
+        divider.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+                return;
+            }
+            e.preventDefault();
+            const step = e.key === 'ArrowUp' ? -24 : 24;
+            const height = Math.max(MIN, top.getBoundingClientRect().height + step);
+            top.style.flex = '0 0 ' + height + 'px';
+        });
+
+        // Clicking a pane moves the marking focus to it.
+        ['a', 'b'].forEach((p) => {
+            const el = this._paneEl(p);
+            el?.addEventListener('focusin', () => this._setActivePane(p));
+            el?.addEventListener('mousedown', () => this._setActivePane(p));
+        });
     }
 
     /**
