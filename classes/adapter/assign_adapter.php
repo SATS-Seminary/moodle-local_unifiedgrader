@@ -1399,6 +1399,72 @@ class assign_adapter extends base_adapter {
      * @param int $userid The user ID.
      * @return array Array of arrays with keys: 'label' (string), 'html' (string).
      */
+    /**
+     * Push the penalised grade to the gradebook, leaving assign_grades raw.
+     *
+     * assign_grades.grade holds the mark the teacher actually typed, so the grader
+     * can always display it back unchanged. The deduction is applied here, on the
+     * way to the gradebook, mirroring how the forum adapter works.
+     *
+     * Storing the reduced grade instead used to make the displayed mark
+     * unrecoverable: the panel added the deduction back to reconstruct the typed
+     * value, which broke whenever a penalty was applied AFTER grading (the stored
+     * mark was never reduced, so the addition inflated it) and whenever a large
+     * penalty clamped the stored grade to zero (the original was simply gone).
+     *
+     * Moodle's own late-penalty framework still applies on top of what is pushed
+     * here, so a late submission with a plagiarism penalty gets both.
+     *
+     * @param int $userid The student user ID.
+     */
+    public function sync_gradebook_penalty(int $userid): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/mod/assign/lib.php');
+
+        $grade = $this->assign->get_user_grade($userid, false);
+        if (!$grade || $grade->grade === null || (float) $grade->grade < 0) {
+            return;
+        }
+
+        $instance = $this->assign->get_instance();
+        $maxgrade = (float) $instance->grade;
+        if ($maxgrade <= 0) {
+            // Scale or "no grade" — percentage deductions are not meaningful.
+            return;
+        }
+
+        $deduction = \local_unifiedgrader\penalty_manager::get_total_deduction(
+            (int) $this->cm->id,
+            $userid,
+            $maxgrade,
+        );
+        if ($deduction <= 0) {
+            return;
+        }
+
+        $penalised = max(0, (float) $grade->grade - $deduction);
+
+        $gradebookgrade = [
+            'rawgrade' => $penalised,
+            'userid' => $userid,
+            'usermodified' => (int) $grade->grader,
+            'datesubmitted' => null,
+            'dategraded' => (int) $grade->timemodified,
+        ];
+        foreach ($this->assign->get_feedback_plugins() as $plugin) {
+            if ($plugin->get_type() === 'comments' && $plugin->is_enabled()) {
+                $gradebookgrade['feedback'] = $plugin->text_for_gradebook($grade);
+                $gradebookgrade['feedbackformat'] = $plugin->format_for_gradebook($grade);
+                break;
+            }
+        }
+
+        $updateinstance = clone $instance;
+        $updateinstance->cmidnumber = $this->cm->idnumber;
+        $updateinstance->gradefeedbackenabled = $this->assign->is_gradebook_feedback_enabled();
+        assign_grade_item_update($updateinstance, $gradebookgrade);
+    }
+
     public function get_plagiarism_links(int $userid): array {
         global $CFG;
 

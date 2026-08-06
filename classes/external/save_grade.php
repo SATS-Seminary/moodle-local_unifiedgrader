@@ -178,9 +178,17 @@ class save_grade extends external_api {
                 );
             }
 
-            // Apply penalty deduction for non-forum, non-quiz, non-scale activities.
-            // These activities store the penalized grade directly (e.g. assignments).
-            if (empty($activityinfo['usescale']) && $acttype !== 'quiz' && $acttype !== 'forum') {
+            // Apply penalty deduction for activity types that store the already
+            // reduced grade. Assignments and forums are NOT among them: they store
+            // the mark the teacher typed and have the deduction applied on the way
+            // to the gradebook (sync_gradebook_penalty below).
+            //
+            // Assignments moved to that model because storing the reduced grade
+            // made the typed mark unrecoverable for display — a penalty applied
+            // after grading inflated it, and a penalty large enough to clamp the
+            // grade to zero erased it. See tests/penalty_roundtrip_test.php.
+            if (empty($activityinfo['usescale'])
+                    && $acttype !== 'quiz' && $acttype !== 'forum' && $acttype !== 'assign') {
                 $maxgrade = (float) ($activityinfo['maxgrade'] ?? 100);
                 $deduction = penalty_manager::get_total_deduction(
                     $params['cmid'],
@@ -215,12 +223,13 @@ class save_grade extends external_api {
             $params['attemptnumber'],
         );
 
-        // For forums, push the penalized grade to the gradebook.
-        // The raw grade is stored in forum_grades; the gradebook gets rawgrade - penalties.
+        // Forums and assignments store the raw (teacher-given) grade; the gradebook
+        // gets rawgrade - penalties. Other types already stored the reduced grade
+        // above, and their adapters no-op here.
         if ($activityinfo === null) {
             $activityinfo = $adapter->get_activity_info();
         }
-        if (($activityinfo['type'] ?? '') === 'forum') {
+        if (in_array($activityinfo['type'] ?? '', ['forum', 'assign'], true)) {
             $adapter->sync_gradebook_penalty($params['userid']);
         }
 

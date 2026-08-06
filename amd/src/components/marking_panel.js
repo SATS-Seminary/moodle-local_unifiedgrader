@@ -698,12 +698,22 @@ export default class extends BaseComponent {
             }
         } else {
             // Points: set the numeric input value on a fresh render only.
-            // Forums store the raw (teacher-given) grade — display as-is.
-            // Other activities store the post-penalty grade — reverse-calculate for display.
+            // Forums and assignments store the raw (teacher-given) grade — show it
+            // as-is. Other activities store the post-penalty grade, so the typed
+            // mark is reconstructed by adding the deduction back.
+            //
+            // That reconstruction is only sound while the stored grade was saved
+            // under the SAME penalties it is being un-deducted against. Assignments
+            // were moved to raw storage precisely because that does not hold: a
+            // penalty applied after grading inflated the field (6 became 18 under a
+            // 100% penalty), and a penalty big enough to clamp the stored grade to
+            // zero destroyed the mark outright.
             const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
             if (gradeInput && state.grade) {
                 let displayGrade = state.grade.grade;
-                if (displayGrade !== null && state.activity?.type !== 'forum') {
+                const storesRawGrade = state.activity?.type === 'forum'
+                    || state.activity?.type === 'assign';
+                if (displayGrade !== null && !storesRawGrade) {
                     const totalDeduction = this._getTotalPenaltyDeduction(state);
                     if (totalDeduction > 0) {
                         displayGrade = parseFloat(displayGrade) + totalDeduction;

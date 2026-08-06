@@ -207,6 +207,20 @@ abstract class base_adapter {
     }
 
     /**
+     * Push this student's penalised grade to the gradebook.
+     *
+     * For activity types that store the teacher's RAW mark (so the grader can
+     * always show back exactly what was typed), the penalty deduction is applied
+     * only on the way to the gradebook. Types that still store the already-reduced
+     * grade have nothing to do here.
+     *
+     * @param int $userid The student user ID.
+     */
+    public function sync_gradebook_penalty(int $userid): void {
+        // No-op by default.
+    }
+
+    /**
      * Whether plagiarism scanning can say anything meaningful about a file.
      *
      * Plagiarism services extract and compare text, so a recording, image or
