@@ -1391,15 +1391,6 @@ class assign_adapter extends base_adapter {
     }
 
     /**
-     * Get plagiarism report links for a user's assignment submission.
-     *
-     * Calls Moodle's generic plagiarism API for each submitted file and for
-     * online text content. Works with any plagiarism plugin (Copyleaks, Turnitin, etc.).
-     *
-     * @param int $userid The user ID.
-     * @return array Array of arrays with keys: 'label' (string), 'html' (string).
-     */
-    /**
      * Push the penalised grade to the gradebook, leaving assign_grades raw.
      *
      * assign_grades.grade holds the mark the teacher actually typed, so the grader
@@ -1465,6 +1456,15 @@ class assign_adapter extends base_adapter {
         assign_grade_item_update($updateinstance, $gradebookgrade);
     }
 
+    /**
+     * Get plagiarism report links for a user's assignment submission.
+     *
+     * Calls Moodle's generic plagiarism API for each submitted file and for
+     * online text content. Works with any plagiarism plugin (Copyleaks, Turnitin, etc.).
+     *
+     * @param int $userid The user ID.
+     * @return array Array of arrays with keys: 'label' (string), 'html' (string).
+     */
     public function get_plagiarism_links(int $userid): array {
         global $CFG;
 

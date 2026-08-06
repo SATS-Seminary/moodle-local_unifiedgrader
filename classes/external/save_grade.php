@@ -187,8 +187,8 @@ class save_grade extends external_api {
             // made the typed mark unrecoverable for display — a penalty applied
             // after grading inflated it, and a penalty large enough to clamp the
             // grade to zero erased it. See tests/penalty_roundtrip_test.php.
-            if (empty($activityinfo['usescale'])
-                    && $acttype !== 'quiz' && $acttype !== 'forum' && $acttype !== 'assign') {
+            $storesrawgrade = in_array($acttype, ['assign', 'forum'], true);
+            if (empty($activityinfo['usescale']) && $acttype !== 'quiz' && !$storesrawgrade) {
                 $maxgrade = (float) ($activityinfo['maxgrade'] ?? 100);
                 $deduction = penalty_manager::get_total_deduction(
                     $params['cmid'],
