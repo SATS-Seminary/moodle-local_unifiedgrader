@@ -899,15 +899,15 @@ export default class extends BaseComponent {
         // total and the override indicator below — otherwise both are derived
         // from the previous student's grade, producing the spurious "Overridden"
         // badge and stale "Rubric total" teachers reported on quizzes.
+        //
+        // The quiz adapter reports the engine's own total, which is already the
+        // un-penalised figure — the deduction is applied on the way to the
+        // gradebook, not to this value. Adding it back here inflated the base by
+        // the penalty and, with it, every guide total derived from it.
         if (state.activity?.type === 'quiz' && state.grade) {
-            if (state.grade.grade === null) {
-                this._quizBaseGrade = 0;
-            } else {
-                const deduction = this._getTotalPenaltyDeduction(state);
-                this._quizBaseGrade = deduction > 0
-                    ? Math.round((parseFloat(state.grade.grade) + deduction) * 100) / 100
-                    : parseFloat(state.grade.grade);
-            }
+            this._quizBaseGrade = state.grade.grade === null
+                ? 0
+                : parseFloat(state.grade.grade);
         }
         this._renderAdvancedGrading(state, isFreshRender);
 
@@ -952,9 +952,9 @@ export default class extends BaseComponent {
             }
         } else {
             // Points: set the numeric input value on a fresh render only.
-            // Forums and assignments store the raw (teacher-given) grade — show it
-            // as-is. Other activities store the post-penalty grade, so the typed
-            // mark is reconstructed by adding the deduction back.
+            // Activities that store the raw (teacher-given) grade show it as-is.
+            // Other activities store the post-penalty grade, so the typed mark is
+            // reconstructed by adding the deduction back.
             //
             // That reconstruction is only sound while the stored grade was saved
             // under the SAME penalties it is being un-deducted against. Assignments
@@ -962,11 +962,18 @@ export default class extends BaseComponent {
             // penalty applied after grading inflated the field (6 became 18 under a
             // 100% penalty), and a penalty big enough to clamp the stored grade to
             // zero destroyed the mark outright.
+            //
+            // Quizzes and BigBlueButton belong on this list for the same reason:
+            // both adapters return the un-penalised mark (the engine total and
+            // grade_grades.rawgrade respectively) and apply the deduction only on
+            // the way to the gradebook. Adding it back here showed a quiz marked
+            // 80 with a 15-point penalty as 95 — the gradebook was right, the
+            // number under the teacher's cursor was not.
             const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
             if (gradeInput && state.grade) {
                 let displayGrade = state.grade.grade;
-                const storesRawGrade = state.activity?.type === 'forum'
-                    || state.activity?.type === 'assign';
+                const storesRawGrade = ['forum', 'assign', 'quiz', 'bigbluebuttonbn']
+                    .includes(state.activity?.type);
                 if (displayGrade !== null && !storesRawGrade) {
                     const totalDeduction = this._getTotalPenaltyDeduction(state);
                     if (totalDeduction > 0) {

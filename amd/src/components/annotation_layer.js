@@ -744,6 +744,9 @@ export default class AnnotationLayer {
                 this._undoStack.push({type: 'add', object: this._tempRect});
                 this._redoStack = [];
                 this._notifyChange();
+                // Same unified-timeline registration the pen, shape and arrow
+                // paths do; without it the toolbar's undo cannot see this box.
+                this._fireUserAction();
             }
             this._tempRect = null;
         } else if (this._currentTool === TOOLS.SHAPE && this._tempShape) {
@@ -802,6 +805,11 @@ export default class AnnotationLayer {
                 this._undoStack.push({type: 'add', object: marker});
                 this._redoStack = [];
                 this._notifyChange();
+                // Registered only once the picker returns text: a cancelled
+                // picker removes the marker again, and an undo entry for a
+                // marker that no longer exists would leave the button armed
+                // with nothing to undo.
+                this._fireUserAction();
             } else {
                 // Cancelled or empty — remove the marker.
                 this._canvas.remove(marker);
@@ -970,6 +978,11 @@ export default class AnnotationLayer {
         this._redoStack = [];
         this._canvas.requestRenderAll();
         this._notifyChange();
+        // Without this the stamp lands on the canvas and in this layer's own undo
+        // stack, but never reaches the marks strip's unified timeline - which is
+        // what the toolbar's undo button actually drives. A misplaced stamp then
+        // had no way back short of clearing every annotation on the submission.
+        this._fireUserAction();
     }
 
     // ──────────────────────────────────────────────

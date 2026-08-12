@@ -179,15 +179,17 @@ class save_grade extends external_api {
             }
 
             // Apply penalty deduction for activity types that store the already
-            // reduced grade. Assignments and forums are NOT among them: they store
-            // the mark the teacher typed and have the deduction applied on the way
-            // to the gradebook (sync_gradebook_penalty below).
+            // reduced grade. Assignments, forums and BigBlueButton are NOT among
+            // them: they store the mark the teacher typed and have the deduction
+            // applied on the way to the gradebook (sync_gradebook_penalty below).
             //
             // Assignments moved to that model because storing the reduced grade
             // made the typed mark unrecoverable for display — a penalty applied
             // after grading inflated it, and a penalty large enough to clamp the
             // grade to zero erased it. See tests/penalty_roundtrip_test.php.
-            $storesrawgrade = in_array($acttype, ['assign', 'forum'], true);
+            // BigBlueButton followed for the same reasons; it keeps the raw mark
+            // in grade_grades.rawgrade for want of a grades table of its own.
+            $storesrawgrade = in_array($acttype, ['assign', 'forum', 'bigbluebuttonbn'], true);
             if (empty($activityinfo['usescale']) && $acttype !== 'quiz' && !$storesrawgrade) {
                 $maxgrade = (float) ($activityinfo['maxgrade'] ?? 100);
                 $deduction = penalty_manager::get_total_deduction(
@@ -223,13 +225,18 @@ class save_grade extends external_api {
             $params['attemptnumber'],
         );
 
-        // Forums and assignments store the raw (teacher-given) grade; the gradebook
-        // gets rawgrade - penalties. Other types already stored the reduced grade
-        // above, and their adapters no-op here.
+        // Forums, assignments and BigBlueButton store the raw (teacher-given)
+        // grade; the gradebook gets rawgrade - penalties. Other types already
+        // stored the reduced grade above, and their adapters no-op here.
+        //
+        // BigBlueButton is synced whichever way the grade was saved: the simple
+        // path and the bbbext_advgrd rubric path both leave the un-penalised mark
+        // in rawgrade, so a rubric-graded session picks up its deduction here too
+        // — it never had one before.
         if ($activityinfo === null) {
             $activityinfo = $adapter->get_activity_info();
         }
-        if (in_array($activityinfo['type'] ?? '', ['forum', 'assign'], true)) {
+        if (in_array($activityinfo['type'] ?? '', ['forum', 'assign', 'bigbluebuttonbn'], true)) {
             $adapter->sync_gradebook_penalty($params['userid']);
         }
 

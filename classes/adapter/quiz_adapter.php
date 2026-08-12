@@ -1840,12 +1840,14 @@ class quiz_adapter extends base_adapter {
         }
         $after = \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $userid]);
         if ($after && empty($after->overridden) && $after->finalgrade !== null) {
+            // False, not null: update_final_grade() reads anything other than
+            // false as new feedback to store, so null erases whatever comment
+            // the marker left on the gradebook row.
             $gradeitem->update_final_grade(
                 $userid,
                 (float) $after->finalgrade,
                 'local/unifiedgrader',
-                null,
-                FORMAT_MOODLE,
+                false,
             );
         }
     }

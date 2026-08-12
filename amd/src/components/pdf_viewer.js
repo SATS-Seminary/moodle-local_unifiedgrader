@@ -353,7 +353,16 @@ export default class PdfViewer extends BaseComponent {
             const layer = this._activeAnnotationLayer
                 || [...this._pageSlots.values()].find((s) => s.annotationLayer)?.annotationLayer;
             if (d.action === 'deleteselected') {
-                layer?.deleteSelected();
+                // Delete whichever layer actually holds the selection, exactly as
+                // the Delete key does. _activeAnnotationLayer tracks the page in
+                // view and only moves when the active page CHANGES, so a shape
+                // selected on a page the viewer does not consider active sent the
+                // delete to a layer with nothing selected — the click appeared to
+                // do nothing at all. Falling back to the active layer keeps the
+                // no-selection case behaving as before.
+                const selected = [...this._pageSlots.values()]
+                    .find((s) => s.annotationLayer?.hasSelection())?.annotationLayer;
+                (selected || layer)?.deleteSelected();
                 return;
             }
             if (d.action === 'clearall') {
@@ -1026,6 +1035,22 @@ export default class PdfViewer extends BaseComponent {
                 document.dispatchEvent(new CustomEvent('unifiedgrader:pdfaction', {
                     detail: {page: pageNum},
                 }));
+            });
+
+            // Selecting a shape makes its page the active one for the toolbars.
+            // Both the annotation toolbar and the marks strip act on a single
+            // bound layer, and that binding otherwise only followed the page
+            // scrolled into view - so a shape selected anywhere else left the
+            // toolbar pointing at a layer with nothing selected. Its delete
+            // button read as disabled and its clicks did nothing, while the
+            // Delete key (which searches every layer) worked fine. Guarded on a
+            // real change: setLayer is cheap but this fires on every selection.
+            layer.onSelectionChange(() => {
+                if (!layer.hasSelection() || this._activeAnnotationLayer === layer) {
+                    return;
+                }
+                this._activeAnnotationLayer = layer;
+                this._annotationToolbar?.setLayer(layer);
             });
 
             layer.onToolChange((tool) => {

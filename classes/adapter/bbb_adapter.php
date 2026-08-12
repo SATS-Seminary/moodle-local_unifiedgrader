@@ -177,7 +177,11 @@ class bbb_adapter extends base_adapter {
             $usergrade = $grades[$userid] ?? null;
 
             $hasattended = $stats && (int) $stats->sessioncount > 0;
-            $hasgrade = $usergrade && $usergrade->finalgrade !== null;
+            // The teacher's mark, matching what assign and quiz list here — both
+            // read their activity's own stored grade rather than the penalised
+            // gradebook figure. See sync_gradebook_penalty() for the split.
+            $usergradevalue = $usergrade ? ($usergrade->rawgrade ?? $usergrade->finalgrade) : null;
+            $hasgrade = $usergradevalue !== null;
 
             if ($hasgrade) {
                 $status = 'graded';
@@ -198,7 +202,7 @@ class bbb_adapter extends base_adapter {
                 'profileimageurl' => $profileimageurl,
                 'status' => $status,
                 'submittedat' => $stats ? (int) $stats->lastattended : 0,
-                'gradevalue' => $hasgrade ? (float) $usergrade->finalgrade : null,
+                'gradevalue' => $hasgrade ? (float) $usergradevalue : null,
                 'locked' => false,
                 'hasoverride' => false,
                 'hasextension' => false,
@@ -476,9 +480,15 @@ class bbb_adapter extends base_adapter {
         if ($gradeitem) {
             $gradegrade = \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $userid]);
             if ($gradegrade) {
-                if ($gradegrade->finalgrade !== null) {
+                // Show the mark the teacher gave, not the penalised gradebook
+                // figure. sync_gradebook_penalty() keeps rawgrade holding the
+                // former and finalgrade the latter; reading finalgrade here is
+                // what let a re-save deduct a second time from an already
+                // reduced mark. Fall back for rows predating that split.
+                $storedgrade = $gradegrade->rawgrade ?? $gradegrade->finalgrade;
+                if ($storedgrade !== null) {
                     $hasgrade = true;
-                    $gradevalue = (float) $gradegrade->finalgrade;
+                    $gradevalue = (float) $storedgrade;
                 }
                 if (!empty($gradegrade->feedback)) {
                     $feedbacktext = file_rewrite_pluginfile_urls(
@@ -514,6 +524,124 @@ class bbb_adapter extends base_adapter {
             'timegraded' => $timegraded,
             'grader' => $grader,
         ];
+    }
+
+    /**
+     * Push this student's penalised mark to the gradebook.
+     *
+     * BigBlueButton has no grades table of its own — bigbluebuttonbn_update_grades()
+     * says as much, and bigbluebuttonbn_grade_item_update() writes straight to the
+     * gradebook. That is why this activity was left on the old model where the
+     * already-reduced mark was stored, and it carried every fault assignments were
+     * moved off raw storage to escape: a penalty added after grading never reached
+     * the gradebook, removing one never restored the mark, and re-saving deducted a
+     * second time from a figure that had already been reduced.
+     *
+     * The raw mark does have a home, though. grade_grades.rawgrade is written even
+     * when the cell is overridden — grade_item::update_raw_grade() guards only
+     * finalgrade behind the override check, and refuses outright only on a locked
+     * grade. So this adapter splits the two columns by intent:
+     *
+     * - rawgrade holds what the teacher typed (or what the rubric scored), written
+     *   by save_grade() through the module's own grade_item_update().
+     * - finalgrade holds rawgrade minus the current penalties, written only here.
+     *
+     * Which is why this pushes finalgrade directly rather than re-entering
+     * bigbluebuttonbn_grade_item_update() the way the quiz adapter does. That call
+     * would set rawgrade to the penalised figure, and the next sync would deduct
+     * from an already-reduced mark — the very compounding this replaces. Starting
+     * from rawgrade and the current penalty rows on every call is what keeps
+     * repeated syncs idempotent.
+     *
+     * Both grading routes converge here: the simple path and bbbext_advgrd's
+     * record_grade() both push their score through bigbluebuttonbn_grade_item_update(),
+     * so rawgrade holds the un-penalised mark either way and the rubric path needs
+     * no special case.
+     *
+     * @param int $userid The student user ID.
+     */
+    public function sync_gradebook_penalty(int $userid): void {
+        $maxgrade = (float) $this->bbb->grade;
+        if ($maxgrade <= 0) {
+            // Grade type "none", or a scale — where deducting a percentage would
+            // subtract from a scale index and mean nothing.
+            return;
+        }
+
+        $gradeitem = $this->fetch_grade_item();
+        if (!$gradeitem) {
+            return;
+        }
+
+        $gradegrade = \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $userid]);
+        if (!$gradegrade) {
+            return;
+        }
+
+        // A locked grade is an administrative decision, not ours to undo.
+        if (!empty($gradegrade->locked)) {
+            return;
+        }
+
+        // The teacher's own mark. Deliberately NOT falling back to finalgrade:
+        // once a penalty has pinned the cell, a cleared grade leaves rawgrade
+        // null while finalgrade still holds the old penalised figure, and reading
+        // that back would resurrect the mark the teacher just removed.
+        $raw = $gradegrade->rawgrade;
+
+        $deduction = \local_unifiedgrader\penalty_manager::get_total_deduction(
+            (int) $this->cm->id,
+            $userid,
+            $maxgrade,
+        );
+        $ispinned = !empty($gradegrade->overridden);
+
+        if ($deduction <= 0 && !$ispinned) {
+            // Nothing to deduct and no pin of ours to release. Leaving the cell
+            // untouched here is what keeps a grade set straight in the gradebook
+            // by an administrator from being quietly overwritten.
+            return;
+        }
+
+        if ($raw !== null && $deduction > 0) {
+            // Pin the reduced figure. update_final_grade() sets overridden, which
+            // is what stops the module reclaiming the cell on its next update.
+            //
+            // The feedback argument must be false, not null: update_final_grade()
+            // treats anything other than false as "here is new feedback" and
+            // writes it, so null erases the marker's comment. BBB keeps its
+            // feedback in this very row, so passing null wiped the comment every
+            // time a penalty was synced.
+            $gradeitem->update_final_grade(
+                $userid,
+                max(0, (float) $raw - $deduction),
+                'local/unifiedgrader',
+                false,
+            );
+            return;
+        }
+
+        // Either the last penalty has just been removed, or the grade itself was
+        // cleared while a penalty remained. Both mean the cell should follow the
+        // raw mark again — including when that mark is now null, which is how a
+        // cleared grade reaches the gradebook instead of leaving the last
+        // penalised figure stranded there.
+        //
+        // Refresh is suppressed on the un-pin because the push below is the
+        // deterministic version of the recompute it would trigger.
+        if ($ispinned) {
+            $gradegrade->set_overridden(false, false);
+        }
+
+        $bbb = clone $this->bbb;
+        $bbb->cmidnumber = $this->cm->idnumber;
+        bigbluebuttonbn_grade_item_update($bbb, (object) [
+            'userid' => $userid,
+            'rawgrade' => $raw === null ? null : (float) $raw,
+            'usermodified' => (int) $gradegrade->usermodified,
+            'datesubmitted' => 0,
+            'dategraded' => (int) ($gradegrade->timemodified ?: time()),
+        ]);
     }
 
     /**
