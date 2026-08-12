@@ -43,7 +43,16 @@ class feedback_data_helper {
         if ($gradedata['grade'] !== null) {
             $gradevalue = round($gradedata['grade'], 2);
             $percentage = $maxgrade > 0 ? round(($gradevalue / $maxgrade) * 100) : 0;
-            $gradedisplay = $gradevalue . ' / ' . $maxgrade . ' (' . $percentage . '%)';
+            $gradedisplay = self::format_scale_value($gradevalue, $activityinfo);
+
+            // A scale value has no meaningful denominator or percentage —
+            // "Proficient" is the whole answer, and "3 / 4 (75%)" invents a
+            // precision the scale does not carry.
+            if ($gradedisplay === '') {
+                $gradedisplay = $gradevalue . ' / ' . $maxgrade . ' (' . $percentage . '%)';
+            } else {
+                $percentage = null;
+            }
         }
 
         return [
@@ -51,7 +60,46 @@ class feedback_data_helper {
             'gradevalue' => $gradevalue,
             'maxgrade' => $maxgrade,
             'percentage' => $percentage,
+            // Present only for rating forums, so the student can see how their
+            // post ratings were combined into the number above.
+            'aggregatelabel' => (string) ($activityinfo['ratingaggregatelabel'] ?? ''),
         ];
+    }
+
+    /**
+     * Render a grade as its scale label, where the activity uses a scale.
+     *
+     * Follows core's rule for rating aggregates: a scale value indexes back
+     * into the scale, except under SUM and COUNT where the number is the point.
+     *
+     * @param float $gradevalue
+     * @param array $activityinfo From adapter get_activity_info()
+     * @return string The label, or an empty string when not scale-graded.
+     */
+    private static function format_scale_value(float $gradevalue, array $activityinfo): string {
+        global $CFG;
+
+        if (empty($activityinfo['usescale']) || empty($activityinfo['scaleitems'])) {
+            return '';
+        }
+
+        $method = (int) ($activityinfo['ratingaggregatemethod'] ?? 0);
+        if ($method !== 0) {
+            // This helper is also reached from the assign and quiz feedback
+            // views, where rating/lib.php has never been loaded.
+            require_once($CFG->dirroot . '/rating/lib.php');
+            if ($method === RATING_AGGREGATE_COUNT || $method === RATING_AGGREGATE_SUM) {
+                return (string) (int) round($gradevalue);
+            }
+        }
+
+        $index = (int) round($gradevalue);
+        foreach ($activityinfo['scaleitems'] as $item) {
+            if ((int) $item['value'] === $index) {
+                return (string) $item['label'];
+            }
+        }
+        return '';
     }
 
     /**

@@ -9,13 +9,49 @@
 <section id="integration-forum">
 <h3>Forum <span class="badge bg-secondary">mod_forum</span></h3>
 
-<p>Forum support targets <strong>whole-forum grading</strong> (the
-<code>itemnumber 1</code> grading mode). Per-post ratings are a separate
-Moodle subsystem and are not handled here.</p>
+<p>Moodle forums carry <strong>two independent grading systems</strong>, and the
+grader supports both. Which one is in force is read from the forum's own
+settings, with whole-forum grading taking precedence if somebody has configured
+both:</p>
 
-<h4>Preview</h4>
+<table class="table table-sm">
+    <thead>
+        <tr><th>Mode</th><th>Turned on by</th><th>Where the grade lives</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Whole forum</strong></td>
+            <td>Whole forum grading &rarr; Type is not <em>None</em></td>
+            <td><code>forum_grades</code>, gradebook <code>itemnumber 1</code>. One grade you type.</td>
+        </tr>
+        <tr>
+            <td><strong>Ratings</strong></td>
+            <td>Ratings &rarr; Aggregate type is not <em>No ratings</em>, with a scale set</td>
+            <td><code>rating</code>, gradebook <code>itemnumber 0</code>. Computed by Moodle from every rating on every post.</td>
+        </tr>
+        <tr>
+            <td><strong>Feedback only</strong></td>
+            <td>Neither of the above</td>
+            <td>No grade — a <em>Mark as graded</em> toggle and written feedback.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h4>Preview: three ways to read the posts</h4>
+<p>Choose with the <em>Post view</em> switch above the preview. The choice is
+remembered per teacher, per forum. Rated forums open on <em>In context</em>,
+since the post is the unit being graded; other forums open on <em>All posts</em>.</p>
 <ul>
-    <li><strong>All of a student's posts</strong> across every discussion in the forum, grouped by discussion, oldest first.</li>
+    <li><strong>All posts</strong> — this student's posts, grouped by discussion, oldest first. Also exactly what the student and the feedback PDF see.</li>
+    <li><strong>In context</strong> — one post at a time with the discussion prompt, the post it replied to, the other replies to that same post, and the replies it drew. Prev/next steps through the student's posts. The sibling replies are the useful part: they are how you tell whether a contribution added something or restated a classmate.</li>
+    <li><strong>Thread</strong> — the whole discussion in reading order with this student's posts highlighted; long runs of unrelated posts fold away. Best for judging originality against what was actually said.</li>
+</ul>
+<p>Clicking a post in the context views, or a row in the marking panel's ratings
+list, moves both panels to the same post — they stay in step. The context views
+are for markers only: a student's feedback page shows their own posts alone.</p>
+
+<h4>Preview: everything else</h4>
+<ul>
     <li><strong>Embedded media</strong> (video, audio, images) are rewritten through Moodle's media filter so they play inline — no broken <code>@@PLUGINFILE@@</code> URLs.</li>
     <li><strong>Wordcount badge</strong> on each post header.</li>
     <li><strong>Plagiarism shield</strong> appears next to each post when a plagiarism plugin (Copyleaks, Turnitin, etc.) is configured. Per-attachment results are additionally listed in the marking-panel <em>Plagiarism</em> card — the same card assignments use (see <a href="#plugin-plagiarism">Plagiarism plugins</a>).</li>
@@ -29,6 +65,26 @@ Moodle subsystem and are not handled here.</p>
     <li>The <em>"Mark as graded"</em> toggle replaces the grade input for forums with grade type <em>None</em>.</li>
     <li>The <code>-</code> / <code>--</code> grade-clearing shortcuts apply here too — a light reset nulls the <code>forum_grades</code> row, a deliberate reset deletes it and lifts a stuck gradebook override (see <a href="#feature-grades">Grade input, clearing &amp; resets</a>). The student's posts are never touched.</li>
 </ul>
+
+<h4>Marking a rated forum</h4>
+<p>Ratings work differently enough to be worth spelling out. The grade is not
+something you type — Moodle computes it by aggregating every rating on every
+post the student wrote, using the forum's own <em>Aggregate type</em>
+(average, sum, count, maximum or minimum).</p>
+<ul>
+    <li>The grade box and any rubric or marking guide are hidden. In their place is a <strong>Post ratings</strong> list — one row per post, with a running total showing what the gradebook will get.</li>
+    <li>Each row shows <strong>two different numbers</strong>: the dropdown holds <em>your</em> rating, while the figure beside it is the aggregate across everyone who has rated that post. A colleague marking the same forum moves the aggregate without touching your choice.</li>
+    <li>Choosing <em>Rate…</em> withdraws your rating rather than scoring it zero. If that was the last rating on the student's work, the gradebook cell is cleared too.</li>
+    <li>A student counts as graded only once <strong>every</strong> post they wrote has been rated by somebody, so a half-marked student stays under <em>Needs grading</em>.</li>
+    <li>You cannot rate your own posts — Moodle forbids it, and those rows are disabled with the reason shown.</li>
+    <li>Feedback is per student, not per post: use the feedback box for an overall comment. Moodle has no field for a comment on an individual rating.</li>
+    <li>A deliberate reset withdraws <em>your</em> ratings from that student's posts. Another marker's ratings are left alone, and the posts themselves are never touched.</li>
+</ul>
+<p class="text-muted"><strong>Penalties and extensions are hidden on rated
+forums.</strong> The gradebook value belongs to Moodle and is recomputed from
+the ratings on every change, so a deduction would either be overwritten by the
+next rating or stick as an override that quietly stops matching the ratings it
+claims to represent.</p>
 
 <h4>Forum extensions</h4>
 <p>Moodle core forums don't have a native extension mechanism — the plugin

@@ -17,8 +17,18 @@
 /**
  * Forum adapter for the unified grading interface.
  *
- * Supports whole-forum grading (itemnumber 1). Post ratings (itemnumber 0)
- * are a separate system not handled here.
+ * Moodle forums carry two independent grading systems, and this adapter
+ * handles both by resolving a single mode up front:
+ *
+ * - MODE_WHOLE  — whole-forum grading (itemnumber 1, {forum_grades}). The
+ *                 teacher's mark is stored and owned by this plugin.
+ * - MODE_RATING — post ratings (itemnumber 0, {rating}). The teacher rates
+ *                 individual posts and mod_forum computes the gradebook value
+ *                 by aggregating them; nothing here owns the grade.
+ * - MODE_NONE   — neither is configured; feedback only.
+ *
+ * Whole-forum grading always wins when a forum has both configured, which is
+ * what keeps every pre-existing forum on exactly the path it has always taken.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
@@ -44,6 +54,15 @@ use mod_forum\grades\forum_gradeitem;
  * Concrete adapter wrapping mod_forum's grading API.
  */
 class forum_adapter extends base_adapter {
+    /** Whole-forum grading (itemnumber 1). */
+    public const MODE_WHOLE = 'whole';
+
+    /** Post ratings (itemnumber 0). */
+    public const MODE_RATING = 'rating';
+
+    /** Neither — feedback only. */
+    public const MODE_NONE = 'none';
+
     /** @var forum_entity The forum entity. */
     private forum_entity $forum;
 
@@ -52,6 +71,12 @@ class forum_adapter extends base_adapter {
 
     /** @var \stdClass The raw forum DB record. */
     private \stdClass $forumrecord;
+
+    /** @var string The resolved grading mode (one of the MODE_* constants). */
+    private string $gradingmode;
+
+    /** @var forum_rating_helper|null Built on demand, only in rating mode. */
+    private ?forum_rating_helper $ratinghelper = null;
 
     /**
      * Constructor.
@@ -70,6 +95,63 @@ class forum_adapter extends base_adapter {
 
         global $DB;
         $this->forumrecord = $DB->get_record('forum', ['id' => $this->forum->get_id()], '*', MUST_EXIST);
+        $this->gradingmode = $this->resolve_grading_mode();
+    }
+
+    /**
+     * Decide which grading system this forum uses.
+     *
+     * Whole-forum grading takes precedence when both are configured: it is the
+     * richer system (decimals, advanced grading, per-user notification), and
+     * giving it priority means no forum that works today changes behaviour.
+     *
+     * @return string One of the MODE_* constants.
+     */
+    private function resolve_grading_mode(): string {
+        if ((int) $this->forumrecord->grade_forum !== 0) {
+            return self::MODE_WHOLE;
+        }
+        // The assessed column holds the RATING_AGGREGATE_* constant, not a boolean —
+        // 0 means ratings are off. A scale of 0 means there is nothing to rate with.
+        if ((int) $this->forumrecord->assessed > 0 && (int) $this->forumrecord->scale !== 0) {
+            return self::MODE_RATING;
+        }
+        return self::MODE_NONE;
+    }
+
+    /**
+     * The grading mode in force for this forum.
+     *
+     * @return string One of the MODE_* constants.
+     */
+    public function get_grading_mode(): string {
+        return $this->gradingmode;
+    }
+
+    /**
+     * Whether this forum is graded by rating individual posts.
+     *
+     * @return bool
+     */
+    private function is_rating_mode(): bool {
+        return $this->gradingmode === self::MODE_RATING;
+    }
+
+    /**
+     * The rating helper, built on first use.
+     *
+     * @return forum_rating_helper
+     */
+    public function rating_helper(): forum_rating_helper {
+        if ($this->ratinghelper === null) {
+            $this->ratinghelper = new forum_rating_helper(
+                $this->cm,
+                $this->context,
+                $this->course,
+                $this->forumrecord,
+            );
+        }
+        return $this->ratinghelper;
     }
 
     /**
@@ -97,6 +179,22 @@ class forum_adapter extends base_adapter {
             $maxgrade = (float) count($scaleitems);
         }
 
+        // In rating mode the scale comes from forum.scale rather than
+        // grade_forum, and there is no single grade box to fill in.
+        $aggregatelabel = '';
+        $aggregatemethod = 0;
+        $canrate = false;
+        if ($this->is_rating_mode()) {
+            $helper = $this->rating_helper();
+            $scaleinfo = $helper->get_scale_info();
+            $usescale = $scaleinfo['usescale'];
+            $scaleitems = $scaleinfo['scaleitems'];
+            $maxgrade = $scaleinfo['maxgrade'];
+            $aggregatelabel = $helper->get_aggregate_label();
+            $aggregatemethod = $helper->get_aggregate_method();
+            $canrate = $helper->can_rate();
+        }
+
         return [
             'id' => (int) $this->cm->id,
             'name' => format_string($this->forum->get_name()),
@@ -112,9 +210,18 @@ class forum_adapter extends base_adapter {
                 ['context' => $this->context],
             ),
             // When grading is disabled (grade type "None"), force simple so the
-            // client does not try to render an advanced grading form.
-            'gradingmethod' => $gradingenabled ? ($gradingmethod ?: 'simple') : 'simple',
-            'gradingdisabled' => !$gradingenabled,
+            // client does not try to render an advanced grading form. Ratings
+            // have a grade but no advanced grading, so they force simple too.
+            'gradingmethod' => ($gradingenabled && !$this->is_rating_mode())
+                ? ($gradingmethod ?: 'simple')
+                : 'simple',
+            // Rating forums DO have a grade — it just isn't typed into a box —
+            // so this stays false and the client hides the input via gradingmode.
+            'gradingdisabled' => !$gradingenabled && !$this->is_rating_mode(),
+            'gradingmode' => $this->gradingmode,
+            'ratingaggregatelabel' => $aggregatelabel,
+            'ratingaggregatemethod' => $aggregatemethod,
+            'canrate' => $canrate,
             'teamsubmission' => false,
             'blindmarking' => false,
             'canmanageoverrides' => false,
@@ -159,11 +266,21 @@ class forum_adapter extends base_adapter {
               GROUP BY p.userid";
         $poststats = $DB->get_records_sql($sql, ['forumid' => $forumid]);
 
-        // Batch-load whole-forum grades (itemnumber = 1).
-        $grades = $DB->get_records('forum_grades', [
-            'forum' => $forumid,
-            'itemnumber' => 1,
-        ], '', 'userid, grade, timemodified');
+        // Batch-load whole-forum grades (itemnumber = 1). Rating forums have no
+        // forum_grades rows at all — their state comes from {rating} instead.
+        $grades = [];
+        $ratingstats = [];
+        $ratinggrades = [];
+        if ($this->is_rating_mode()) {
+            $userids = array_map('intval', array_keys($enrolledusers));
+            $ratingstats = $this->rating_helper()->count_post_stats($userids);
+            $ratinggrades = $this->rating_helper()->get_gradebook_grades($userids);
+        } else {
+            $grades = $DB->get_records('forum_grades', [
+                'forum' => $forumid,
+                'itemnumber' => 1,
+            ], '', 'userid, grade, timemodified');
+        }
 
         // Batch-load forum extensions.
         $extensions = $DB->get_records('local_unifiedgrader_fext', [
@@ -202,8 +319,18 @@ class forum_adapter extends base_adapter {
 
             $hasposts = $userposts && (int) $userposts->postcount > 0;
             $hasgrade = $usergrade && $usergrade->grade !== null;
-            // For grading-disabled forums, treat "has gradebook feedback" as graded.
-            if (!$gradingenabled && !$hasgrade && isset($feedbackuserids[$userid])) {
+            $gradevalue = $hasgrade ? (float) $usergrade->grade : null;
+
+            if ($this->is_rating_mode()) {
+                // Graded here means every post the student wrote has been rated by
+                // somebody. A partially rated student stays "submitted" so they
+                // keep showing up under the needs-grading filter — which is the
+                // honest answer, and needs no new status to express.
+                $stats = $ratingstats[$userid] ?? ['posts' => 0, 'rated' => 0];
+                $hasgrade = $stats['posts'] > 0 && $stats['rated'] >= $stats['posts'];
+                $gradevalue = $ratinggrades[$userid] ?? null;
+            } else if (!$gradingenabled && !$hasgrade && isset($feedbackuserids[$userid])) {
+                // For grading-disabled forums, treat "has gradebook feedback" as graded.
                 $hasgrade = true;
             }
             $status = $this->resolve_status($hasposts, $hasgrade);
@@ -226,7 +353,7 @@ class forum_adapter extends base_adapter {
                 'profileimageurl' => $profileimageurl,
                 'status' => $status,
                 'submittedat' => $submittedat,
-                'gradevalue' => $hasgrade ? (float) $usergrade->grade : null,
+                'gradevalue' => $gradevalue,
                 'locked' => false,
                 'hasoverride' => false,
                 'islate' => $islate,
@@ -337,6 +464,81 @@ class forum_adapter extends base_adapter {
     }
 
     /**
+     * Per-post rating state for one student, for the marking panel.
+     *
+     * @param int $userid
+     * @return array
+     */
+    public function get_post_ratings(int $userid): array {
+        if (!$this->is_rating_mode()) {
+            return [];
+        }
+
+        $helper = $this->rating_helper();
+        $posts = $helper->get_user_posts($userid);
+        if (empty($posts)) {
+            return [];
+        }
+
+        $ratings = $helper->decorate_posts_with_ratings($posts, $userid);
+
+        $result = [];
+        foreach ($posts as $post) {
+            $state = $ratings[(int) $post->id] ?? null;
+            $result[] = [
+                'postid' => (int) $post->id,
+                'discussionid' => (int) $post->discussionid,
+                'discussionname' => format_string($post->discussionname),
+                'subject' => format_string($post->subject),
+                'created' => (int) $post->created,
+                'createddisplay' => userdate($post->created),
+                'own' => $state['own'] ?? null,
+                'aggregate' => $state['aggregate'] ?? null,
+                'aggregatelabel' => $state['aggregatelabel'] ?? '',
+                'count' => $state['count'] ?? 0,
+                'canrate' => $state['canrate'] ?? false,
+                'noratereason' => $state['noratereason'] ?? '',
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * The threaded context surrounding a student's posts.
+     *
+     * Feeds the paged and thread preview modes. Returns an empty payload for
+     * activity types or students with nothing to show.
+     *
+     * @param int $userid
+     * @return array With keys discussions and targetpostids.
+     */
+    public function get_post_context(int $userid): array {
+        $builder = new forum_context_builder(
+            $this->cm,
+            $this->context,
+            $this->forumrecord,
+            $this->is_rating_mode() ? $this->rating_helper() : null,
+        );
+        return $builder->build($userid);
+    }
+
+    /**
+     * Write (or clear) the current user's rating on one post.
+     *
+     * @param int $postid
+     * @param int $rating Scale value, or RATING_UNSET_RATING to clear.
+     * @return array Fresh aggregate state for that post.
+     * @throws \moodle_exception If the forum is not rating-graded.
+     */
+    public function save_post_rating(int $postid, int $rating): array {
+        if (!$this->is_rating_mode()) {
+            throw new \moodle_exception('rating_notratingforum', 'local_unifiedgrader');
+        }
+        return $this->rating_helper()->save_post_rating($postid, $rating);
+    }
+
+    /**
      * Get current grade and feedback for a user.
      *
      * @param int $userid
@@ -348,13 +550,22 @@ class forum_adapter extends base_adapter {
         $forumid = $this->forum->get_id();
 
         // Get grade from forum_grades table directly (avoids creating empty records).
-        $graderecord = $DB->get_record('forum_grades', [
-            'forum' => $forumid,
-            'itemnumber' => 1,
-            'userid' => $userid,
-        ]);
-
-        $hasgrade = $graderecord && $graderecord->grade !== null;
+        // Rating forums have no such row: their grade is whatever mod_forum
+        // computed into the gradebook from the post ratings.
+        $graderecord = null;
+        $hasgrade = false;
+        $ratinggrade = null;
+        if ($this->is_rating_mode()) {
+            $ratinggrade = $this->rating_helper()->get_gradebook_grade($userid);
+            $hasgrade = $ratinggrade !== null;
+        } else {
+            $graderecord = $DB->get_record('forum_grades', [
+                'forum' => $forumid,
+                'itemnumber' => 1,
+                'userid' => $userid,
+            ]);
+            $hasgrade = $graderecord && $graderecord->grade !== null;
+        }
 
         // Get feedback from the gradebook (forums have no feedback table).
         $feedbacktext = '';
@@ -381,10 +592,12 @@ class forum_adapter extends base_adapter {
         // Advanced grading: read the grading definition and current fill.
         // Skip entirely when forum grading is disabled (grade type "None") — a
         // marking guide/rubric without a grade type is a non-sequitur.
+        // Core does not support advanced grading on the ratings item, so this
+        // block is whole-forum territory only.
         $rubricdata = null;
         $gradingdefinition = null;
 
-        if ($this->forum->is_grading_enabled()) {
+        if (!$this->is_rating_mode() && $this->forum->is_grading_enabled()) {
             $gradingmanager = get_grading_manager($this->context, 'mod_forum', 'forum');
             $controller = $gradingmanager->get_active_controller();
 
@@ -401,8 +614,14 @@ class forum_adapter extends base_adapter {
             }
         }
 
+        if ($this->is_rating_mode()) {
+            $gradevalue = $ratinggrade;
+        } else {
+            $gradevalue = $hasgrade ? (float) $graderecord->grade : null;
+        }
+
         return [
-            'grade' => $hasgrade ? (float) $graderecord->grade : null,
+            'grade' => $gradevalue,
             'feedback' => format_text($feedbacktext, $feedbackformat, ['context' => $this->context]),
             'feedbackformat' => $feedbackformat,
             'rubricdata' => $rubricdata ? json_encode($rubricdata) : '',
@@ -440,6 +659,15 @@ class forum_adapter extends base_adapter {
         $forumid = $this->forum->get_id();
         $gradeduser = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
         $graderuser = $DB->get_record('user', ['id' => $USER->id], '*', MUST_EXIST);
+
+        // In rating mode the grade is not ours to write: it is derived from the
+        // post ratings by mod_forum. Any incoming $grade is ignored (the client
+        // renders that field read-only) and we save feedback only. Writing a
+        // forum_grades row here would create a phantom whole-forum grade that
+        // nothing reads and that the gradebook would never reflect.
+        if ($this->is_rating_mode()) {
+            return $this->save_feedback_only($userid, $feedback, $feedbackformat, $draftitemid);
+        }
 
         // Check if advanced grading is active (only when grading is enabled).
         $controller = null;
@@ -506,6 +734,79 @@ class forum_adapter extends base_adapter {
         $this->save_feedback_to_gradebook($userid, $feedbacktosave, $feedbackformat);
 
         return true;
+    }
+
+    /**
+     * Save feedback without touching the grade — the rating-mode save path.
+     *
+     * Feedback lands on the itemnumber-0 grade_grade, which survives every
+     * later rating change: forum_update_grades() builds its grade arrays with
+     * a rawgrade and no feedback key, and grade_item::update_raw_grade() only
+     * writes feedback when the key is actually present.
+     *
+     * @param int $userid The student.
+     * @param string $feedback HTML feedback text.
+     * @param int $feedbackformat Text format constant.
+     * @param int $draftitemid Draft area holding any embedded feedback files.
+     * @return bool
+     */
+    private function save_feedback_only(
+        int $userid,
+        string $feedback,
+        int $feedbackformat,
+        int $draftitemid,
+    ): bool {
+        $feedbacktosave = $feedback;
+
+        if ($draftitemid > 0) {
+            // File storage is keyed on grade_grades.id, so the row has to exist
+            // before the files can be filed against it. A student with no
+            // ratings yet has no row, so create an empty one first.
+            $gradegrade = $this->ensure_grade_grade($userid);
+            if ($gradegrade) {
+                $feedbacktosave = file_save_draft_area_files(
+                    $draftitemid,
+                    $this->context->id,
+                    'local_unifiedgrader',
+                    'forumfeedback',
+                    (int) $gradegrade->id,
+                    $this->get_editor_options(),
+                    $feedback,
+                );
+            }
+        }
+
+        $this->save_feedback_to_gradebook($userid, $feedbacktosave, $feedbackformat);
+
+        return true;
+    }
+
+    /**
+     * Fetch this student's grade_grade row on the active item, creating an
+     * empty one if it does not exist yet.
+     *
+     * @param int $userid
+     * @return \grade_grade|null
+     */
+    private function ensure_grade_grade(int $userid): ?\grade_grade {
+        $gradeitem = $this->fetch_grade_item();
+        if (!$gradeitem) {
+            return null;
+        }
+
+        $gradegrade = \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $userid]);
+        if ($gradegrade) {
+            return $gradegrade;
+        }
+
+        $gradegrade = new \grade_grade();
+        $gradegrade->itemid = $gradeitem->id;
+        $gradegrade->userid = $userid;
+        $gradegrade->timecreated = time();
+        $gradegrade->timemodified = time();
+        $gradegrade->insert('local/unifiedgrader');
+
+        return $gradegrade;
     }
 
     /**
@@ -694,11 +995,14 @@ class forum_adapter extends base_adapter {
      */
     public function supports_feature(string $feature): bool {
         return match ($feature) {
-            'rubric', 'markingguide' => (bool) get_grading_manager(
+            // Core supports advanced grading on the whole-forum item only, so a
+            // rating forum has no rubric or guide regardless of what is defined.
+            'rubric', 'markingguide' => !$this->is_rating_mode() && (bool) get_grading_manager(
                 $this->context,
                 'mod_forum',
                 'forum',
             )->get_active_method(),
+            'postratings' => $this->is_rating_mode(),
             'onlinetext' => true,
             'filesubmission' => true,
             'blindmarking' => false,
@@ -809,7 +1113,20 @@ class forum_adapter extends base_adapter {
 
         $forumid = $this->forum->get_id();
 
-        if ($this->forum->is_grading_enabled()) {
+        if ($this->is_rating_mode()) {
+            // Rated forum: released once there is something to see — either a
+            // rating that produced a gradebook value, or written feedback.
+            $hasgrade = $this->rating_helper()->get_gradebook_grade($userid) !== null;
+            if (!$hasgrade) {
+                $gradeitem = $this->fetch_grade_item();
+                $gradegrade = $gradeitem
+                    ? \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $userid])
+                    : null;
+                if (!$gradegrade || empty($gradegrade->feedback)) {
+                    return false;
+                }
+            }
+        } else if ($this->forum->is_grading_enabled()) {
             // Graded forum: require a numeric grade in forum_grades.
             $graderecord = $DB->get_record('forum_grades', [
                 'forum' => $forumid,
@@ -852,6 +1169,9 @@ class forum_adapter extends base_adapter {
      * @return array|null
      */
     public function get_grading_definition(): ?array {
+        if ($this->is_rating_mode()) {
+            return null;
+        }
         $gradingmanager = get_grading_manager($this->context, 'mod_forum', 'forum');
         $method = $gradingmanager->get_active_method();
         if (!$method) {
@@ -865,7 +1185,15 @@ class forum_adapter extends base_adapter {
     }
 
     /**
-     * Fetch the grade_item for whole-forum grading (itemnumber 1).
+     * Fetch the grade_item this forum's grading mode targets.
+     *
+     * Whole-forum grading lives on itemnumber 1, ratings on itemnumber 0. This
+     * one switch is what steers feedback storage, the forumfeedback filearea,
+     * release checks and posting state onto the correct item — everything
+     * downstream reads it rather than picking an itemnumber for itself.
+     *
+     * The two items never collide over feedback files: that filearea is keyed
+     * on grade_grades.id, which is unique across the whole gradebook.
      *
      * @return \grade_item|null
      */
@@ -874,12 +1202,15 @@ class forum_adapter extends base_adapter {
             'itemtype' => 'mod',
             'itemmodule' => 'forum',
             'iteminstance' => $this->forum->get_id(),
-            'itemnumber' => 1,
+            'itemnumber' => $this->is_rating_mode() ? 0 : 1,
             'courseid' => $this->course->id,
         ];
         $item = \grade_item::fetch($params);
 
-        if (!$item && !$this->forum->is_grading_enabled()) {
+        // In rating mode forum_grade_item_update() has already created item 0
+        // with a real grade type, so the manual-insert fallback below is only
+        // ever needed for the grade-type-"None" whole-forum case.
+        if (!$item && !$this->is_rating_mode() && !$this->forum->is_grading_enabled()) {
             // For forums with grade type "None", Moodle's grade_update() skips
             // creating the grade_item entirely (gradelib.php returns early when
             // gradetype == GRADE_TYPE_NONE for a new item). Create it manually
@@ -971,6 +1302,14 @@ class forum_adapter extends base_adapter {
         $fs = $plagiarismenabled ? get_file_storage() : null;
         $hasanyplagiarism = false;
 
+        // In rating mode each post carries its own mark, so show it where the
+        // post is read. Rendered here rather than in the client because this
+        // same HTML feeds the student's feedback view and the PDF export.
+        $ratings = [];
+        if ($this->is_rating_mode() && $userid) {
+            $ratings = $this->rating_helper()->decorate_posts_with_ratings($posts, $userid);
+        }
+
         $html = '';
         foreach ($grouped as $discussionid => $discussionposts) {
             $discussion = $discussions[$discussionid] ?? null;
@@ -1019,12 +1358,13 @@ class forum_adapter extends base_adapter {
                     }
                 }
 
-                $html .= '<div class="card mb-2">';
+                $html .= '<div class="card mb-2" data-postid="' . (int) $post->id . '">';
                 $html .= '<div class="card-header py-1 small text-muted'
                     . ' d-flex justify-content-between align-items-center">';
                 $html .= '<span><strong>' . $subject . '</strong> &mdash; ' . $postdate . '</span>';
                 $html .= '<span class="ms-2 text-nowrap d-flex align-items-center gap-2">';
                 $html .= $wordcountlabel;
+                $html .= $this->render_rating_badge($ratings[(int) $post->id] ?? null);
                 $html .= $shieldhtml;
                 $html .= '</span>';
                 $html .= '</div>';
@@ -1041,6 +1381,39 @@ class forum_adapter extends base_adapter {
         }
 
         return $html;
+    }
+
+    /**
+     * Render the read-only rating badge shown in a post card header.
+     *
+     * Returns an empty string outside rating mode, or when nobody has rated
+     * the post yet — an unrated post says so by having no badge, which reads
+     * more clearly than a badge containing a dash.
+     *
+     * @param array|null $rating Entry from forum_rating_helper::decorate_posts_with_ratings().
+     * @return string
+     */
+    private function render_rating_badge(?array $rating): string {
+        if (empty($rating) || $rating['aggregate'] === null || (int) $rating['count'] === 0) {
+            return '';
+        }
+
+        $label = $rating['aggregatelabel'];
+        $count = (int) $rating['count'];
+        $title = get_string(
+            'rating_badge_title',
+            'local_unifiedgrader',
+            (object) [
+                'method' => $this->rating_helper()->get_aggregate_label(),
+                'count' => $count,
+            ],
+        );
+
+        return '<span class="badge bg-primary-subtle text-primary-emphasis fw-normal"'
+            . ' data-region="post-rating-badge" data-postid="' . (int) $rating['postid'] . '"'
+            . ' title="' . s($title) . '">'
+            . '<i class="fa fa-star-o me-1" aria-hidden="true"></i>' . s($label)
+            . '</span>';
     }
 
     /**
@@ -1396,6 +1769,15 @@ SCRIPT;
     public function reset_grade_and_submission(int $userid): bool {
         global $DB;
 
+        if ($this->is_rating_mode()) {
+            // Undo *my* marking, not everybody's. Another marker's ratings are
+            // their judgement to withdraw, and the student's posts are never
+            // the teacher's to delete.
+            $this->rating_helper()->delete_own_ratings_for_user($userid);
+            $this->clear_recoverable_gradebook_block($userid);
+            return true;
+        }
+
         // Drop the forum_grades row outright. Setting grade=null leaves the
         // row in place which is fine for re-grading, but a deliberate reset
         // should leave no trace — the student should show as "nosubmission"
@@ -1474,6 +1856,14 @@ SCRIPT;
         require_once($CFG->libdir . '/gradelib.php');
         require_once($CFG->dirroot . '/mod/forum/lib.php');
 
+        // In rating mode the gradebook value belongs to core, recomputed from
+        // the {rating} rows on every change. Pushing a penalised figure here
+        // would be overwritten by the next rating — or, worse, stick as an
+        // override and silently diverge from the ratings it claims to reflect.
+        if ($this->is_rating_mode()) {
+            return;
+        }
+
         $forumid = $this->forum->get_id();
 
         $graderecord = $DB->get_record('forum_grades', [
@@ -1493,15 +1883,21 @@ SCRIPT;
 
         $rawgrade = (float) $graderecord->grade;
 
-        // Calculate penalty deduction.
+        // Calculate penalty deduction. A negative grade_for_forum is a scale id,
+        // not a maximum — deducting percentage points from a scale index is
+        // meaningless, so scales are left alone here exactly as they are in
+        // calculate_late_penalty() and in the client's penalty UI.
         $maxgrade = (float) $this->forum->get_grade_for_forum();
-        $deduction = \local_unifiedgrader\penalty_manager::get_total_deduction(
-            (int) $this->cm->id,
-            $userid,
-            $maxgrade > 0 ? $maxgrade : 100,
-        );
-
-        $penalizedgrade = $deduction > 0 ? max(0, $rawgrade - $deduction) : $rawgrade;
+        if ($maxgrade < 0) {
+            $penalizedgrade = $rawgrade;
+        } else {
+            $deduction = \local_unifiedgrader\penalty_manager::get_total_deduction(
+                (int) $this->cm->id,
+                $userid,
+                $maxgrade > 0 ? $maxgrade : 100,
+            );
+            $penalizedgrade = $deduction > 0 ? max(0, $rawgrade - $deduction) : $rawgrade;
+        }
 
         // Push the penalized grade to the gradebook.
         $forumgrades = [

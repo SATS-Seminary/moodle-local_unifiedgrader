@@ -170,6 +170,10 @@ if ($cm->modname === 'forum') {
         'activityname' => $activityinfo['name'],
         'activityurl' => (new moodle_url('/mod/forum/view.php', ['id' => $cm->id]))->out(false),
         'gradedisplay' => $gradedisplay,
+        // Rated forums only: a bare number is confusing when it is the average
+        // (or sum) of several post ratings rather than a mark someone typed.
+        'aggregatelabel' => $gradeinfo['aggregatelabel'] ?? '',
+        'hasaggregatelabel' => !empty($gradeinfo['aggregatelabel']),
         'feedback' => $feedback,
         'hasfeedback' => !empty($feedback),
         'postcontent' => $submissiondata['content'],

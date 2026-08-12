@@ -148,6 +148,17 @@ abstract class base_adapter {
      * @return bool True on success.
      */
     public function reset_grade_and_submission(int $userid): bool {
+        // Activity types with no grade of ours to clear (quiz, BigBlueButton)
+        // still have something for "--" to undo: a gradebook override pinning the
+        // cell, left behind by manual gradebook editing or the penalty subsystem.
+        // Lifting it lets the cell recompute from the activity — for a quiz, from
+        // the attempt — which is what the teacher means by resetting the mark.
+        //
+        // Previously this returned true without doing anything, so "--" reported
+        // success while changing nothing, and the override had to be cleared by
+        // hand in the gradebook. Adapters that own a stored grade (assign, forum)
+        // override this method and clear that as well.
+        $this->clear_recoverable_gradebook_block($userid);
         return true;
     }
 

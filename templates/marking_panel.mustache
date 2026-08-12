@@ -205,6 +205,33 @@
         </div>
     </div>
 
+    {{! Post ratings — rating-graded forums only. The grade is derived from these,
+        so this replaces the grade box rather than sitting beside it.
+
+        Deliberately a SIBLING of grade-section, not a child: rating mode hides
+        grade-section to remove the grade input, and nesting this inside it meant
+        the ratings list was hidden by the very branch that was supposed to
+        reveal it. Rows are rendered by JS. }}
+    <div data-region="post-ratings-section" class="d-none card mb-3">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold">{{#str}} rating_section_title, local_unifiedgrader {{/str}}</span>
+            <span data-region="post-ratings-progress" class="small text-muted"></span>
+        </div>
+        <div class="card-body py-2">
+            <div data-region="post-ratings-total"
+                 class="small fw-semibold mb-2 text-body-secondary"></div>
+            <div data-region="post-ratings-list" class="d-flex flex-column gap-1"></div>
+            <div data-region="post-ratings-empty" class="small text-muted d-none">
+                {{#str}} rating_no_posts, local_unifiedgrader {{/str}}
+            </div>
+            <div data-region="post-ratings-error"
+                 class="small text-danger mt-1 d-none" role="alert"></div>
+            <div class="form-text mt-1">
+                {{#str}} rating_feedback_hint, local_unifiedgrader {{/str}}
+            </div>
+        </div>
+    </div>
+
     {{! Rubric / Marking guide section (collapsible, expanded by default, populated by JS) }}
     <div data-region="rubric-section" class="d-none card mb-3">
         <div class="card-header py-2 d-flex justify-content-between align-items-center">

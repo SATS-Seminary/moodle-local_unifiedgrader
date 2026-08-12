@@ -46,6 +46,11 @@ export default class extends BaseComponent {
             ANNOTATION_TOOLBAR: '[data-region="annotation-toolbar"]',
             SPLIT_VIEW: '[data-region="split-view"]',
             SPLIT_DIVIDER: '[data-region="split-divider"]',
+            FORUM_VIEW_TOOLBAR: '[data-region="forum-view-toolbar"]',
+            FORUM_CONTEXT_VIEW: '[data-region="forum-context-view"]',
+            FORUM_PAGER: '[data-region="forum-pager"]',
+            FORUM_PAGER_LABEL: '[data-region="forum-pager-label"]',
+            FORUM_JUMP_NEXT: '[data-region="forum-jump-next"]',
         };
         this._container = null;
         this._currentFileId = null;
@@ -75,6 +80,10 @@ export default class extends BaseComponent {
         return [
             {watch: 'submission:updated', handler: this._renderSubmission},
             {watch: 'ui.loading:updated', handler: this._toggleLoading},
+            // Mode changes, page turns and rating updates all arrive here.
+            // currentpostid is written by the marking panel too — that shared
+            // field is the whole binding between the two components.
+            {watch: 'forumcontext:updated', handler: this._renderForumContext},
         ];
     }
 
@@ -96,9 +105,12 @@ export default class extends BaseComponent {
             });
         }
 
+        this._setupForumViewControls();
+
         if (state.submission) {
             this._renderSubmission({state});
         }
+        this._renderForumContext({state});
     }
 
     /**
@@ -124,10 +136,12 @@ export default class extends BaseComponent {
         pdfWrapper.classList.add('d-none');
         docPreview.classList.add('d-none');
         this.getElement(this.selectors.TEXT_ANNOT_VIEW)?.classList.add('d-none');
+        this.getElement(this.selectors.FORUM_CONTEXT_VIEW)?.classList.add('d-none');
         // Hidden by default; re-shown only when a PDF is previewed.
         this._setPixelToolbar(false);
         this._currentFileId = null;
         this._removePortfolioPopout();
+        this._updateForumToolbar(state);
 
         // Reset file selector in the right panel.
         this._renderFileSelector([]);
@@ -995,6 +1009,18 @@ export default class extends BaseComponent {
         // Remove the portfolio pop-out button if it was added previously.
         this._removePortfolioPopout();
 
+        // A forum in paged or thread mode renders its posts inline with the
+        // surrounding discussion rather than through the flat-list iframe.
+        const forumMode = this.reactive.state.forumcontext?.mode || 'flat';
+        if (this.reactive.state.activity?.type === 'forum' && forumMode !== 'flat') {
+            this._renderForumInline(this.reactive.state, forumMode);
+            return;
+        }
+        const contextView = this.getElement(this.selectors.FORUM_CONTEXT_VIEW);
+        if (contextView) {
+            contextView.classList.add('d-none');
+        }
+
         // Assignment online text renders inline as an annotatable paper sheet
         // (seg_comments then adds margin comments + marks). Other content types
         // (forum posts, quiz attempts) keep the iframe so their plugin JS/CSS load.
@@ -1019,6 +1045,647 @@ export default class extends BaseComponent {
             iframe.src = url;
             docPreview.classList.remove('d-none');
         }
+    }
+
+    /**
+     * Wire the forum display-mode buttons and pager.
+     *
+     * Every control dispatches into shared state rather than calling the
+     * marking panel: one source of truth, two readers.
+     */
+    _setupForumViewControls() {
+        const toolbar = this.getElement(this.selectors.FORUM_VIEW_TOOLBAR);
+        if (!toolbar) {
+            return;
+        }
+
+        toolbar.querySelectorAll('[data-action="forum-view-mode"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.reactive.dispatch(
+                    'setForumViewMode',
+                    this.reactive.state.activity?.cmid,
+                    btn.dataset.mode,
+                );
+            });
+        });
+
+        const prev = toolbar.querySelector('[data-action="forum-post-prev"]');
+        if (prev) {
+            prev.addEventListener('click', () => this._stepPost(-1));
+        }
+        toolbar.querySelectorAll('[data-action="forum-post-next"]').forEach((btn) => {
+            btn.addEventListener('click', () => this._stepPost(1));
+        });
+    }
+
+    /**
+     * Move focus to the student's previous or next post.
+     *
+     * @param {number} delta -1 or 1.
+     */
+    _stepPost(delta) {
+        const ids = this.reactive.state.forumcontext?.targetpostids || [];
+        if (ids.length === 0) {
+            return;
+        }
+        const current = this.reactive.state.forumcontext?.currentpostid || 0;
+        const index = ids.indexOf(current);
+        // An unknown current post starts the walk at the beginning rather than
+        // dead-ending, which is what index -1 would otherwise do.
+        const next = index === -1
+            ? 0
+            : Math.min(Math.max(index + delta, 0), ids.length - 1);
+        this.reactive.dispatch('setCurrentForumPost', ids[next]);
+    }
+
+    /**
+     * Render whichever forum display mode is active.
+     *
+     * @param {object} args Watcher args.
+     * @param {object} args.state Current state.
+     */
+    _renderForumContext({state}) {
+        if (!this._updateForumToolbar(state)) {
+            return;
+        }
+
+        // _showSubmissionContent is the single entry point for "show the posts";
+        // it routes to the iframe or to the inline renderer depending on mode,
+        // so rendering here as well would double the work.
+        this._showSubmissionContent();
+    }
+
+    /**
+     * Sync the toolbar to the current mode.
+     *
+     * Kept separate from rendering so _renderSubmission can refresh the controls
+     * without triggering a second content render on top of the one it already does.
+     *
+     * @param {object} state Current state.
+     * @return {boolean} Whether the posts view is on screen.
+     */
+    _updateForumToolbar(state) {
+        const toolbar = this.getElement(this.selectors.FORUM_VIEW_TOOLBAR);
+        const view = this.getElement(this.selectors.FORUM_CONTEXT_VIEW);
+        if (!toolbar || !view) {
+            return false;
+        }
+
+        const isForum = state.activity?.type === 'forum';
+        // The mode switch belongs to the posts view; it has nothing to say
+        // while a file preview or the split view is on screen.
+        const showing = isForum && this._currentFileId === null && !this._multiview;
+        toolbar.classList.toggle('d-none', !showing);
+        if (!showing) {
+            view.classList.add('d-none');
+            return false;
+        }
+
+        const mode = state.forumcontext?.mode || 'flat';
+        toolbar.querySelectorAll('[data-action="forum-view-mode"]').forEach((btn) => {
+            const active = btn.dataset.mode === mode;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+
+        const pager = this.getElement(this.selectors.FORUM_PAGER);
+        const jump = this.getElement(this.selectors.FORUM_JUMP_NEXT);
+        if (pager) {
+            pager.classList.toggle('d-none', mode !== 'paged');
+        }
+        if (jump) {
+            jump.classList.toggle('d-none', mode !== 'thread');
+        }
+
+        return true;
+    }
+
+    /**
+     * Render the paged or thread view inline, in place of the posts iframe.
+     *
+     * @param {object} state Current state.
+     * @param {string} mode Either paged or thread.
+     */
+    _renderForumInline(state, mode) {
+        const view = this.getElement(this.selectors.FORUM_CONTEXT_VIEW);
+        if (!view) {
+            return;
+        }
+
+        const docPreview = this.getElement(this.selectors.DOCUMENT_PREVIEW);
+        const pdfWrapper = this.getElement(this.selectors.PDF_VIEWER_WRAPPER);
+        const textView = this.getElement(this.selectors.TEXT_ANNOT_VIEW);
+        if (docPreview) {
+            docPreview.classList.add('d-none');
+        }
+        if (pdfWrapper) {
+            pdfWrapper.classList.add('d-none');
+        }
+        if (textView) {
+            textView.classList.add('d-none');
+        }
+        view.classList.remove('d-none');
+
+        if (mode === 'paged') {
+            this._renderPagedPost(state, view);
+        } else {
+            this._renderThread(state, view);
+        }
+    }
+
+    /**
+     * Paged mode: one of the student's posts with the context needed to judge it.
+     *
+     * Prompt, what it replied to, what else was said in reply to the same post,
+     * the post itself, and what it drew in return. Siblings matter more than
+     * they look — they are how you tell whether the student added anything or
+     * restated a classmate.
+     *
+     * @param {object} state Current state.
+     * @param {HTMLElement} view Container.
+     */
+    _renderPagedPost(state, view) {
+        view.innerHTML = '';
+
+        const ids = state.forumcontext?.targetpostids || [];
+        const discussions = state.forumcontext?.discussions || [];
+        if (ids.length === 0) {
+            this._renderNoContext(view);
+            return;
+        }
+
+        const currentId = state.forumcontext?.currentpostid || ids[0];
+        const located = this._locatePost(discussions, currentId);
+        if (!located) {
+            this._renderNoContext(view);
+            return;
+        }
+        const {discussion, post, byId} = located;
+
+        this._updatePagerLabel(ids.indexOf(currentId) + 1, ids.length);
+
+        const heading = document.createElement('h5');
+        heading.className = 'border-bottom pb-2 mb-3';
+        heading.textContent = discussion.name;
+        view.appendChild(heading);
+
+        const prompt = discussion.posts.find((p) => p.isprompt);
+        // Only show the prompt separately when it is not already the parent —
+        // otherwise a top-level reply would render it twice.
+        if (prompt && prompt.id !== post.id && prompt.id !== post.parent) {
+            view.appendChild(this._buildContextGroup('forumview_prompt', [prompt], true));
+        }
+
+        const parent = post.parent ? byId[post.parent] : null;
+        if (parent) {
+            const key = parent.isprompt ? 'forumview_prompt' : 'forumview_replying_to';
+            view.appendChild(this._buildContextGroup(key, [parent], parent.isprompt));
+        }
+
+        const siblings = discussion.posts.filter(
+            (p) => p.parent === post.parent && p.id !== post.id,
+        );
+        if (siblings.length > 0) {
+            view.appendChild(this._buildContextGroup('forumview_siblings', siblings, true));
+        }
+
+        view.appendChild(this._buildPostCard(post, state, true));
+
+        const replies = discussion.posts.filter((p) => p.parent === post.id);
+        if (replies.length > 0) {
+            view.appendChild(this._buildContextGroup('forumview_replies', replies, false));
+        }
+    }
+
+    /**
+     * Thread mode: the whole discussion, the student's posts highlighted.
+     *
+     * Long runs of unrelated posts collapse so a 40-reply thread stays readable
+     * when only three posts are being graded.
+     *
+     * @param {object} state Current state.
+     * @param {HTMLElement} view Container.
+     */
+    _renderThread(state, view) {
+        view.innerHTML = '';
+
+        const discussions = state.forumcontext?.discussions || [];
+        if (discussions.length === 0) {
+            this._renderNoContext(view);
+            return;
+        }
+
+        const COLLAPSE_RUN = 3;
+
+        discussions.forEach((discussion) => {
+            const block = document.createElement('div');
+            block.className = 'mb-4';
+
+            const heading = document.createElement('h5');
+            heading.className = 'border-bottom pb-2 mb-3';
+            heading.textContent = discussion.name;
+            block.appendChild(heading);
+
+            // Walk the thread, buffering consecutive posts that are neither the
+            // student's nor the prompt. A short run renders as-is; a long one
+            // folds behind a disclosure.
+            let run = [];
+            const flushRun = () => {
+                if (run.length === 0) {
+                    return;
+                }
+                if (run.length < COLLAPSE_RUN) {
+                    run.forEach((p) => block.appendChild(this._buildPostCard(p, state, false)));
+                } else {
+                    block.appendChild(this._buildCollapsedRun(run, state));
+                }
+                run = [];
+            };
+
+            discussion.posts.forEach((post) => {
+                if (post.isstudent || post.isprompt) {
+                    flushRun();
+                    block.appendChild(this._buildPostCard(post, state, post.isstudent));
+                } else {
+                    run.push(post);
+                }
+            });
+            flushRun();
+
+            view.appendChild(block);
+        });
+
+        this._scrollToCurrentPost(state, view);
+    }
+
+    /**
+     * Build a labelled group of context posts.
+     *
+     * @param {string} stringKey Lang string for the group heading.
+     * @param {Array} posts Posts to render.
+     * @param {boolean} muted Whether to dim them relative to the graded post.
+     * @return {HTMLElement}
+     */
+    _buildContextGroup(stringKey, posts, muted) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mb-3';
+
+        const label = document.createElement('div');
+        label.className = 'small text-uppercase text-muted fw-semibold mb-1';
+        label.textContent = '';
+        getString(stringKey, 'local_unifiedgrader').then((str) => {
+            label.textContent = str;
+            return str;
+        }).catch(() => {});
+        wrapper.appendChild(label);
+
+        posts.forEach((post) => {
+            const card = this._buildPostCard(post, null, false);
+            if (muted) {
+                card.classList.add('opacity-75');
+            }
+            wrapper.appendChild(card);
+        });
+
+        return wrapper;
+    }
+
+    /**
+     * Fold a run of unrelated posts behind a disclosure.
+     *
+     * @param {Array} posts The run.
+     * @param {object} state Current state.
+     * @return {HTMLElement}
+     */
+    _buildCollapsedRun(posts, state) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mb-2';
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'btn btn-sm btn-link text-decoration-none p-0 small';
+        const body = document.createElement('div');
+        body.className = 'd-none';
+
+        posts.forEach((post) => {
+            const card = this._buildPostCard(post, state, false);
+            card.classList.add('opacity-75');
+            body.appendChild(card);
+        });
+
+        const setLabel = (expanded) => {
+            const key = expanded ? 'forumview_collapse' : 'forumview_collapsed';
+            getString(key, 'local_unifiedgrader', posts.length).then((str) => {
+                toggle.innerHTML = '';
+                const icon = document.createElement('i');
+                icon.className = expanded ? 'fa fa-chevron-up me-1' : 'fa fa-chevron-down me-1';
+                icon.setAttribute('aria-hidden', 'true');
+                toggle.appendChild(icon);
+                toggle.appendChild(document.createTextNode(str));
+                return str;
+            }).catch(() => {
+                toggle.textContent = `… ${posts.length} …`;
+            });
+        };
+        setLabel(false);
+
+        toggle.addEventListener('click', () => {
+            const expanded = body.classList.toggle('d-none') === false;
+            toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            setLabel(expanded);
+        });
+
+        wrapper.appendChild(toggle);
+        wrapper.appendChild(body);
+        return wrapper;
+    }
+
+    /**
+     * Render one post card.
+     *
+     * @param {object} post Post entry from the context payload.
+     * @param {?object} state Current state, or null for pure context posts.
+     * @param {boolean} highlight Whether this is a post being graded.
+     * @return {HTMLElement}
+     */
+    _buildPostCard(post, state, highlight) {
+        const card = document.createElement('div');
+        card.className = 'card mb-2 local-unifiedgrader-context-post';
+        card.dataset.postid = String(post.id);
+        if (highlight) {
+            card.classList.add('border-primary', 'local-unifiedgrader-context-post-target');
+        }
+        // Indent by reply depth, capped so a deep thread does not walk off the
+        // right edge of the panel. Carried as an attribute, not an inline
+        // style, so the narrow-panel media query can reset it.
+        card.dataset.depth = String(Math.min(post.depth, 4));
+
+        const header = document.createElement('div');
+        header.className = 'card-header py-1 small text-muted d-flex '
+            + 'justify-content-between align-items-center gap-2';
+
+        const who = document.createElement('span');
+        who.className = 'd-flex align-items-center gap-2 text-truncate';
+        if (post.authorpicture) {
+            const img = document.createElement('img');
+            img.src = post.authorpicture;
+            img.alt = '';
+            img.className = 'rounded-circle';
+            img.width = 20;
+            img.height = 20;
+            who.appendChild(img);
+        }
+        const name = document.createElement('span');
+        name.className = 'text-truncate';
+        const subject = document.createElement('strong');
+        subject.textContent = post.subject;
+        name.appendChild(subject);
+        name.appendChild(document.createTextNode(` — ${post.authorname}, ${post.createddisplay}`));
+        who.appendChild(name);
+        header.appendChild(who);
+
+        const badges = document.createElement('span');
+        badges.className = 'd-flex align-items-center gap-2 text-nowrap';
+        if (highlight) {
+            const mine = document.createElement('span');
+            mine.className = 'badge bg-primary';
+            getString('forumview_this_student', 'local_unifiedgrader').then((str) => {
+                mine.textContent = str;
+                return str;
+            }).catch(() => {});
+            badges.appendChild(mine);
+        }
+        if (post.wordcount > 0) {
+            const words = document.createElement('span');
+            getString('forum_wordcount', 'local_unifiedgrader', post.wordcount).then((str) => {
+                words.textContent = str;
+                return str;
+            }).catch(() => {});
+            badges.appendChild(words);
+        }
+        if (post.rating && post.rating.count > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-primary-subtle text-primary-emphasis fw-normal';
+            badge.textContent = post.rating.aggregatelabel;
+            badges.appendChild(badge);
+        }
+        header.appendChild(badges);
+
+        const body = document.createElement('div');
+        body.className = 'card-body py-2';
+        // Server-formatted through format_text(); assigning it is the same trust
+        // boundary the flat view already relies on.
+        body.innerHTML = post.message;
+
+        card.appendChild(header);
+        card.appendChild(body);
+
+        // Rate the post where it is read. The marking panel's list is the
+        // overview and the running total; this is the control you reach for
+        // with the post in front of you.
+        const rater = this._buildInlineRatingControl(post, state);
+        if (rater) {
+            card.appendChild(rater);
+        }
+
+        // Clicking any post the student wrote focuses it, so the thread view can
+        // drive the marking panel's rating rows too.
+        if (post.isstudent && state) {
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('a, button, input, select')) {
+                    return;
+                }
+                this.reactive.dispatch('setCurrentForumPost', post.id);
+            });
+        }
+
+        return card;
+    }
+
+    /**
+     * Build the inline rating footer for one of the graded student's posts.
+     *
+     * Returns null for anything that is not rateable work under assessment:
+     * context posts by classmates, forums that are not rating-graded, and posts
+     * core will not accept a rating for (your own, or one outside the forum's
+     * rating window) — those show the reason instead of a dead control.
+     *
+     * Writes go through the same mutation the marking panel uses, so the two
+     * stay in step without either knowing about the other.
+     *
+     * @param {object} post Post entry from the context payload.
+     * @param {?object} state Current state, or null for pure context posts.
+     * @return {?HTMLElement}
+     */
+    _buildInlineRatingControl(post, state) {
+        if (!state || !post.isstudent || !post.rating) {
+            return null;
+        }
+        if (state.activity?.gradingmode !== 'rating') {
+            return null;
+        }
+
+        const footer = document.createElement('div');
+        footer.className = 'card-footer py-2 d-flex align-items-center gap-2 flex-wrap';
+        footer.dataset.region = 'post-rating-control';
+        footer.dataset.postid = String(post.id);
+
+        const label = document.createElement('label');
+        label.className = 'small text-muted mb-0';
+        label.setAttribute('for', `ug-rate-${post.id}`);
+        getString('rating_your_rating', 'local_unifiedgrader').then((str) => {
+            label.textContent = str;
+            return str;
+        }).catch(() => {});
+        footer.appendChild(label);
+
+        const select = document.createElement('select');
+        select.id = `ug-rate-${post.id}`;
+        select.className = 'form-select form-select-sm w-auto';
+        select.dataset.action = 'inline-post-rating';
+        select.dataset.postid = String(post.id);
+
+        // -999 is RATING_UNSET_RATING: core reads it as "remove my rating",
+        // which is not the same as rating zero.
+        const unset = document.createElement('option');
+        unset.value = '-999';
+        unset.textContent = '...';
+        getString('rating_choose', 'local_unifiedgrader').then((str) => {
+            unset.textContent = str;
+            return str;
+        }).catch(() => {});
+        select.appendChild(unset);
+
+        (state.activity?.scaleitems || []).forEach((item) => {
+            const option = document.createElement('option');
+            option.value = String(item.value);
+            option.textContent = item.label;
+            select.appendChild(option);
+        });
+        const own = post.rating.own;
+        select.value = own === null || own === undefined ? '-999' : String(own);
+
+        if (!post.rating.canrate) {
+            select.disabled = true;
+            select.title = post.rating.noratereason || '';
+        } else {
+            select.addEventListener('change', (e) => {
+                this.reactive.dispatch(
+                    'savePostRating',
+                    state.activity.cmid,
+                    post.id,
+                    parseInt(e.target.value, 10),
+                );
+            });
+        }
+        footer.appendChild(select);
+
+        // The aggregate is a different number from the select: it blends every
+        // marker who rated this post, while the select holds only yours.
+        const aggregate = document.createElement('span');
+        aggregate.className = 'small text-muted ms-auto';
+        aggregate.dataset.region = 'inline-rating-aggregate';
+        if (post.rating.count > 0) {
+            getString(
+                post.rating.count === 1 ? 'rating_aggregate_one' : 'rating_aggregate_of',
+                'local_unifiedgrader',
+                {value: post.rating.aggregatelabel, count: post.rating.count},
+            ).then((str) => {
+                aggregate.textContent = str;
+                return str;
+            }).catch(() => {
+                aggregate.textContent = post.rating.aggregatelabel;
+            });
+        } else {
+            getString('rating_unrated', 'local_unifiedgrader').then((str) => {
+                aggregate.textContent = str;
+                return str;
+            }).catch(() => {});
+        }
+        footer.appendChild(aggregate);
+
+        if (!post.rating.canrate && post.rating.noratereason) {
+            const reason = document.createElement('span');
+            reason.className = 'small text-muted w-100';
+            reason.textContent = post.rating.noratereason;
+            footer.appendChild(reason);
+        }
+
+        return footer;
+    }
+
+    /**
+     * Find a post and its discussion within the payload.
+     *
+     * @param {Array} discussions The context payload.
+     * @param {number} postid
+     * @return {?object} {discussion, post, byId} or null.
+     */
+    _locatePost(discussions, postid) {
+        for (const discussion of discussions) {
+            const post = discussion.posts.find((p) => p.id === postid);
+            if (post) {
+                const byId = {};
+                discussion.posts.forEach((p) => {
+                    byId[p.id] = p;
+                });
+                return {discussion, post, byId};
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Update the "Post n of m" label.
+     *
+     * @param {number} index 1-based.
+     * @param {number} total
+     */
+    _updatePagerLabel(index, total) {
+        const label = this.getElement(this.selectors.FORUM_PAGER_LABEL);
+        if (!label) {
+            return;
+        }
+        getString('forumview_post_of', 'local_unifiedgrader', {index, total}).then((str) => {
+            label.textContent = str;
+            return str;
+        }).catch(() => {
+            label.textContent = `${index} / ${total}`;
+        });
+    }
+
+    /**
+     * Bring the focused post into view in thread mode.
+     *
+     * @param {object} state Current state.
+     * @param {HTMLElement} view Container.
+     */
+    _scrollToCurrentPost(state, view) {
+        const current = state.forumcontext?.currentpostid || 0;
+        if (!current) {
+            return;
+        }
+        const target = view.querySelector(`[data-postid="${current}"]`);
+        if (target) {
+            target.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+    }
+
+    /**
+     * Render the empty state.
+     *
+     * @param {HTMLElement} view Container.
+     */
+    _renderNoContext(view) {
+        const message = document.createElement('p');
+        message.className = 'text-muted';
+        getString('forumview_no_context', 'local_unifiedgrader').then((str) => {
+            message.textContent = str;
+            return str;
+        }).catch(() => {});
+        view.innerHTML = '';
+        view.appendChild(message);
     }
 
     /**

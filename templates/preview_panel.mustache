@@ -62,6 +62,68 @@
         </div>
     </div>
 
+    {{! Forum display-mode switch. The file-selector pills choose WHAT to look at;
+        this chooses HOW to read the posts. Shown only for forums, and only while
+        the Posts view is active.
+
+        It sits here, above every content region, deliberately. The content
+        regions below carry flex-grow-1, so a toolbar placed after them gets
+        pushed to the foot of the column by whichever one is currently visible —
+        which is why it used to drop to the bottom in "All posts" (the iframe is
+        shown) but stay at the top in the other two (the iframe is hidden). Being
+        a fixed top bar, like the translation panel above, keeps it put whatever
+        is on screen. }}
+    <div data-region="forum-view-toolbar"
+         class="d-none border-bottom bg-body-tertiary px-3 py-2
+                d-flex align-items-center gap-2 flex-wrap flex-shrink-0">
+        <span class="small text-muted">{{#str}} forumview_label, local_unifiedgrader {{/str}}</span>
+        <div class="btn-group btn-group-sm" role="group"
+             aria-label="{{#str}} forumview_label, local_unifiedgrader {{/str}}">
+            <button type="button" class="btn btn-outline-secondary"
+                    data-action="forum-view-mode" data-mode="flat"
+                    title="{{#str}} forumview_flat_help, local_unifiedgrader {{/str}}">
+                <i class="fa fa-list me-1" aria-hidden="true"></i>
+                {{#str}} forumview_flat, local_unifiedgrader {{/str}}
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    data-action="forum-view-mode" data-mode="paged"
+                    title="{{#str}} forumview_paged_help, local_unifiedgrader {{/str}}">
+                <i class="fa fa-crosshairs me-1" aria-hidden="true"></i>
+                {{#str}} forumview_paged, local_unifiedgrader {{/str}}
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    data-action="forum-view-mode" data-mode="thread"
+                    title="{{#str}} forumview_thread_help, local_unifiedgrader {{/str}}">
+                <i class="fa fa-comments me-1" aria-hidden="true"></i>
+                {{#str}} forumview_thread, local_unifiedgrader {{/str}}
+            </button>
+        </div>
+
+        {{! Pager — paged mode only. }}
+        <div data-region="forum-pager" class="d-none ms-auto d-flex align-items-center gap-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-action="forum-post-prev"
+                    aria-label="{{#str}} forumview_prev, local_unifiedgrader {{/str}}">
+                <i class="fa fa-chevron-left" aria-hidden="true"></i>
+            </button>
+            <span data-region="forum-pager-label" class="small text-muted px-1"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-action="forum-post-next"
+                    aria-label="{{#str}} forumview_next, local_unifiedgrader {{/str}}">
+                <i class="fa fa-chevron-right" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        {{! Jump-to-next-highlighted — thread mode only. }}
+        <button type="button"
+                data-region="forum-jump-next"
+                class="btn btn-sm btn-outline-secondary d-none ms-auto"
+                data-action="forum-post-next">
+            <i class="fa fa-arrow-down me-1" aria-hidden="true"></i>
+            {{#str}} forumview_jump_next, local_unifiedgrader {{/str}}
+        </button>
+    </div>
+
     {{! Translation view (rendered by the translation_panel JS component) }}
     <div data-region="translation-view" class="d-none flex-grow-1 overflow-auto" style="min-height: 0;">
     </div>
@@ -102,6 +164,12 @@
         component decorates it with margin comments and tick/cross/query marks
         anchored by character offset. Shown instead of the iframe for online text. }}
     <div data-region="text-annot-view" class="d-none flex-grow-1 overflow-auto" style="min-height: 0;"></div>
+
+    {{! Threaded post context — the paged and thread views render here. Both are
+        drawn from one payload fetched with the student, so switching mode or
+        turning a page costs no round trip. }}
+    <div data-region="forum-context-view"
+         class="d-none flex-grow-1 overflow-auto p-3" style="min-height: 0;"></div>
 
     {{! Split view — two submissions at once, stacked with a draggable divider.
         Built for "watch the recording while marking the manuscript": the video

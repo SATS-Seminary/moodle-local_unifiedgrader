@@ -110,9 +110,34 @@ export default class {
                 }])[0]);
             }
 
+            // Forums fetch their threaded context (and, when rated, the per-post
+            // ratings) in the same batch, so the panel never flashes an empty
+            // ratings list before filling it in. Both are indexed by name below
+            // rather than by position, since the earlier pushes are conditional.
+            const isForum = stateManager.state.activity?.type === 'forum';
+            const isRated = stateManager.state.activity?.gradingmode === 'rating';
+            let contextIndex = -1;
+            let ratingsIndex = -1;
+            if (isForum) {
+                contextIndex = calls.length;
+                calls.push(Ajax.call([{
+                    methodname: 'local_unifiedgrader_get_post_context',
+                    args: {cmid, userid},
+                }])[0].catch(() => ({discussions: [], targetpostids: []})));
+                if (isRated) {
+                    ratingsIndex = calls.length;
+                    calls.push(Ajax.call([{
+                        methodname: 'local_unifiedgrader_get_post_ratings',
+                        args: {cmid, userid},
+                    }])[0].catch(() => null));
+                }
+            }
+
             const results = await Promise.all(calls);
             const [submissionData, gradeData, notes, penalties, referrals] = results;
             const feedbackDraft = (draftitemid ? results[5] : null) || {feedbackhtml: ''};
+            const postContext = contextIndex >= 0 ? results[contextIndex] : null;
+            const postRatings = ratingsIndex >= 0 ? results[ratingsIndex] : null;
 
             // Stale-response guard. loadStudent is dispatched from several places
             // (initial load, the student list, prev/next, the penalty-recalc
@@ -141,6 +166,26 @@ export default class {
             stateManager.state.notes = notes;
             stateManager.state.penalties = penalties;
             stateManager.state.referrals = referrals;
+
+            if (postContext) {
+                Object.assign(stateManager.state.forumcontext, {
+                    discussions: postContext.discussions || [],
+                    targetpostids: postContext.targetpostids || [],
+                    // Focus the student's first post on arrival, so the paged
+                    // view opens on something worth grading rather than blank.
+                    currentpostid: (postContext.targetpostids || [])[0] || 0,
+                    loaded: true,
+                });
+            }
+            if (postRatings) {
+                Object.assign(stateManager.state.postratings, {
+                    posts: postRatings.posts || [],
+                    gradebookgrade: postRatings.gradebookgrade ?? null,
+                    gradebookdisplay: postRatings.gradebookdisplay || '',
+                    aggregatelabel: postRatings.aggregatelabel || '',
+                    loaded: true,
+                });
+            }
 
             // Update submission comment count and reset loaded flag.
             stateManager.state.submissionComments.count = submissionData.commentcount || 0;
@@ -910,6 +955,128 @@ export default class {
             stateManager.state.ui.loading = false;
             stateManager.setReadOnly(true);
         }
+    }
+
+    /**
+     * Record the current grader's rating on one forum post.
+     *
+     * The gradebook value is recomputed server-side by mod_forum, so the
+     * response carries it back rather than the client trying to re-derive an
+     * aggregate it does not own.
+     *
+     * @param {object} stateManager The reactive state manager.
+     * @param {number} cmid Course module ID.
+     * @param {number} postid Forum post ID.
+     * @param {number} rating Scale value, or -999 to clear.
+     */
+    async savePostRating(stateManager, cmid, postid, rating) {
+        stateManager.setReadOnly(false);
+        stateManager.state.ui.saving = true;
+        stateManager.setReadOnly(true);
+
+        try {
+            const result = await Ajax.call([{
+                methodname: 'local_unifiedgrader_save_post_rating',
+                args: {cmid, postid, rating},
+            }])[0];
+
+            stateManager.setReadOnly(false);
+            stateManager.state.ui.saving = false;
+
+            if (!result.success) {
+                // A rejected rating is a row-level problem, not a page-level
+                // one — surface it against the post and leave the rest alone.
+                stateManager.state.postratings.error = result.error || '';
+                stateManager.setReadOnly(true);
+                return;
+            }
+
+            stateManager.state.postratings.error = '';
+            const posts = stateManager.state.postratings.posts.map((p) => {
+                if (p.postid !== postid) {
+                    return p;
+                }
+                return {
+                    ...p,
+                    own: result.own,
+                    aggregate: result.aggregate,
+                    aggregatelabel: result.aggregatelabel,
+                    count: result.count,
+                };
+            });
+            Object.assign(stateManager.state.postratings, {
+                posts: posts,
+                gradebookgrade: result.gradebookgrade ?? null,
+                gradebookdisplay: result.gradebookdisplay || '',
+            });
+
+            // The threaded views carry their own copy of the rating badge, so
+            // keep them in step without refetching the whole tree.
+            const discussions = stateManager.state.forumcontext.discussions.map((d) => ({
+                ...d,
+                posts: d.posts.map((p) => {
+                    if (p.id !== postid || !p.rating) {
+                        return p;
+                    }
+                    return {
+                        ...p,
+                        rating: {
+                            ...p.rating,
+                            own: result.own,
+                            aggregate: result.aggregate,
+                            aggregatelabel: result.aggregatelabel,
+                            count: result.count,
+                        },
+                    };
+                }),
+            }));
+            stateManager.state.forumcontext.discussions = discussions;
+
+            // The grade shown elsewhere in the panel is the gradebook value.
+            stateManager.state.grade.grade = result.gradebookgrade ?? null;
+            stateManager.setReadOnly(true);
+        } catch (error) {
+            _handleError(error);
+            stateManager.setReadOnly(false);
+            stateManager.state.ui.saving = false;
+            stateManager.setReadOnly(true);
+        }
+    }
+
+    /**
+     * Focus a post. Both the preview pager and the marking-panel rating rows
+     * watch this one field, which is why neither needs to know the other exists.
+     *
+     * @param {object} stateManager The reactive state manager.
+     * @param {number} postid Forum post ID.
+     */
+    setCurrentForumPost(stateManager, postid) {
+        stateManager.setReadOnly(false);
+        stateManager.state.forumcontext.currentpostid = postid;
+        stateManager.setReadOnly(true);
+    }
+
+    /**
+     * Switch the forum preview display mode and remember the choice.
+     *
+     * @param {object} stateManager The reactive state manager.
+     * @param {number} cmid Course module ID.
+     * @param {string} mode One of flat, paged, thread.
+     */
+    setForumViewMode(stateManager, cmid, mode) {
+        stateManager.setReadOnly(false);
+        stateManager.state.forumcontext.mode = mode;
+        stateManager.setReadOnly(true);
+
+        // Underscore, not a dot: save_preference cleans the key with
+        // PARAM_ALPHANUMEXT, which strips "." — a key written with one comes
+        // back different from the key the server reads.
+        // Persisting is a convenience, not a correctness concern: if it fails
+        // the teacher still gets the view they asked for, just not next time.
+        Ajax.call([{
+            methodname: 'local_unifiedgrader_save_preference',
+            args: {key: `forumview_${cmid}`, value: mode},
+        }])[0].catch(() => {});
     }
 
     /**

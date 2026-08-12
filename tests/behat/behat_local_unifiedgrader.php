@@ -29,7 +29,16 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+// NOTE: no MOODLE_INTERNAL test here, this file may be required by behat before including /config.php.
+//
+// This is not a style preference. Behat loads every registered context class
+// while it builds the suite list, which happens before Moodle's config.php has
+// run — so MOODLE_INTERNAL is not defined yet and the usual guard fires. Because
+// die() here takes down the whole behat process with no message and exit code 0,
+// a guard in this one file silently stopped every feature in the plugin from
+// running, and made the CI step report success without executing anything.
+// Core's own context classes carry this comment in place of the guard for the
+// same reason.
 
 require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
 
@@ -84,6 +93,27 @@ class behat_local_unifiedgrader extends behat_base {
         $this->execute(
             'behat_general::wait_until_exists',
             ['[data-region="rubric-body"], [data-action="grade-input"]', 'css_element'],
+        );
+    }
+
+    /**
+     * Wait for a rating-graded forum's per-post rating rows to be rendered.
+     *
+     * The grade-input boundary the marking panel uses is no help here: on a
+     * rated forum that field exists but is hidden, so it is present long before
+     * the ratings arrive. A rendered row is the real signal, since it only
+     * appears once get_post_ratings has come back and been drawn.
+     *
+     * Example:
+     *   And the post ratings list has loaded
+     *
+     * @Given /^the post ratings list has loaded$/
+     */
+    public function the_post_ratings_list_has_loaded(): void {
+        $this->execute('behat_general::wait_until_the_page_is_ready');
+        $this->execute(
+            'behat_general::wait_until_exists',
+            ['[data-region="post-rating-row"]', 'css_element'],
         );
     }
 

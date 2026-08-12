@@ -99,6 +99,11 @@
                 {{#str}} grade, local_unifiedgrader {{/str}}: {{gradedisplay}}
             </span>
         {{/gradedisplay}}
+        {{! Rated forums: name where the number came from, so a student who was
+            rated on five separate posts can see it is an average, not a mark. }}
+        {{#hasaggregatelabel}}
+            <span class="text-muted small">{{aggregatelabel}}</span>
+        {{/hasaggregatelabel}}
         {{#haspenalties}}
             {{#penalties}}
                 <span class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">

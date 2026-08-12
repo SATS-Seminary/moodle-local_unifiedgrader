@@ -1392,6 +1392,10 @@ class quiz_adapter extends base_adapter {
 
         $quba = question_engine::load_questions_usage_by_activity($attempt->uniqueid);
 
+        // Slots actually graded here, so the same events Moodle's own manual
+        // grading page raises can be raised below (see the note after the sync).
+        $gradedslots = [];
+
         foreach ($questions as $slot => $data) {
             $slot = (int) $slot;
             $mark = isset($data['mark']) && $data['mark'] !== '' ? (float) $data['mark'] : null;
@@ -1406,6 +1410,7 @@ class quiz_adapter extends base_adapter {
             if ($mark !== null && $maxmark > 0) {
                 // Mark provided — save both mark and comment.
                 $quba->manual_grade($slot, $comment, $mark, FORMAT_HTML);
+                $gradedslots[$slot] = (int) $qa->get_question_id();
             } else if (!empty($comment)) {
                 // Comment-only update — reuse the existing mark if available.
                 // When $existingmark is null (never graded), manual_grade() with
@@ -1413,6 +1418,7 @@ class quiz_adapter extends base_adapter {
                 // comment-only path (no grade change, state preserved).
                 $existingmark = $qa->get_mark();
                 $quba->manual_grade($slot, $comment, $existingmark, FORMAT_HTML);
+                $gradedslots[$slot] = (int) $qa->get_question_id();
             }
         }
 
@@ -1431,6 +1437,33 @@ class quiz_adapter extends base_adapter {
 
         // Sync to gradebook.
         quiz_update_grades($this->quiz, (int) $attempt->userid);
+
+        // Raise the same event Moodle's own manual grading page raises, once per
+        // question marked. Writing the question usage directly is faster, but it
+        // bypasses the event other plugins listen for — and some of them own
+        // grading behaviour we must not reimplement.
+        //
+        // Concretely: a late-penalty plugin pins the gradebook cell with an
+        // override, which is exactly what stops the quiz module overwriting the
+        // penalised mark. Its listener responds to this event by clearing that
+        // override, letting the new total through, and re-applying the penalty to
+        // it. Without the event the override simply stayed, and everything the
+        // teacher marked here was silently kept out of the gradebook.
+        //
+        // Firing after the gradebook sync means listeners recalculate from the
+        // updated total rather than the stale one.
+        foreach ($gradedslots as $slot => $questionid) {
+            \mod_quiz\event\question_manually_graded::create([
+                'objectid' => $questionid,
+                'courseid' => (int) $this->course->id,
+                'context' => $this->context,
+                'other' => [
+                    'quizid' => (int) $this->quiz->id,
+                    'attemptid' => (int) $attempt->id,
+                    'slot' => $slot,
+                ],
+            ])->trigger();
+        }
     }
 
     /**

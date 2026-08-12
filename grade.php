@@ -184,6 +184,20 @@ $templatedata = [
     'graderfullname' => fullname($USER),
 ];
 
+// Forum preview display mode, remembered per teacher per forum. A rating forum
+// opens in the paged in-context view because the post is the unit being graded;
+// everything else keeps the flat list it has always shown.
+if ($cm->modname === 'forum') {
+    $defaultview = ($activityinfo['gradingmode'] ?? '') === 'rating' ? 'paged' : 'flat';
+    $savedview = \local_unifiedgrader\preferences_manager::get(
+        $USER->id,
+        'forumview_' . $cm->id,
+    );
+    $templatedata['forumviewmode'] = in_array($savedview, ['flat', 'paged', 'thread'], true)
+        ? $savedview
+        : $defaultview;
+}
+
 // TinyMCE editor setup for the feedback textarea.
 // The textarea is rendered in the static Mustache template, so use_editor() can find it.
 $editor = editors_get_preferred_editor(FORMAT_HTML);

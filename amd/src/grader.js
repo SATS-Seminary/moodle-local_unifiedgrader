@@ -83,6 +83,10 @@ export const init = (containerId) => {
     const reportFormUrl = container.dataset.reportformurl || '';
     const graderFullname = container.dataset.graderfullname || '';
     const coursefullname = container.dataset.coursefullname || '';
+    // Saved per teacher, per forum. Rating forums default to the paged
+    // in-context view because that is the unit being graded; everything else
+    // keeps the flat list it has always had.
+    const forumviewmode = container.dataset.forumviewmode || 'flat';
 
     let activityinfo = {};
     let participants = [];
@@ -157,6 +161,30 @@ export const init = (containerId) => {
         notes: [],
         penalties: [],
         referrals: [],
+        // Rating-graded forums only: one entry per post the student wrote,
+        // plus the gradebook value mod_forum derived from them.
+        postratings: {
+            posts: [],
+            gradebookgrade: null,
+            gradebookdisplay: '',
+            aggregatelabel: '',
+            // Declared up front: the reactive proxy only tracks keys that
+            // existed when the state was set, so a rejected rating written to a
+            // missing key would never reach the watcher.
+            error: '',
+            loaded: false,
+        },
+        // The threaded discussion behind the student's posts, plus which post
+        // is currently in focus. currentpostid is the single source of truth
+        // shared by the preview pager and the marking-panel rating rows —
+        // neither component talks to the other, they both watch this.
+        forumcontext: {
+            discussions: [],
+            targetpostids: [],
+            currentpostid: 0,
+            mode: forumviewmode,
+            loaded: false,
+        },
         submissionComments: {
             count: 0,
             canpost: false,

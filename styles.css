@@ -1670,3 +1670,67 @@ span.local-unifiedgrader-mark-highlight {
     }
 }
 
+
+/* ---------------------------------------------------------------------------
+   Rating-based forums
+   --------------------------------------------------------------------------- */
+
+/* One row per post in the marking panel's ratings list. The border is always
+   present (transparent when idle) so highlighting the focused row does not
+   shift the layout by a pixel. The row owns its own border rather than wearing
+   Bootstrap's utility classes, so the focused state needs no !important to win. */
+.local-unifiedgrader-rating-row {
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.local-unifiedgrader-rating-row:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+/* The row whose post the preview is currently showing. */
+.local-unifiedgrader-rating-row-current {
+    border-color: var(--bs-primary);
+    background-color: var(--bs-primary-bg-subtle);
+}
+
+/* Post cards in the paged and thread context views. */
+.local-unifiedgrader-context-post {
+    max-width: 100%;
+}
+
+.local-unifiedgrader-context-post .card-body {
+    overflow-wrap: anywhere;
+}
+
+/* The post being graded, so the eye finds it in a long thread. */
+.local-unifiedgrader-context-post-target {
+    border-width: 2px;
+    box-shadow: 0 0 0 0.15rem rgba(var(--bs-primary-rgb), 0.15);
+}
+
+/* Reply depth as an attribute rather than an inline style, so the narrow-panel
+   reset below can override it on equal specificity instead of shouting. */
+.local-unifiedgrader-context-post[data-depth="1"] {
+    margin-left: 1.25rem;
+}
+
+.local-unifiedgrader-context-post[data-depth="2"] {
+    margin-left: 2.5rem;
+}
+
+.local-unifiedgrader-context-post[data-depth="3"] {
+    margin-left: 3.75rem;
+}
+
+.local-unifiedgrader-context-post[data-depth="4"] {
+    margin-left: 5rem;
+}
+
+/* Deep threads indent, but the panel is narrow — stop indenting before the
+   text column becomes unreadable. */
+@media (max-width: 1200px) {
+    .local-unifiedgrader-context-post[data-depth] {
+        margin-left: 0;
+    }
+}

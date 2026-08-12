@@ -325,4 +325,22 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_get_post_ratings' => [
+        'classname' => 'local_unifiedgrader\external\get_post_ratings',
+        'description' => 'Get the rating state of each of a student\'s forum posts.',
+        'type' => 'read',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_save_post_rating' => [
+        'classname' => 'local_unifiedgrader\external\save_post_rating',
+        'description' => 'Record the current user\'s rating on a single forum post.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_get_post_context' => [
+        'classname' => 'local_unifiedgrader\external\get_post_context',
+        'description' => 'Get the threaded discussion context around a student\'s forum posts.',
+        'type' => 'read',
+        'ajax' => true,
+    ],
 ];

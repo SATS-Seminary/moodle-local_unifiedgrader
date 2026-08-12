@@ -1177,8 +1177,12 @@ export default class extends BaseComponent {
         const actType = state.activity.type;
 
         // Unified "Overrides and Extensions" action — available for all activity types.
+        // Except a rating-graded forum: extensions exist to feed the late
+        // penalty, and there is no penalty to feed when the gradebook value is
+        // core's, recomputed from the ratings on every change.
         const overridesExtensionsActions = [];
-        const canManage = state.activity.canmanageoverrides || state.activity.canmanageextensions;
+        const canManage = (state.activity.canmanageoverrides || state.activity.canmanageextensions)
+            && state.activity.gradingmode !== 'rating';
         if (canManage) {
             overridesExtensionsActions.push({
                 id: 'overrides_extensions',

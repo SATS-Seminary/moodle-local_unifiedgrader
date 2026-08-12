@@ -105,12 +105,28 @@ jobs:
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpunit --fail-on-warning ./plugin
 
+      # The tag expression must keep the component filter. Passing only
+      # "~@local_unifiedgrader_wip" REPLACES moodle-plugin-ci's default
+      # "@local_unifiedgrader" rather than narrowing it, which runs the whole of
+      # core's suite — 5638 scenarios, most of them failing, because this plugin
+      # deliberately takes over the activity grading screens that core's own
+      # tests drive.
+      #
+      # Scenarios tagged @local_unifiedgrader_wip are written against step
+      # definitions that do not exist yet (they need fixtures — a PDF
+      # submission, an attached marking guide, a seeded orphan submission row).
+      # They are excluded rather than deleted so the intent stays recorded.
+      # Everything else runs for real: until the guard in
+      # tests/behat/behat_local_unifiedgrader.php was removed, loading that
+      # context killed the whole behat process silently and this step passed
+      # without executing a single scenario.
       - name: Behat features
         id: behat
         if: ${{ !cancelled() }}
         run: |
           if [ -d "plugin/tests/behat" ]; then
-            moodle-plugin-ci behat --profile chrome --scss-deprecations ./plugin
+            moodle-plugin-ci behat --profile chrome --scss-deprecations \
+              --tags '@local_unifiedgrader&&~@local_unifiedgrader_wip' ./plugin
           else
             echo "No Behat features found, skipping."
           fi

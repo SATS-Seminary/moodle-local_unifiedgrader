@@ -103,6 +103,30 @@ class get_activity_info extends external_api {
                 VALUE_DEFAULT,
                 false,
             ),
+            'gradingmode' => new external_value(
+                PARAM_ALPHA,
+                'Forum grading system in force: whole, rating or none',
+                VALUE_DEFAULT,
+                '',
+            ),
+            'ratingaggregatelabel' => new external_value(
+                PARAM_TEXT,
+                'How post ratings combine into the grade, e.g. "Average of ratings"',
+                VALUE_DEFAULT,
+                '',
+            ),
+            'ratingaggregatemethod' => new external_value(
+                PARAM_INT,
+                'RATING_AGGREGATE_* constant in force (0 when not a rating forum)',
+                VALUE_DEFAULT,
+                0,
+            ),
+            'canrate' => new external_value(
+                PARAM_BOOL,
+                'Whether the current user may rate posts in this activity',
+                VALUE_DEFAULT,
+                false,
+            ),
             'teamsubmission' => new external_value(PARAM_BOOL, 'Team submission enabled'),
             'blindmarking' => new external_value(PARAM_BOOL, 'Blind marking enabled'),
             'canmanageoverrides' => new external_value(

@@ -96,6 +96,12 @@ export default class extends BaseComponent {
             ATTEMPT_SELECT: '[data-action="attempt-select"]',
             MARK_GRADED_SECTION: '[data-region="mark-graded-section"]',
             MARK_GRADED_TOGGLE: '[data-action="mark-graded-toggle"]',
+            POST_RATINGS_SECTION: '[data-region="post-ratings-section"]',
+            POST_RATINGS_LIST: '[data-region="post-ratings-list"]',
+            POST_RATINGS_TOTAL: '[data-region="post-ratings-total"]',
+            POST_RATINGS_PROGRESS: '[data-region="post-ratings-progress"]',
+            POST_RATINGS_EMPTY: '[data-region="post-ratings-empty"]',
+            POST_RATINGS_ERROR: '[data-region="post-ratings-error"]',
         };
         this._editingFeedback = false;
         // One-shot: set when a save is dispatched while the teacher is
@@ -178,6 +184,10 @@ export default class extends BaseComponent {
             {watch: 'state.notes:updated', handler: this._renderNotes},
             {watch: 'state.penalties:updated', handler: this._renderPenalties},
             {watch: 'state.referrals:updated', handler: this._renderReferral},
+            {watch: 'postratings:updated', handler: this._renderPostRatings},
+            // Focus changes come through forumcontext, which the preview pager
+            // also writes — that shared field is what keeps the two in step.
+            {watch: 'forumcontext:updated', handler: this._highlightCurrentRatingRow},
             {watch: 'ui:updated', handler: this._updateUI},
         ];
     }
@@ -282,6 +292,10 @@ export default class extends BaseComponent {
         if (state.grade) {
             this._renderGrade({state});
         }
+
+        // postratings:updated only fires on change, so the first paint needs
+        // an explicit call.
+        this._renderPostRatings({state});
 
         // Attempt selector change handler.
         const attemptSelect = this.getElement(this.selectors.ATTEMPT_SELECT);
@@ -568,6 +582,214 @@ export default class extends BaseComponent {
     }
 
     /**
+     * Render the per-post rating rows for a rating-graded forum.
+     *
+     * Each row shows two different numbers on purpose: the aggregate blends
+     * every marker who rated that post, while the select holds only this
+     * grader's own rating. A colleague's mark moves the aggregate without
+     * touching what this teacher chose.
+     *
+     * @param {object} args Watcher args.
+     * @param {object} args.state Current state.
+     */
+    _renderPostRatings({state}) {
+        const section = this.getElement(this.selectors.POST_RATINGS_SECTION);
+        if (!section) {
+            return;
+        }
+
+        if (state.activity?.gradingmode !== 'rating') {
+            section.classList.add('d-none');
+            return;
+        }
+        section.classList.remove('d-none');
+
+        const list = this.getElement(this.selectors.POST_RATINGS_LIST);
+        const empty = this.getElement(this.selectors.POST_RATINGS_EMPTY);
+        const errorEl = this.getElement(this.selectors.POST_RATINGS_ERROR);
+        const posts = state.postratings?.posts || [];
+
+        if (errorEl) {
+            const message = state.postratings?.error || '';
+            errorEl.textContent = message;
+            errorEl.classList.toggle('d-none', message === '');
+        }
+
+        if (empty) {
+            empty.classList.toggle('d-none', posts.length > 0);
+        }
+        if (!list) {
+            return;
+        }
+
+        list.innerHTML = '';
+        posts.forEach((post) => {
+            list.appendChild(this._buildRatingRow(post, state));
+        });
+
+        this._renderRatingTotals(state, posts);
+        this._highlightCurrentRatingRow({state});
+    }
+
+    /**
+     * Build one rating row.
+     *
+     * @param {object} post Entry from state.postratings.posts.
+     * @param {object} state Current state.
+     * @return {HTMLElement}
+     */
+    _buildRatingRow(post, state) {
+        const row = document.createElement('div');
+        row.className = 'd-flex align-items-center gap-2 p-1 rounded'
+            + ' local-unifiedgrader-rating-row';
+        row.dataset.region = 'post-rating-row';
+        row.dataset.postid = String(post.postid);
+
+        // Clicking the row pages the preview to this post. It writes the shared
+        // state field rather than reaching into the preview component.
+        const label = document.createElement('button');
+        label.type = 'button';
+        label.className = 'btn btn-link btn-sm text-start p-0 flex-grow-1 text-decoration-none';
+        label.dataset.action = 'focus-post';
+        label.innerHTML = '';
+        const subject = document.createElement('span');
+        subject.className = 'd-block text-truncate small fw-semibold';
+        subject.textContent = post.subject;
+        const meta = document.createElement('span');
+        meta.className = 'd-block text-muted';
+        meta.style.fontSize = '0.75rem';
+        meta.textContent = post.createddisplay;
+        label.appendChild(subject);
+        label.appendChild(meta);
+        label.addEventListener('click', () => {
+            this.reactive.dispatch('setCurrentForumPost', post.postid);
+        });
+
+        const aggregate = document.createElement('span');
+        aggregate.className = 'small text-nowrap text-muted';
+        aggregate.dataset.region = 'post-rating-aggregate';
+        aggregate.textContent = '';
+        if (post.count > 0) {
+            getString(
+                post.count === 1 ? 'rating_aggregate_one' : 'rating_aggregate_of',
+                'local_unifiedgrader',
+                {value: post.aggregatelabel, count: post.count},
+            ).then((str) => {
+                aggregate.textContent = str;
+                return str;
+            }).catch(() => {
+                aggregate.textContent = post.aggregatelabel;
+            });
+        } else {
+            getString('rating_unrated', 'local_unifiedgrader').then((str) => {
+                aggregate.textContent = str;
+                return str;
+            }).catch(() => {});
+        }
+
+        const select = document.createElement('select');
+        select.className = 'form-select form-select-sm w-auto';
+        select.dataset.action = 'post-rating-input';
+        select.dataset.postid = String(post.postid);
+
+        // -999 is RATING_UNSET_RATING: core reads it as "remove my rating",
+        // which is not the same as rating zero.
+        const unset = document.createElement('option');
+        unset.value = '-999';
+        unset.textContent = '...';
+        getString('rating_choose', 'local_unifiedgrader').then((str) => {
+            unset.textContent = str;
+            return str;
+        }).catch(() => {});
+        select.appendChild(unset);
+
+        (state.activity?.scaleitems || []).forEach((item) => {
+            const option = document.createElement('option');
+            option.value = String(item.value);
+            option.textContent = item.label;
+            select.appendChild(option);
+        });
+        select.value = post.own === null || post.own === undefined ? '-999' : String(post.own);
+
+        if (!post.canrate) {
+            select.disabled = true;
+            select.title = post.noratereason || '';
+            row.classList.add('opacity-75');
+        } else {
+            select.addEventListener('change', (e) => {
+                this.reactive.dispatch(
+                    'savePostRating',
+                    state.activity.cmid,
+                    post.postid,
+                    parseInt(e.target.value, 10),
+                );
+            });
+        }
+
+        row.appendChild(label);
+        row.appendChild(aggregate);
+        row.appendChild(select);
+        return row;
+    }
+
+    /**
+     * Render the "how this adds up" line and the rated-so-far counter.
+     *
+     * @param {object} state Current state.
+     * @param {Array} posts Rating rows.
+     */
+    _renderRatingTotals(state, posts) {
+        const total = this.getElement(this.selectors.POST_RATINGS_TOTAL);
+        const progress = this.getElement(this.selectors.POST_RATINGS_PROGRESS);
+        const label = state.postratings?.aggregatelabel
+            || state.activity?.ratingaggregatelabel
+            || '';
+
+        if (total) {
+            const display = state.postratings?.gradebookdisplay || '';
+            const key = display === '' ? 'rating_gradebook_none' : 'rating_gradebook_note';
+            const args = display === '' ? label : {label: label, value: display};
+            getString(key, 'local_unifiedgrader', args).then((str) => {
+                total.textContent = str;
+                return str;
+            }).catch(() => {
+                total.textContent = display ? `${label}: ${display}` : label;
+            });
+        }
+
+        if (progress) {
+            const rated = posts.filter((p) => p.count > 0).length;
+            getString('rating_progress', 'local_unifiedgrader', {
+                rated: rated,
+                posts: posts.length,
+            }).then((str) => {
+                progress.textContent = str;
+                return str;
+            }).catch(() => {
+                progress.textContent = `${rated}/${posts.length}`;
+            });
+        }
+    }
+
+    /**
+     * Mark the row whose post the preview is currently showing.
+     *
+     * @param {object} args Watcher args.
+     * @param {object} args.state Current state.
+     */
+    _highlightCurrentRatingRow({state}) {
+        const list = this.getElement(this.selectors.POST_RATINGS_LIST);
+        if (!list) {
+            return;
+        }
+        const current = state.forumcontext?.currentpostid || 0;
+        list.querySelectorAll('[data-region="post-rating-row"]').forEach((row) => {
+            const isCurrent = parseInt(row.dataset.postid, 10) === current;
+            row.classList.toggle('local-unifiedgrader-rating-row-current', isCurrent);
+        });
+    }
+
+    /**
      * Render grade data into the form.
      *
      * @param {object} args Watcher args.
@@ -629,6 +851,38 @@ export default class extends BaseComponent {
         if (markGradedSection) {
             markGradedSection.classList.add('d-none');
         }
+
+        // Rating-graded forum: the grade is derived from the per-post ratings,
+        // so there is no box to type into and no rubric to fill. The ratings
+        // section below is the grading control; feedback stays as it is.
+        if (state.activity?.gradingmode === 'rating') {
+            if (gradeSection) {
+                gradeSection.classList.add('d-none');
+            }
+            if (rubricSection) {
+                rubricSection.classList.add('d-none');
+            }
+            // Penalties and extensions are withheld here rather than left to
+            // misbehave: the gradebook value belongs to core, recomputed from
+            // the ratings on every change, so a deduction would either be
+            // overwritten by the next rating or stick as an override that
+            // silently diverges from the ratings it claims to reflect.
+            const penaltyBtn = this.getElement(this.selectors.TOGGLE_PENALTIES);
+            const badgesEl = this.getElement(this.selectors.PENALTY_BADGES);
+            const finalGradeEl = this.getElement(this.selectors.FINAL_GRADE_DISPLAY);
+            if (penaltyBtn) {
+                penaltyBtn.classList.add('d-none');
+            }
+            if (badgesEl) {
+                badgesEl.classList.add('d-none');
+            }
+            if (finalGradeEl) {
+                finalGradeEl.classList.add('d-none');
+            }
+            this._renderFeedbackAndSnapshot(state, true, isFreshRender);
+            return;
+        }
+
         if (gradeSection) {
             gradeSection.classList.remove('d-none');
         }
@@ -735,7 +989,25 @@ export default class extends BaseComponent {
                     && gradeInput.value === ''
                     && !DirtyTracker.isDirty('grade')
                     && displayGrade !== null;
-                if (isFreshRender || fillBlankFromServer) {
+
+                // A quiz total is computed by the question engine, not typed: the
+                // grade field is a readout, and quiz_adapter::save_grade ignores
+                // any value sent for it. So after marking the manual questions the
+                // server's figure is authoritative and must replace what is on
+                // screen, even though this is not a fresh render — otherwise the
+                // teacher saves, sees the old total, and only gets the new one by
+                // navigating to another student and back.
+                //
+                // Guarded so it can only ever replace a value the teacher did not
+                // put there: not while the field is dirty, and not when they have
+                // deliberately overridden the computed mark.
+                const refreshComputedGrade = !isFreshRender
+                    && state.activity?.type === 'quiz'
+                    && !DirtyTracker.isDirty('grade')
+                    && !this._gradeManuallyOverridden
+                    && displayGrade !== null;
+
+                if (isFreshRender || fillBlankFromServer || refreshComputedGrade) {
                     gradeInput.value = displayGrade !== null ? String(displayGrade) : '';
                 }
                 if (isFreshRender) {

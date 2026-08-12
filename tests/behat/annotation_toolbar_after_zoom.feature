@@ -19,7 +19,8 @@ Feature: Annotation tools stay responsive after a PDF zoom
     And the following "activities" exist:
       | activity | name            | intro    | course     | idnumber | submissiondrafts |
       | assign   | Annotation PDF  | Try me   | annot_test | annot1   | 0                |
-    And the "local_unifiedgrader/enable_assign" admin setting is "1"
+    And the following config values are set as admin:
+      | enable_assign | 1 | local_unifiedgrader |
 
   # This scenario is the regression marker for the v2.5.1 → v2.5.2 sequence:
   # zoom destroys all page slots, the toolbar's _layer reference was cleared
