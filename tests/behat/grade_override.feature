@@ -28,13 +28,13 @@ Feature: Manual grade override locks against subsequent rubric edits
     # The rubric isn't set up in this stub — UG works fine without one.
     # When a rubric IS attached we'd seed a rubric scenario in the Given.
     And I enter "18" as the overall grade
-    Then the field "[data-action=\"grade-input\"]" matches value "18"
+    Then the field with xpath "//input[@data-action='grade-input']" matches value "18"
     # After a page reload the override persists (assumes autosave fired
     # on focusout). The override badge should also be visible because the
     # displayed grade differs from any rubric-computed total.
     When I reload the page
     And the marking panel has loaded
-    Then the field "[data-action=\"grade-input\"]" matches value "18"
+    Then the field with xpath "//input[@data-action='grade-input']" matches value "18"
 
   @local_unifiedgrader_wip
   Scenario: Override survives a rubric score edit
@@ -54,5 +54,5 @@ Feature: Manual grade override locks against subsequent rubric edits
     And I enter "18" as the overall grade
     And I set the rubric score for "Argumentation" to "9"
     # Rubric total would now be 16, but the override locked, so:
-    Then the field "[data-action=\"grade-input\"]" matches value "18"
+    Then the field with xpath "//input[@data-action='grade-input']" matches value "18"
     And I should see "Overridden"

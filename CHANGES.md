@@ -1,5 +1,42 @@
 # Changelog
 
+## v2.9.1 (2026081200)
+
+Bug fix release. Penalties recorded in the grader did not always reach the gradebook. **Some existing grades are wrong and are not corrected automatically** — see *What to check* below.
+
+### What went wrong, in plain terms
+
+When a marker records a penalty in the Unified Grader — a word-count deduction, or the outcome of an academic integrity review — the grader immediately shows the reduced mark, and has always done so correctly. What did not always happen was the second step: writing that reduced mark into the gradebook.
+
+The deduction only reached the gradebook when the grade was saved *after* the penalty was recorded. That made the fault look intermittent rather than systematic, and it is why it went unnoticed for so long:
+
+- **Penalty applied while marking** — the marker adds the penalty and then saves the grade moments later. The grade save carried the deduction through, so these are correct.
+- **Penalty applied after the grade was already issued** — typically an academic integrity outcome decided weeks later. Nothing saves the grade again afterwards, so nothing recalculated. The penalty was stored, the grader displayed it, and the gradebook quietly kept the original mark.
+
+Two related faults had the same shape. **Removing** a penalty never restored the mark, so a deduction lifted after appeal stayed in place. And on **quizzes** a penalty never applied at all, in either order, because a quiz mark is produced by the question engine rather than typed by a marker and the deduction was never carried across to it.
+
+Late penalties were unaffected throughout. Where a late penalty and a manual penalty both apply they now accumulate correctly, on assignments, forums and quizzes alike.
+
+### What to check
+
+Students whose penalty was applied **after** their grade was issued are the affected group, most likely those coming out of an integrity process. Their gradebook mark will be higher than the figure the grader displays.
+
+Re-saving the grade through the Unified Grader corrects it, because the save now recalculates. Comparing the grader's "final grade after penalties" against the gradebook column will show whether a given student is affected.
+
+### Fixes
+
+- **A penalty applied after the grade was issued never reached the gradebook.** `save_penalty` and `delete_penalty` wrote their row and returned without syncing. Every other path that changes a grade calls `sync_gradebook_penalty()` — `save_grade`, `clear_all_overrides`, `delete_forum_extension`, `forum_extension`, `overrides_extensions` — but the two penalty endpoints did not, so the deduction only reached the gradebook if something else happened to save the grade afterwards. Both endpoints now sync. The sync recomputes from the activity's raw mark and the current penalty rows on every call rather than adjusting the previously synced value, so calling it from the penalty path as well as the grade path cannot deduct twice.
+- **Removing a student's last penalty left the reduced mark in the gradebook permanently.** `assign_adapter::sync_gradebook_penalty()` returned early when the total deduction was zero, so no path ever wrote the restored figure back. Found by the regression test for the fix above, which passed on adding a penalty and failed on removing one. `forum_adapter` was already correct here.
+- **Manual penalties never applied to quizzes.** A quiz mark is computed by the question engine, so `quiz_adapter` inherited a no-op sync and a word-count or integrity penalty reached no grade at all while the grader displayed it as though it had. It now pushes the penalised figure through `quiz_grade_item_update()`, which raises `user_graded` — the event a late-penalty access rule observes — so that rule re-applies its own deduction on top and the two compound, without this plugin needing to know how the late penalty is calculated. The same division of labour assignments already rely on. Because a late-penalty rule pins the gradebook cell with an override to stop the quiz module overwriting it, the sync lifts the override, writes, and makes sure the cell is pinned again before returning; leaving it unpinned would let the next recalculation restore the un-penalised mark. A locked grade is left untouched.
+- **Typing `-` to clear an assignment grade did not persist.** The field went blank and the previous mark returned on the next page load. `assign::apply_grade_to_user()` guards its write with `isset($formdata->grade)`, and `isset()` is false for null, so the clear was silently dropped. Null grades now take the direct save path, which stores mod_assign's own `-1` sentinel. `forum_adapter` has always done this; assign never got the same guard.
+
+### Test infrastructure
+
+- **The Behat suite had never run, and reported success on every build.** `tests/behat/behat_local_unifiedgrader.php` opened with `defined('MOODLE_INTERNAL') || die();`. Behat loads context classes while building its suite list, before `config.php`, so `MOODLE_INTERNAL` was undefined and the guard fired; a bare `die()` exits with status **0** and prints nothing, so the runner saw a clean exit. One bad context file takes the whole run down, so all eight feature files were affected. Core's own context classes carry an explanatory comment in place of this guard for exactly this reason.
+- With the process alive, three further defects surfaced in sequence, each hidden by the previous one: the context called `unescape_argument()`, which does not exist on `behat_base` in Moodle 5.0 and whose absence aborted every scenario in its Background; seven assertions passed a CSS selector to core's `the field "X" matches value "Y"`, which resolves X by label, name, id or placeholder only, and the grade input has none of those; and the step that types a grade returned without waiting for the autosave it triggers, so a following reload raced it. Fixing the last of these is what exposed the `-` bug above — adding the wait did not make the scenario pass, which proved the failure was in the product rather than the test.
+- **A grade and penalty matrix**, in `tests/penalty_matrix_test.php`: twenty tests across assignments, forums and quizzes, covering a plain grade, a manual penalty, a late penalty, both together, penalties applied before and after grading, repeated syncs, removal, and the gradebook override lifecycle. Two of them pin the *route* rather than the arithmetic — writing `grade_grades` directly instead of going through the module API would skip the late-penalty hook and silently drop every late penalty on the course.
+- Scenarios written against step definitions that were never implemented are tagged `@local_unifiedgrader_wip` and excluded in CI; the remaining 17 run for real on every build.
+
 ## v2.9.0 (2026080700)
 
 Feature release. Adds support for **rating-based forums** — the second of Moodle's

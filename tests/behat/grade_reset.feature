@@ -28,15 +28,15 @@ Feature: Dash escape hatches in the overall grade input
     # Save fires, grade persists.
     When I reload the page
     And the marking panel has loaded
-    Then the field "[data-action=\"grade-input\"]" matches value "15"
+    Then the field with xpath "//input[@data-action='grade-input']" matches value "15"
     # Now reset.
     When I enter "-" as the overall grade
-    Then the field "[data-action=\"grade-input\"]" matches value ""
+    Then the field with xpath "//input[@data-action='grade-input']" matches value ""
     # After refresh, server-side state should reflect "no grade" (-1
     # internally → blank in the display).
     When I reload the page
     And the marking panel has loaded
-    Then the field "[data-action=\"grade-input\"]" matches value ""
+    Then the field with xpath "//input[@data-action='grade-input']" matches value ""
 
   Scenario: Typing a stray non-numeric value also resets without error
     # Regression for the original "lone - throws PARAM_FLOAT exception"
@@ -44,7 +44,7 @@ Feature: Dash escape hatches in the overall grade input
     When I am on the Unified Grader for activity "Essay 1"
     And the marking panel has loaded
     And I enter "x" as the overall grade
-    Then the field "[data-action=\"grade-input\"]" matches value ""
+    Then the field with xpath "//input[@data-action='grade-input']" matches value ""
     And I should not see "Exception"
 
   @local_unifiedgrader_wip

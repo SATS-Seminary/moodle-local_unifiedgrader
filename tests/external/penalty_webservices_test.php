@@ -388,4 +388,144 @@ final class penalty_webservices_test extends \advanced_testcase {
         $result = delete_penalty::execute($scenario->cm->id, 99999);
         $this->assertTrue($result['success']);
     }
+
+    // Gradebook synchronisation.
+
+    /**
+     * Read the gradebook's final grade for a student on the scenario activity.
+     *
+     * @param \stdClass $scenario
+     * @param int $userid
+     * @return float|null
+     */
+    private function gradebook_grade(\stdClass $scenario, int $userid): ?float {
+        $item = \grade_item::fetch([
+            'itemtype' => 'mod',
+            'itemmodule' => 'assign',
+            'iteminstance' => $scenario->activity->id,
+            'itemnumber' => 0,
+            'courseid' => $scenario->course->id,
+        ]);
+        if (!$item) {
+            return null;
+        }
+        $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $userid]);
+        return ($grade && $grade->finalgrade !== null) ? (float) $grade->finalgrade : null;
+    }
+
+    /**
+     * Grade a student through the plugin's own save_grade path.
+     *
+     * @param \stdClass $scenario
+     * @param int $userid
+     * @param float $grade
+     */
+    private function award_grade(\stdClass $scenario, int $userid, float $grade): void {
+        \local_unifiedgrader\adapter\adapter_factory::create($scenario->cm->id)
+            ->save_grade($userid, $grade, '', FORMAT_HTML);
+        \local_unifiedgrader\adapter\adapter_factory::create($scenario->cm->id)
+            ->sync_gradebook_penalty($userid);
+    }
+
+    /**
+     * A penalty added after the grade was issued must reach the gradebook.
+     *
+     * This is the academic-integrity case: the student is graded, and weeks
+     * later a penalty is applied. Nothing re-saves the grade afterwards, so
+     * before the fix the penalty was recorded and displayed in the grader while
+     * the gradebook silently kept the un-penalised mark.
+     */
+    public function test_penalty_added_after_grading_reaches_the_gradebook(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+        $student = $scenario->students[0];
+
+        $this->award_grade($scenario, $student->id, 80.0);
+        $this->assertEqualsWithDelta(80.0, $this->gradebook_grade($scenario, $student->id), 0.01);
+
+        // Weeks later: a 25% penalty, with no further grade save.
+        save_penalty::execute($scenario->cm->id, $student->id, 'other', 'Academic integrity', 25);
+
+        // The deduction is 25% of the MAXIMUM (100), not of the mark: 80 - 25 = 55.
+        $this->assertEqualsWithDelta(
+            55.0,
+            $this->gradebook_grade($scenario, $student->id),
+            0.01,
+            'A penalty applied after grading must be pushed to the gradebook.',
+        );
+    }
+
+    /**
+     * Removing a penalty must restore the grade in the gradebook.
+     */
+    public function test_deleting_a_penalty_restores_the_gradebook_grade(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+        $student = $scenario->students[0];
+
+        $this->award_grade($scenario, $student->id, 80.0);
+        $saved = save_penalty::execute($scenario->cm->id, $student->id, 'other', 'Academic integrity', 25);
+        $this->assertEqualsWithDelta(55.0, $this->gradebook_grade($scenario, $student->id), 0.01);
+
+        delete_penalty::execute($scenario->cm->id, $saved['penaltyid']);
+
+        $this->assertEqualsWithDelta(
+            80.0,
+            $this->gradebook_grade($scenario, $student->id),
+            0.01,
+            'Removing a penalty must restore the un-penalised mark.',
+        );
+    }
+
+    /**
+     * Saving the same penalty repeatedly must not compound the deduction.
+     *
+     * The sync recomputes from the activity's raw mark and the current penalty
+     * rows on every call, so it is idempotent by construction. This locks that
+     * in, because the alternative - deducting from the previously synced value -
+     * is exactly how this plugin has produced double-deduction bugs before.
+     */
+    public function test_repeated_penalty_saves_do_not_compound(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+        $student = $scenario->students[0];
+
+        $this->award_grade($scenario, $student->id, 80.0);
+        $saved = save_penalty::execute($scenario->cm->id, $student->id, 'wordcount', '', 10);
+
+        // Re-save the same penalty twice more.
+        save_penalty::execute($scenario->cm->id, $student->id, 'wordcount', '', 10, $saved['penaltyid']);
+        save_penalty::execute($scenario->cm->id, $student->id, 'wordcount', '', 10, $saved['penaltyid']);
+
+        $this->assertEqualsWithDelta(
+            70.0,
+            $this->gradebook_grade($scenario, $student->id),
+            0.01,
+            'Repeated saves of one penalty must deduct once, not three times.',
+        );
+    }
+
+    /**
+     * Several penalties on one student must sum, not overwrite one another.
+     */
+    public function test_multiple_penalties_sum_in_the_gradebook(): void {
+        $this->resetAfterTest();
+
+        $scenario = $this->create_scenario();
+        $student = $scenario->students[0];
+
+        $this->award_grade($scenario, $student->id, 80.0);
+        save_penalty::execute($scenario->cm->id, $student->id, 'wordcount', '', 10);
+        save_penalty::execute($scenario->cm->id, $student->id, 'other', 'Academic integrity', 15);
+
+        $this->assertEqualsWithDelta(
+            55.0,
+            $this->gradebook_grade($scenario, $student->id),
+            0.01,
+            'A 10% and a 15% penalty on a mark of 80/100 must leave 55.',
+        );
+    }
 }

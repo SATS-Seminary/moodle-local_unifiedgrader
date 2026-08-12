@@ -47,6 +47,28 @@ require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
  */
 class behat_local_unifiedgrader extends behat_base {
     /**
+     * Turn an escaped step argument back into its literal value.
+     *
+     * The step regexes below accept escaped quotes - (?:[^"]|\\")* - so a
+     * feature file may write \" inside a quoted argument. The steps called
+     * $this->unescape_argument() to undo that, but no such method exists on
+     * behat_base in Moodle 5.0. Since behat_base::__call() throws a coding
+     * exception for anything it does not recognise, every step that used it
+     * aborted its scenario, and because most of those calls sit in Background
+     * steps that took down all 17 scenarios at once.
+     *
+     * It went unnoticed because the MOODLE_INTERNAL guard in this file was
+     * killing the behat process before any scenario ran at all - one silent
+     * failure hiding another.
+     *
+     * @param string $value The raw argument as matched by the step regex.
+     * @return string The argument with escaped quotes resolved.
+     */
+    private function unescape_argument(string $value): string {
+        return str_replace('\\"', '"', $value);
+    }
+
+    /**
      * Open the Unified Grader for the activity with the given name in the
      * current course. Resolves the cmid by name lookup so feature files
      * don't have to chase numeric IDs across scenarios.
@@ -137,6 +159,11 @@ class behat_local_unifiedgrader extends behat_base {
         $this->execute('behat_general::i_click_on', [
             '[data-region="marking-content"]', 'css_element',
         ]);
+        // The focusout starts an autosave. Returning before it lands leaves the
+        // next step racing it: a scenario that reloads immediately afterwards
+        // reads whatever the server had before the save, which surfaces as the
+        // previous grade reappearing rather than as an obvious timing failure.
+        $this->wait_for_pending_js();
     }
 
     /**

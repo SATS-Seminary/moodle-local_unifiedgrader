@@ -687,4 +687,60 @@ final class assign_adapter_test extends \advanced_testcase {
             $this->assertArrayHasKey($key, $p, "Missing key: {$key}");
         }
     }
+
+    /**
+     * A null grade must clear the stored mark, not be silently ignored.
+     *
+     * Typing "-" in the grade field is the teacher's "ungrade me" signal and
+     * arrives here as null. assign::apply_grade_to_user() guards its write with
+     * isset($formdata->grade), which is false for null, so routing a clear
+     * through assign::save_grade() dropped it and left the previous mark in
+     * place - the teacher saw the field blank until they reloaded.
+     */
+    public function test_null_grade_clears_the_stored_mark(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $student = $s->scenario->students[0];
+
+        $s->adapter->save_grade($student->id, 15.0, '', FORMAT_HTML);
+        $this->assertEqualsWithDelta(
+            15.0,
+            $s->adapter->get_grade_data($student->id)['grade'],
+            0.01,
+            'Precondition: the grade of 15 must be stored.',
+        );
+
+        $s->adapter->save_grade($student->id, null, '', FORMAT_HTML);
+
+        $this->assertNull(
+            $s->adapter->get_grade_data($student->id)['grade'],
+            'A null grade must clear the mark rather than leave the previous one.',
+        );
+    }
+
+    /**
+     * Clearing a grade must survive a fresh read, not just the in-memory object.
+     *
+     * The Behat scenario that caught this only failed after a page reload, so
+     * the assertion has to come from a newly constructed adapter rather than
+     * the one that performed the write.
+     */
+    public function test_cleared_grade_stays_cleared_on_reload(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $student = $s->scenario->students[0];
+
+        $s->adapter->save_grade($student->id, 15.0, '', FORMAT_HTML);
+        $s->adapter->save_grade($student->id, null, '', FORMAT_HTML);
+
+        // A fresh adapter, as a page reload would build.
+        $reloaded = adapter_factory::create($s->scenario->cm->id);
+
+        $this->assertNull(
+            $reloaded->get_grade_data($student->id)['grade'],
+            'The cleared grade must still be clear when the page is reloaded.',
+        );
+    }
 }

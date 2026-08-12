@@ -29,6 +29,7 @@ use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_unifiedgrader\adapter\adapter_factory;
 use local_unifiedgrader\penalty_manager;
 
 /**
@@ -113,6 +114,20 @@ class save_penalty extends external_api {
             $params['percentage'],
             $params['penaltyid'],
         );
+
+        // Push the recalculated grade to the gradebook.
+        //
+        // Without this the penalty was recorded and shown in the grader, but the
+        // gradebook kept the un-penalised mark until somebody happened to re-save
+        // the grade. A penalty added during marking was saved moments later and
+        // looked fine; a penalty added weeks afterwards — an academic integrity
+        // outcome, typically — never reached the gradebook at all.
+        //
+        // The sync is idempotent: it reads the raw mark from the activity and the
+        // current penalty rows on every call, so running it here as well as from
+        // save_grade cannot deduct twice. Errors are deliberately not swallowed —
+        // a silent failure here is precisely the bug being fixed.
+        adapter_factory::create($params['cmid'])->sync_gradebook_penalty($params['userid']);
 
         // Return the saved ID and the full updated list.
         return [

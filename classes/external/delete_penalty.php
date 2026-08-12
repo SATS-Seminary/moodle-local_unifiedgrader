@@ -28,6 +28,7 @@ use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_unifiedgrader\adapter\adapter_factory;
 use local_unifiedgrader\penalty_manager;
 
 /**
@@ -75,6 +76,14 @@ class delete_penalty extends external_api {
         }
 
         penalty_manager::delete_penalty($params['penaltyid']);
+
+        // Restore the grade the student should now hold. Read the student off the
+        // row before it goes, since after the delete there is nothing to look up.
+        // Removing a penalty was as silently one-sided as adding one: the row
+        // disappeared from the grader while the gradebook kept the reduced mark.
+        if ($record) {
+            adapter_factory::create($params['cmid'])->sync_gradebook_penalty((int) $record->userid);
+        }
 
         return ['success' => true];
     }

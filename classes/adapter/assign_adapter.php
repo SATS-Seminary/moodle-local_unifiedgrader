@@ -683,15 +683,22 @@ class assign_adapter extends base_adapter {
         }
 
         /*
-         * Use save_grade_directly() in two cases:
+         * Use save_grade_directly() in three cases:
          * 1. Advanced grading is active but no criteria data — avoids the
          *    grading form processing null criteria (foreach-on-null warnings).
          * 2. Grade type is "None" — assign::save_grade() does not persist a
          *    numeric grade when there is no grade column, so the "Mark as
          *    graded" toggle state would silently revert on reload.
+         * 3. A null grade, which is the teacher's "ungrade me" signal (typing
+         *    "-"). assign::apply_grade_to_user() guards the write with
+         *    isset($formdata->grade), and isset() is false for null, so the
+         *    clear was silently dropped and the previous mark stayed put. The
+         *    direct path stores mod_assign's own -1 sentinel instead.
+         *    forum_adapter has always taken the direct path for null; assign
+         *    never did.
          */
         $gradingdisabled = ((int) $instance->grade === 0);
-        if (($controller && empty($advancedgradingdata)) || $gradingdisabled) {
+        if ($grade === null || ($controller && empty($advancedgradingdata)) || $gradingdisabled) {
             $this->save_grade_directly(
                 $userid,
                 $grade,
@@ -1429,10 +1436,13 @@ class assign_adapter extends base_adapter {
             $userid,
             $maxgrade,
         );
-        if ($deduction <= 0) {
-            return;
-        }
 
+        // A zero deduction still has to be pushed. Returning early here meant
+        // that removing a student's last penalty left the reduced mark sitting
+        // in the gradebook permanently, because nothing ever wrote the restored
+        // figure back. The push is the same value mod_assign would send anyway,
+        // so doing it unconditionally is safe and keeps the sync idempotent.
+        // forum_adapter already handles this correctly with a ternary.
         $penalised = max(0, (float) $grade->grade - $deduction);
 
         $gradebookgrade = [
