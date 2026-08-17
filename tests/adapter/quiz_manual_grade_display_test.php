@@ -42,7 +42,6 @@ require_once($CFG->dirroot . '/mod/quiz/locallib.php');
  * @covers \local_unifiedgrader\adapter\quiz_adapter
  */
 final class quiz_manual_grade_display_test extends \advanced_testcase {
-
     /**
      * The grading definition carries the auto-marked total and the grade scale.
      */
@@ -107,8 +106,9 @@ final class quiz_manual_grade_display_test extends \advanced_testcase {
             ],
         );
 
-        // (4 + 3) / 10 × 100 = 70 — what the pane shows live, and what the quiz
-        // module stores once the save completes.
+        // Four auto marks plus three manual, of ten raw, on a quiz out of 100 —
+        // 70, which is what the pane shows live and what the quiz module stores
+        // once the save completes.
         $expected = (($definition['quizautomarks'] + 3.0) / $definition['quizsummax'])
             * $definition['quizmaxgrade'];
         $this->assertEqualsWithDelta(70.0, $expected, 0.001);
