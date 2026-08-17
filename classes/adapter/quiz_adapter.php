@@ -484,11 +484,22 @@ class quiz_adapter extends base_adapter {
                 if ($quizgradeitem && $quizgradeitem->get_decimals() !== null) {
                     $quizdecimalpoints = (int) $quizgradeitem->get_decimals();
                 }
+                // Marks already earned on the questions the guide does not show,
+                // plus the raw-to-gradebook scale (a quiz out of 46.5 raw marks
+                // graded out of 100), so the pane can show the whole-quiz grade
+                // live while the manual questions are being marked. Omitted for
+                // scale-graded quizzes, where the grade is a scale item and no
+                // such arithmetic applies — the client then falls back to its
+                // delta-on-the-stored-grade behaviour.
+                $usescale = (int) $this->quiz->grade < 0;
                 $gradingdefinition = json_encode([
                     'method' => 'quizmanual',
                     'name' => get_string('manualquestions', 'local_unifiedgrader'),
                     'criteria' => $manualquestions['criteria'],
                     'decimalpoints' => $quizdecimalpoints,
+                    'quizautomarks' => $usescale ? null : (float) ($manualquestions['automarks'] ?? 0),
+                    'quizsummax' => $usescale ? null : (float) $this->quiz->sumgrades,
+                    'quizmaxgrade' => $usescale ? null : (float) $this->quiz->grade,
                 ]);
                 $rubricdata = json_encode([
                     'criteria' => $manualquestions['fill'],
@@ -1315,7 +1326,9 @@ class quiz_adapter extends base_adapter {
      *
      * @param \question_usage_by_activity $quba
      * @param array $slots Ordered slot numbers (empty = use QUBA default order).
-     * @return array With keys 'criteria' (definition) and 'fill' (current data).
+     * @return array With keys 'criteria' (definition), 'fill' (current data) and
+     *               'automarks' (raw marks already earned on the questions this
+     *               guide does NOT show — see below).
      */
     private function get_manual_questions(\question_usage_by_activity $quba, array $slots = []): array {
         if (empty($slots)) {
@@ -1323,6 +1336,13 @@ class quiz_adapter extends base_adapter {
         }
         $criteria = [];
         $fill = [];
+        // Raw marks from every question the marking guide does not show, so the
+        // grading pane can display the whole quiz score while the teacher marks
+        // the manual questions. It cannot derive that from quiz_grades: an
+        // attempt with any question still in needsgrading state has
+        // sumgrades = NULL (question_usage_by_activity::get_total_mark bails
+        // out), so exactly the students being marked have no stored grade yet.
+        $automarks = 0.0;
 
         $questionnum = 0;
         foreach ($slots as $slot) {
@@ -1340,6 +1360,10 @@ class quiz_adapter extends base_adapter {
             // Include questions that use manual grading behaviour.
             $behaviour = $qa->get_behaviour_name();
             if ($behaviour !== 'manualgraded') {
+                $automark = $qa->get_mark();
+                if ($automark !== null) {
+                    $automarks += (float) $automark;
+                }
                 continue;
             }
 
@@ -1378,7 +1402,7 @@ class quiz_adapter extends base_adapter {
             ];
         }
 
-        return ['criteria' => $criteria, 'fill' => $fill];
+        return ['criteria' => $criteria, 'fill' => $fill, 'automarks' => $automarks];
     }
 
     /**

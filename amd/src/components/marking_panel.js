@@ -2801,12 +2801,35 @@ export default class extends BaseComponent {
      * @return {number} The rubric-implied grade on the activity's scale.
      */
     _computeRubricGrade(total, maxTotal, gradeInput) {
-        if (this._gradingDefinition?.method === 'quizmanual' && this._quizBaseGrade !== undefined) {
-            // For quiz manual grading, the guide only shows manually-graded
-            // questions. The displayed grade is the full quiz grade adjusted
-            // by the delta between current manual scores and the initial manual total.
-            const delta = total - (this._guideBaseTotal ?? 0);
-            return Math.max(0, this._roundToGradePrecision(this._quizBaseGrade + delta));
+        if (this._gradingDefinition?.method === 'quizmanual') {
+            // For quiz manual grading the guide only shows the manually-graded
+            // questions, so the whole-quiz grade is (marks already earned on the
+            // other questions + the manual marks entered here), scaled from raw
+            // marks onto the quiz's maximum grade.
+            //
+            // This cannot be a delta on the stored quiz grade: an attempt with
+            // any question still awaiting marking has no stored grade at all
+            // (sumgrades is NULL until every question is graded), so the base was
+            // 0 for exactly the students being marked and the pane showed the
+            // manual marks alone until the teacher navigated away and back. The
+            // delta was also unscaled, so on a quiz whose raw total differs from
+            // its maximum grade each edit moved the grade by the wrong amount.
+            const auto = parseFloat(this._gradingDefinition.quizautomarks);
+            const sumMax = parseFloat(this._gradingDefinition.quizsummax);
+            const maxGrade = parseFloat(this._gradingDefinition.quizmaxgrade);
+            if (isFinite(auto) && sumMax > 0 && maxGrade > 0) {
+                const scaled = ((auto + total) / sumMax) * maxGrade;
+                return Math.min(
+                    maxGrade,
+                    Math.max(0, this._roundToGradePrecision(scaled)),
+                );
+            }
+            // Scale-graded quiz (or missing scaling data): fall back to adjusting
+            // the stored grade by the change in manual marks.
+            if (this._quizBaseGrade !== undefined) {
+                const delta = total - (this._guideBaseTotal ?? 0);
+                return Math.max(0, this._roundToGradePrecision(this._quizBaseGrade + delta));
+            }
         }
         // Normalize the guide total to the assignment's grade scale.
         // A marking guide may have a different max total than the activity
