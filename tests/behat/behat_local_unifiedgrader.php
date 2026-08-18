@@ -363,6 +363,13 @@ class behat_local_unifiedgrader extends behat_base {
      * (display visible, editor hidden). The post-save collapse is async (AJAX
      * save + reactive re-render), so this spins rather than checking once.
      *
+     * Extended timeout, not the standard one: this step is used after clicking
+     * save, so it waits on a full server round-trip rather than a DOM tick. The
+     * standard 6s was enough locally and on most CI jobs but timed out on a
+     * loaded runner, failing the scenario three times in a row in one job while
+     * the same commit passed everywhere else. The condition asserted is
+     * unchanged — only the patience for it is.
+     *
      * @Then /^the overall feedback is shown as a saved card$/
      */
     public function the_overall_feedback_is_shown_as_a_saved_card(): void {
@@ -371,7 +378,7 @@ class behat_local_unifiedgrader extends behat_base {
             . "var e=document.querySelector('[data-region=\"feedback-editor-wrapper\"]');"
             . "return !!(d && !d.classList.contains('d-none') && e && e.classList.contains('d-none'));"
             . "})()";
-        if (!$this->getSession()->wait(self::get_timeout() * 1000, $js)) {
+        if (!$this->getSession()->wait(self::get_extended_timeout() * 1000, $js)) {
             throw new Exception('The overall feedback did not collapse to the saved card.');
         }
     }
