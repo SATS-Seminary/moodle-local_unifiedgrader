@@ -77,6 +77,16 @@
         </div>
     </div>
 
+    {{#hasfilternotice}}
+    <div class="alert alert-secondary mb-0 small py-2" role="status">
+        {{#pix}} i/info, core {{/pix}}
+        <span class="ms-1">{{filternotice}}</span>
+        {{#filterdiagnostic}}
+        <div class="mt-1 text-muted">{{{filterdiagnostic}}}</div>
+        {{/filterdiagnostic}}
+    </div>
+    {{/hasfilternotice}}
+
     {{#hasoverlay}}
         {{{overlayhtml}}}
     {{/hasoverlay}}
@@ -103,6 +113,14 @@
                         ({{#str}} bbb_session_count, local_unifiedgrader, {{activitypoints.sessioncount}} {{/str}})
                     </small>
                 </h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-action="bbb-refresh-engagement"
+                        data-cmid="{{cmid}}"
+                        title="{{#str}} bbb_engagement_refresh_help, local_unifiedgrader {{/str}}">
+                    <i class="fa fa-cloud-download me-1" aria-hidden="true"></i>
+                    {{#str}} bbb_engagement_refresh_button, local_unifiedgrader {{/str}}
+                </button>
+                <span class="text-muted small" data-region="bbb-refresh-status"></span>
                 {{#hasstatisticslinks}}
                     {{#singlestatisticsurl}}
                     <a href="{{singlestatisticsurl}}" target="_blank" rel="noopener"
@@ -285,7 +303,10 @@
     <div class="alert alert-warning mb-0" role="status">
         {{#pix}} i/warning, core {{/pix}}
         <strong class="ms-1">{{#str}} bbb_didnotattend, local_unifiedgrader {{/str}}</strong>
-        <div class="small text-muted mt-1">{{#str}} bbb_didnotattend_desc, local_unifiedgrader {{/str}}</div>
+        <div class="small text-muted mt-1">
+            {{#didnotattendsessions}}{{#str}} bbb_didnotattend_sessions_desc, local_unifiedgrader {{/str}}{{/didnotattendsessions}}
+            {{^didnotattendsessions}}{{#str}} bbb_didnotattend_desc, local_unifiedgrader {{/str}}{{/didnotattendsessions}}
+        </div>
     </div>
     {{/hasattended}}
 {{/hasrecordings}}
@@ -443,11 +464,16 @@
 
 <script>
 (function() {
-    var btn = document.querySelector('[data-action="bbb-refresh-engagement"]');
-    if (!btn) {
+    // Two buttons can be present: the one in the Activity Points header, and the
+    // first-run prompt shown when no engagement data has arrived at all. Wire
+    // every one of them, and pair each with the status span beside it.
+    var buttons = document.querySelectorAll('[data-action="bbb-refresh-engagement"]');
+    if (!buttons.length) {
         return;
     }
-    var status = document.querySelector('[data-region="bbb-refresh-status"]');
+    Array.prototype.forEach.call(buttons, function(btn) {
+    var status = btn.parentNode.querySelector('[data-region="bbb-refresh-status"]')
+        || document.querySelector('[data-region="bbb-refresh-status"]');
     btn.addEventListener('click', function() {
         var cmid = parseInt(btn.getAttribute('data-cmid'), 10);
         btn.disabled = true;
@@ -464,6 +490,7 @@
                 var msg = '{{#str}} bbb_engagement_scrape_result, local_unifiedgrader {{/str}}';
                 msg = msg.replace('{matched}', result.matched)
                          .replace('{unmatched}', result.unmatched)
+                         .replace('{parsed}', result.parsed)
                          .replace('{recordings}', result.recordings);
                 status.textContent = msg;
                 // Reload the iframe so the engagement card repopulates.
@@ -474,6 +501,7 @@
                 btn.disabled = false;
             });
         });
+    });
     });
 })();
 </script>

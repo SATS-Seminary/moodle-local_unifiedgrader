@@ -146,7 +146,16 @@ class engagement_service {
             if (!$statsurl) {
                 continue;
             }
-            $parsed = stats_scraper::fetch_and_parse($statsurl);
+            // Dashboard JSON first: it carries Moodle user ids, so attendance
+            // lands on the right person without matching display names. Recent
+            // BBB builds serve nothing else — the statistics page is a React
+            // shell there and the HTML parser finds no tables in it. Older
+            // recordings still serve the original page, so that parser stays as
+            // the fallback rather than being retired.
+            $parsed = dashboard_client::fetch($statsurl);
+            if (!$parsed || empty($parsed['participants'])) {
+                $parsed = stats_scraper::fetch_and_parse($statsurl);
+            }
             if (!$parsed || empty($parsed['participants'])) {
                 continue;
             }
@@ -155,7 +164,7 @@ class engagement_service {
             $recordingid = (string) $rec->get('recordingid');
 
             foreach ($parsed['participants'] as $p) {
-                $userid = $namemap[self::normalise_name($p['fullname'])] ?? 0;
+                $userid = self::resolve_userid($p, $namemap);
                 if ($userid > 0) {
                     $stats['matched']++;
                 } else {
@@ -166,6 +175,28 @@ class engagement_service {
         }
 
         return $stats;
+    }
+
+    /**
+     * Resolve a participant to a Moodle user id.
+     *
+     * The dashboard supplies `extId`, which mod_bigbluebuttonbn populates with
+     * the Moodle user id when the user joins, so it is taken at face value where
+     * it is numeric. Guests join without one (core skips them when logging
+     * summaries for the same reason), and the older HTML statistics page has no
+     * equivalent field at all, so both fall back to matching the display name
+     * against enrolled users — best effort, and 0 when it misses.
+     *
+     * @param array $participant Parsed participant entry.
+     * @param array $namemap Normalised fullname => userid, for enrolled users.
+     * @return int 0 when the participant could not be resolved.
+     */
+    private static function resolve_userid(array $participant, array $namemap): int {
+        $extid = trim((string) ($participant['extuserid'] ?? ''));
+        if ($extid !== '' && ctype_digit($extid)) {
+            return (int) $extid;
+        }
+        return $namemap[self::normalise_name($participant['fullname'] ?? '')] ?? 0;
     }
 
     /**

@@ -695,4 +695,272 @@ final class bbb_adapter_test extends \advanced_testcase {
         $s->adapter->save_grade($student->id, 70.0, '', FORMAT_HTML);
         $this->assertTrue($s->adapter->is_grade_released($student->id));
     }
+
+    /**
+     * Two rostered sessions, the student was in one: only that one is offered.
+     *
+     * Attendance is the submission on BBB, so the pane must show the sessions
+     * this student was in and not the whole activity's.
+     */
+    public function test_recordings_filtered_to_sessions_the_student_attended(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+        $other = $s->scenario->students[1];
+
+        // Both sessions have a roster: another student was summarised on each.
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-1');
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-2');
+        // The student under review only attended the first.
+        $gen->create_bbb_summary_log($s->scenario->activity, $target->id, [], 1800, null, 'rec-1');
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-1', 'https://bbb.example.com/play/alpha', 'Session A', 1),
+            $this->fake_recording('rec-2', 'https://bbb.example.com/play/bravo', 'Session B', 2),
+        ]);
+        $content = $adapter->get_submission_data($target->id)['content'];
+
+        $this->assertStringContainsString('play/alpha', $content);
+        $this->assertStringNotContainsString('play/bravo', $content);
+    }
+
+    /**
+     * Guard 1: a session nobody has attendance data for stays visible.
+     *
+     * Recordings predating the analytics callback have no roster at all, so no
+     * one can be shown to have missed them. Judged per recording — the presence
+     * of a roster on one session must not imply absence from another.
+     */
+    public function test_recording_without_any_roster_is_still_offered(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+        $other = $s->scenario->students[1];
+
+        // Only rec-1 was ever summarised; rec-2 has no roster from anybody.
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-1');
+        $gen->create_bbb_summary_log($s->scenario->activity, $target->id, [], 1800, null, 'rec-1');
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-1', 'https://bbb.example.com/play/alpha', 'Session A', 1),
+            $this->fake_recording('rec-2', 'https://bbb.example.com/play/bravo', 'Session B', 2),
+        ]);
+        $content = $adapter->get_submission_data($target->id)['content'];
+
+        $this->assertStringContainsString('play/alpha', $content);
+        $this->assertStringContainsString('play/bravo', $content);
+    }
+
+    /**
+     * Guard 2: a join log with no summary keeps every session on offer.
+     *
+     * EVENT_JOIN proves attendance but carries no recording id, so the sessions
+     * cannot be attributed and hiding any of them would be a guess.
+     */
+    public function test_join_log_without_summary_keeps_all_recordings(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+        $other = $s->scenario->students[1];
+
+        // Both sessions rostered, but this student only has an unattributable join.
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-1');
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-2');
+        $gen->create_bbb_join_log($s->scenario->activity, $target->id);
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-1', 'https://bbb.example.com/play/alpha', 'Session A', 1),
+            $this->fake_recording('rec-2', 'https://bbb.example.com/play/bravo', 'Session B', 2),
+        ]);
+        $content = $adapter->get_submission_data($target->id)['content'];
+
+        $this->assertStringContainsString('play/alpha', $content);
+        $this->assertStringContainsString('play/bravo', $content);
+        $this->assertStringContainsString('without saying which session', $content);
+    }
+
+    /**
+     * A student on no roster gets no sessions and is told so, not left with an
+     * empty pane — and counts as a non-submitter.
+     */
+    public function test_student_on_no_roster_gets_did_not_attend(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+        $other = $s->scenario->students[1];
+
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-1');
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-2');
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-1', 'https://bbb.example.com/play/alpha', 'Session A', 1),
+            $this->fake_recording('rec-2', 'https://bbb.example.com/play/bravo', 'Session B', 2),
+        ]);
+        $data = $adapter->get_submission_data($target->id);
+
+        $this->assertStringNotContainsString('play/alpha', $data['content']);
+        $this->assertStringNotContainsString('play/bravo', $data['content']);
+        $this->assertStringContainsString('Did not attend', $data['content']);
+        $this->assertStringContainsString('was not in any of them', $data['content']);
+        $this->assertEquals('nosubmission', $data['status']);
+    }
+
+    /**
+     * Guard 3: attendance that cannot be reconciled with any recording must not
+     * read as absence.
+     *
+     * If the session ids and the recording ids fail to line up, every recording
+     * looks rostered-but-unattended and the student loses the lot -- even though
+     * we hold positive evidence they were there. Show the sessions instead.
+     */
+    public function test_unreconcilable_attendance_keeps_recordings(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+        $other = $s->scenario->students[1];
+
+        // Both recordings carry rosters, so guard 1 cannot save them...
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-1');
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-2');
+        // ...and this student attended, but under an id matching no recording.
+        $gen->create_bbb_summary_log($s->scenario->activity, $target->id, [], 1800, null, 'some-other-id');
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-1', 'https://bbb.example.com/play/alpha', 'Session A', 1),
+            $this->fake_recording('rec-2', 'https://bbb.example.com/play/bravo', 'Session B', 2),
+        ]);
+        $data = $adapter->get_submission_data($target->id);
+
+        $this->assertStringContainsString('play/alpha', $data['content']);
+        $this->assertStringContainsString('play/bravo', $data['content']);
+        $this->assertStringNotContainsString('Did not attend', $data['content']);
+        // The pane must say why it stood down, or an unfiltered list is
+        // indistinguishable from a filter that never ran.
+        $this->assertStringContainsString('does not correspond to any of the recordings', $data['content']);
+    }
+
+    /**
+     * Attendance cached against a recording counts, even when the summary logs
+     * point somewhere else entirely.
+     *
+     * This is the production shape: a site with the analytics callback on *and*
+     * refreshed attendance. Rosters get built from the cached rows, which are
+     * stamped with the recording id as the refresh walks each recording, while
+     * the logs carry a `recordid` that does not correspond to any of them. Read
+     * only the logs and the student matches nothing, so every recording reads as
+     * attended-by-nobody and the whole list is hidden.
+     */
+    public function test_cached_attendance_counts_when_summary_logs_disagree(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+
+        // The logs know this student attended, but under an unusable id.
+        $gen->create_bbb_summary_log($s->scenario->activity, $target->id, [], 1800, null, 'internal-meeting-xyz');
+
+        // The refresh recorded the same attendance against the real recording,
+        // and gave the other recording a roster this student is absent from.
+        foreach ([['rec-1', $target->id], ['rec-2', (int) $s->scenario->students[1]->id]] as [$recid, $userid]) {
+            $DB->insert_record('local_unifiedgrader_bbbeng', (object) [
+                'cmid' => $s->scenario->cm->id,
+                'recordingid' => $recid,
+                'userid' => $userid,
+                'fullname' => 'Attendee',
+                'duration' => 1800,
+                'talks' => 0, 'chats' => 0, 'raisehand' => 0, 'polls' => 0, 'emojis' => 0,
+                'timefetched' => time(),
+            ]);
+        }
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-1', 'https://bbb.example.com/play/alpha', 'Session A', 1),
+            $this->fake_recording('rec-2', 'https://bbb.example.com/play/bravo', 'Session B', 2),
+        ]);
+        $content = $adapter->get_submission_data($target->id)['content'];
+
+        $this->assertStringContainsString('play/alpha', $content, 'The session they attended must survive');
+        $this->assertStringNotContainsString('play/bravo', $content, 'The session they missed must be filtered out');
+        $this->assertStringNotContainsString('Showing every session', $content, 'No guard should have fired');
+    }
+
+    /**
+     * The player must load the session the student attended, not the first one
+     * on the activity.
+     *
+     * A student with a single attended session renders no switcher pills, so the
+     * recording chosen for them on first paint is the only one they will ever
+     * see. Picking it by position rather than by attendance means the teacher
+     * marks the wrong video with nothing on screen to suggest it.
+     */
+    public function test_player_loads_the_attended_session_not_the_first(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+        $other = $s->scenario->students[1];
+
+        // Rosters on both, and this student was only in the later one.
+        $gen->create_bbb_summary_log($s->scenario->activity, $other->id, [], 1800, null, 'rec-early');
+        $gen->create_bbb_summary_log($s->scenario->activity, $target->id, [], 1800, null, 'rec-late');
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-early', 'https://bbb.example.com/play/early', 'Session 1', 1),
+            $this->fake_recording('rec-late', 'https://bbb.example.com/play/late', 'Session 2', 2),
+        ]);
+        $content = $adapter->get_submission_data($target->id)['content'];
+
+        // One session survives, so no pills are drawn — which is exactly why the
+        // recording the player opens with has to be the right one.
+        $this->assertStringNotContainsString('data-region="bbb-recording-switcher"', $content);
+        $this->assertStringContainsString('play/late', $content);
+        $this->assertStringNotContainsString('play/early', $content);
+    }
+
+    /**
+     * Two attended sessions open on the longer one, not on the aggregate.
+     *
+     * A student who dropped into a session for ten minutes by mistake and did
+     * the work in another should be marked against the second. "All sessions"
+     * loads whichever recording sorts first, so defaulting to it puts the wrong
+     * video in front of the teacher.
+     */
+    public function test_multiple_sessions_open_on_the_longest_attended(): void {
+        $this->resetAfterTest();
+
+        $s = $this->create_scenario();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $target = $s->scenario->students[0];
+
+        // Ten minutes in the first session, nearly two hours in the second.
+        $gen->create_bbb_summary_log($s->scenario->activity, $target->id, [], 600, null, 'rec-early');
+        $gen->create_bbb_summary_log($s->scenario->activity, $target->id, [], 6480, null, 'rec-late');
+
+        $adapter = $this->adapter_with_recordings($s->scenario, [
+            $this->fake_recording('rec-early', 'https://bbb.example.com/play/early', 'Session 1', 1),
+            $this->fake_recording('rec-late', 'https://bbb.example.com/play/late', 'Session 2', 2),
+        ]);
+        $content = $adapter->get_submission_data($target->id)['content'];
+
+        // Both sessions stay reachable...
+        $this->assertStringContainsString('data-region="bbb-recording-switcher"', $content);
+        // ...but the long one is selected, and it is what the player loads.
+        $this->assert_pill_active($content, 'data-recordingref', 'rec-late', true);
+        $this->assert_pill_active($content, 'data-recordingref', 'rec-early', false);
+        $this->assertStringContainsString('src="https://bbb.example.com/play/late"', $content);
+    }
 }

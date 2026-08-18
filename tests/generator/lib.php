@@ -409,6 +409,9 @@ class local_unifiedgrader_generator extends component_generator_base {
      * @param array $engagement Optional engagement counts (chats, talks, raisehand, pollvotes, emojis).
      * @param int $duration Session duration in seconds.
      * @param int|null $timecreated Override timecreated (defaults to now).
+     * @param string $recordid BBB internal meeting id, which is also the recording id.
+     *                         Core stamps every summary log with it; leave empty to
+     *                         simulate a payload that arrived without one.
      * @return \stdClass The created log record.
      */
     public function create_bbb_summary_log(
@@ -417,6 +420,7 @@ class local_unifiedgrader_generator extends component_generator_base {
         array $engagement = [],
         int $duration = 1800,
         ?int $timecreated = null,
+        string $recordid = '',
     ): \stdClass {
         global $DB;
 
@@ -432,6 +436,9 @@ class local_unifiedgrader_generator extends component_generator_base {
                 ],
             ],
         ];
+        if ($recordid !== '') {
+            $meta['recordid'] = $recordid;
+        }
 
         $record = (object) [
             'courseid' => (int) $bbb->course,
