@@ -1652,7 +1652,7 @@ class bbb_adapter extends base_adapter {
     private function pin_group_param(string $url, int $groupid): string {
         $moodleurl = new \moodle_url($url);
         $moodleurl->param('group', $groupid);
-        // out(false) — the caller hands this to Mustache/html_writer, which escapes.
+        // Unescaped: the caller hands this to Mustache/html_writer, which escapes it there.
         return $moodleurl->out(false);
     }
 

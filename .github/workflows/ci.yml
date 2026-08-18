@@ -12,6 +12,15 @@ jobs:
   test:
     runs-on: ubuntu-22.04
 
+    # Composer downloads dependency zips from codeload.github.com, which rate-limits
+    # anonymous callers hard: a run that lands while the runner's shared IP is busy
+    # gets HTTP 429 on a dozen packages at once and the install step dies before a
+    # single check runs. Authenticating with the job's own GITHUB_TOKEN lifts the
+    # limit. Job-level so it also covers the `composer create-project` above the
+    # install step. Read-only token; nothing here writes.
+    env:
+      COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+
     services:
       postgres:
         image: postgres:16
