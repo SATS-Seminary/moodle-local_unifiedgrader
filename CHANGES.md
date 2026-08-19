@@ -1,9 +1,54 @@
 # Changelog
 
-## v2.9.4 (2026081800)
+## v2.9.4 (2026081900)
 
-- **"The recording was not found." when grading a grouped BigBlueButton session.** On an activity with separate or visible groups, the recording player could refuse to play a recording the grader had just listed, showing that error and the group-selection notice over the BigBlueButton activity page inside the preview pane. BigBlueButton builds its playback links without a group, so `bbb_view.php` resolves one from the teacher's *sticky* active group in the session — the group they last picked from a group menu anywhere in that course. When that group is not the recording's, the recording is filtered out of the very list the player checks, and playback bounces to the activity page. The grader now states the recording's own group on every playback link, so the session that is on screen is the session that plays, whatever group the teacher last looked at. The companion fix in `bbbext_advgrd` v0.4.1 does the same for the annotation overlay's player.
-- Teachers who hit this can also clear the stuck selection by opening the BigBlueButton activity and setting its group menu to **All participants**; after upgrading, that is no longer necessary.
+BigBlueButton grading: the right session, the right video, and attendance you can rely on.
+
+### Action required
+
+**Run "Refresh attendance" once per BigBlueButton activity after upgrading.** The button now sits in the Activity Points card header and is always available. Until it has run, an activity has no record of who was in which session, and the grader will keep showing every session to every student — correctly, because it cannot yet tell an absence from a gap in the data. Sites with many activities can use `php cli/refresh_bbb_engagement.php --courseid=N` (or `--all`) instead.
+
+### The session list now shows only the sessions the student attended
+
+On BigBlueButton the attendance *is* the submission, so a session a student was not in is not theirs to be marked on. The switcher previously listed every recording on the activity for every student. It now lists the sessions that student attended, and a student who attended none is told **"Did not attend"** rather than being shown the whole activity — matching the `nosubmission` status the participant list already gave them.
+
+Three guards keep *"we have no record"* from being rendered as *"they were absent"*. Each fires on its own positive signal rather than on the absence of the student's own rows, which is the same evidence as absence:
+
+- **A recording no one has attendance data for.** Attendance only began being recorded when the analytics callback was enabled, or when the refresh first ran, so earlier recordings have no roster and nobody can be shown to have missed them. Judged per recording, so a site that enabled the callback midway keeps its older sessions visible while newer ones filter properly.
+- **A join log with no summary.** `EVENT_JOIN` carries no recording id, so it is hard evidence of attendance that cannot be attributed to a session.
+- **Attendance that reconciles with no recording at all.** A contradiction rather than an absence — showing every session beats reporting a student who was there as having missed everything.
+
+When a guard fires the pane says so, so an unfiltered list is distinguishable from a filter that never ran. Users who can read site configuration also see the two identifiers that failed to match.
+
+### The player opens on the session being marked
+
+The grader chose the student's session and then told the annotation overlay nothing, and the overlay chooses for itself — from every recording on the activity, landing on whichever sorts first. A student with a single attended session draws no switcher pills, so nothing ever corrected that choice: **the teacher was shown, and could mark, the wrong recording, with nothing on screen to suggest it.** The active recording is now named explicitly.
+
+Where a student attended more than one session, the pane opens on the one they were present longest for, rather than on the aggregate. A student who dropped into a meeting for ten minutes by mistake and did the work in another session is now marked against the session that carries the work; **All sessions** remains one click away for their totals.
+
+### Attendance is read from BigBlueButton's Learning Dashboard
+
+Engagement metrics were scraped from each recording's *statistics* page. On current BigBlueButton builds that page is a React shell — a few hundred bytes with no tables in it — so the parser silently found nothing and recordings acquired no attendance at all. Activity Points went quiet on newer recordings, and, once the session filter arrived, those recordings had no roster to filter against.
+
+Attendance is now read from `learning_dashboard_data.json`, which is where the dashboard itself gets its figures, behind the signed cookies the statistics page sets. Two properties make it the better source rather than merely a working one:
+
+- Participants carry their **Moodle user id**, which mod_bigbluebuttonbn sets when building the join URL. Attendance lands on the right person without matching display names — the weakness of the old path, where a student who joined under a shortened name was recorded against nobody and read as absent.
+- It exists for recordings **already made**, so past sessions back-fill. The analytics callback only ever helps going forward.
+
+The original parser remains as the fallback for recordings still served the older page. The refresh now reports how many recordings were *read*, not merely how many were *found* — a recording that could not be read keeps no attendance, and that difference is the whole diagnosis when filtering looks wrong.
+
+Attendance is also read from both the summary logs and the cached rows, rather than whichever source the metrics tiles happen to prefer. The two identify a session differently — cached rows are stamped with the recording id by the refresh as it walks each recording, while the logs carry whatever the server put in `recordid` — so reading only the preferred source compared two different id spaces, and every recording could look attended by nobody.
+
+### Recordings would not play when the teacher's group did not match
+
+On an activity with separate or visible groups, the player could refuse to play a recording the grader had just listed, showing *"The recording was not found."* and the group-selection notice over the BigBlueButton activity page inside the preview pane. BigBlueButton builds its playback links without a group, so `bbb_view.php` resolves one from the teacher's *sticky* active group — the group they last picked from a group menu anywhere in that course. When that group is not the recording's, the recording is filtered out of the very list the player checks, and playback bounces to the activity page.
+
+Every playback link now states the recording's own group, so the session on screen is the session that plays, whatever group the teacher last looked at. The companion fix in `bbbext_advgrd` v0.4.1 does the same for the annotation overlay's player. Teachers on an unpatched site can clear the stuck selection by opening the activity and setting its group menu to **All participants**.
+
+### Also
+
+- `cli/refresh_bbb_engagement.php` back-fills attendance for a single activity, a course, or the whole site, and reports recordings that yielded nothing.
+- **Activity Score is no longer available.** The 0–10 figure came from the old statistics page and has no equivalent in the Learning Dashboard, which shows `N/A` for it too.
 
 ## v2.9.3 (2026081700)
 
