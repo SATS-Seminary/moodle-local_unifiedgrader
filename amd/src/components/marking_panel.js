@@ -24,6 +24,7 @@
 import {BaseComponent} from 'core/reactive';
 import Templates from 'core/templates';
 import Notification from 'core/notification';
+import Pending from 'core/pending';
 import {get_string as getString} from 'core/str';
 import {getInstanceForElementId} from 'editor_tiny/editor';
 import CommentLibraryPopout from 'local_unifiedgrader/components/comment_library_popout';
@@ -1210,11 +1211,22 @@ export default class extends BaseComponent {
         this._updateFeedbackContent(feedbackHtml, true);
 
         // Focus the TinyMCE editor after a brief delay (needed after unhiding).
+        // Not if a save has started in the meantime: the focus would land after
+        // the save, and the post-save collapse to the saved card skips a focused
+        // editor, so the editor stayed open as if the save had failed. Pending
+        // makes Behat wait for the delay too, which is how it raced the save on
+        // a loaded CI runner.
         const textarea = this.getElement(this.selectors.FEEDBACK_INPUT);
         if (textarea) {
             const editor = getInstanceForElementId(textarea.id);
             if (editor) {
-                setTimeout(() => editor.focus(), 100);
+                const pending = new Pending('local_unifiedgrader/marking_panel:focusfeedback');
+                setTimeout(() => {
+                    if (this._editingFeedback && !this._saveInFlight) {
+                        editor.focus();
+                    }
+                    pending.resolve();
+                }, 100);
             }
         }
     }

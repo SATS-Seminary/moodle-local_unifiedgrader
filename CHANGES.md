@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.12.5 (2026092802)
+
+### Re-edited feedback sometimes stayed open after saving
+
+Clicking Edit on saved overall feedback focuses the editor 100 ms later. After a save, the editor collapses back to the saved card only if it does not have focus, so a Save clicked within those 100 ms was followed by the delayed focus, and the editor stayed open as if the save had failed. The delayed focus is now skipped once a save has started.
+
+The timer was also invisible to Behat's wait for pending JavaScript, which is how `feedback_card_reedit.feature` raced it: the scenario failed three times in a row on one loaded CI runner in v2.12.4 (and before, in the `deploy.sh` run of 23 September) while passing everywhere else. The earlier fix of a longer wait could not help, since the save had landed and the editor was simply focused. The timer is now tracked with `core/pending`.
+
 ## v2.12.4 (2026092801)
 
 ### Forum feedback banner missing inside a discussion
