@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.12.3 (2026092800)
+
+### Quiz feedback page crashed for every student
+
+The quiz branch of `view_feedback.php` merged `$gradinginfo` into its template without ever assigning it. v2.12.0 added the nine grading keys to that branch by mistake (they were meant for BigBlueButton), where the undefined variable only raised warnings. v2.12.1 moved them into the typed `feedback_data_helper::grading_template_data()`, which throws on the null: "Argument #1 ($gradinginfo) must be of type array, null given".
+
+The quiz branch now calls `parse_grading_data()` like the others. Quizzes have no rubric or marking guide, so the page renders as it did before v2.12.0. The wiring test in `tests/feedback_data_helper_test.php` now also checks that every feedback view parses its own grading data, and fails on the v2.12.2 code.
+
 ## v2.12.2 (2026092301)
 
 ### Quiz extensions vanishing from the student's calendar

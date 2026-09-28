@@ -245,6 +245,7 @@ if ($cm->modname === 'quiz') {
     $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
     $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
     $gradedisplay = $gradeinfo['gradedisplay'];
+    $gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
 
     // Feedback text (from gradebook for quizzes). Already formatted by get_grade_data()
     // with pluginfile.php URLs rewritten and format_text() applied.

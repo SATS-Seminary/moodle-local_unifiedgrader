@@ -270,5 +270,14 @@ final class feedback_data_helper_test extends \advanced_testcase {
             $merges,
             'Each feedback view must merge grading_template_data() into its context'
         );
+
+        // In v2.12.1 the quiz branch merged a $gradinginfo it never assigned,
+        // and the typed helper threw on the null for every student.
+        $parses = preg_match_all('~\$gradinginfo = feedback_data_helper::parse_grading_data\(~', $src);
+        $this->assertSame(
+            $renders,
+            $parses,
+            'Each feedback view must parse its own grading data before merging it'
+        );
     }
 }
