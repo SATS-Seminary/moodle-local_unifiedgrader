@@ -32,6 +32,7 @@ they're flagged for follow-up rather than left as broken tests.
 | `grade_override.feature` | Manual grade override survives subsequent rubric edits |
 | `grade_reset.feature` | `-` clears grade, `--` clears grade + orphan submission, stray characters don't throw |
 | `group_filter.feature` | Default group selection + per-cmid persistence across refreshes |
+| `student_feedback_view.feature` | The student feedback page loads for assignments, forums, quizzes and BBB — the v2.12.1 quiz crash |
 | `annotation_toolbar_after_zoom.feature` | Tool clicks still dispatch to the active annotation layer after a zoom — the v2.5.1 / v2.5.2 stuck-tool regression |
 
 Worth adding next (not in this scaffold):
@@ -77,12 +78,14 @@ the critical tag:
 
 ## Custom step definitions
 
-`behat_local_unifiedgrader.php` ships four plugin-specific steps:
+`behat_local_unifiedgrader.php` ships these plugin-specific steps, among others:
 
 - `I am on the Unified Grader for activity "<name>"` — resolves cmid by activity name
 - `the marking panel has loaded` — waits for the reactive panel to settle
 - `I enter "<value>" as the overall grade` — types into the grade input and triggers focusout
 - `I set the rubric score for "<criterion>" to "<score>"` — fills a marking-guide score input by criterion name
+- `"<student>" has been graded with feedback "<text>" on "<activity>"` — saves a grade and feedback through the adapter, for any supported activity type
+- `I am on the feedback page for activity "<name>"` — opens `view_feedback.php` for that activity
 
 Everything else uses core Moodle steps (`behat_general`, `behat_forms`,
 `behat_navigation`, `behat_data_generators`). Prefer extending core

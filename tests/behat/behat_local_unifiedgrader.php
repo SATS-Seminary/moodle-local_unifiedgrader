@@ -339,23 +339,60 @@ class behat_local_unifiedgrader extends behat_base {
         global $DB;
         $activity = $this->unescape_argument($activity);
         $feedback = $this->unescape_argument($feedback);
-        $cm = $DB->get_record_sql(
-            "SELECT cm.id
-               FROM {course_modules} cm
-               JOIN {modules} m ON m.id = cm.module AND m.name = 'assign'
-               JOIN {assign} a ON a.id = cm.instance
-              WHERE a.name = :name",
-            ['name' => $activity],
-        );
-        if (!$cm) {
-            throw new Exception("No assignment named '{$activity}' found");
-        }
+        $cmid = $this->get_supported_cmid_by_name($activity);
         $studentrec = $DB->get_record('user', ['username' => $student], '*', MUST_EXIST);
         // Grade as the site admin (has the capability). The grader identity is
         // irrelevant to how the saved feedback renders for the teacher.
         \core\session\manager::set_user(get_admin());
-        $adapter = \local_unifiedgrader\adapter\adapter_factory::create((int) $cm->id);
+        $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cmid);
+        // A quiz takes its grade from the attempt and ignores this one; the
+        // other activity types store it.
         $adapter->save_grade((int) $studentrec->id, 15.0, '<p>' . s($feedback) . '</p>');
+    }
+
+    /**
+     * Open the student feedback page for the activity with the given name.
+     *
+     * view_feedback.php builds a separate page per activity type, and each
+     * branch has shipped a crash that no unit test could reach, because the
+     * script only runs as a page: v2.12.3 fixed a quiz branch that threw a
+     * TypeError for every student.
+     *
+     * Example:
+     *   When I am on the feedback page for activity "Quiz 1"
+     *
+     * @When /^I am on the feedback page for activity "(?P<activityname>(?:[^"]|\\")*)"$/
+     * @param string $activityname
+     */
+    public function i_am_on_the_feedback_page_for_activity(string $activityname): void {
+        $cmid = $this->get_supported_cmid_by_name($this->unescape_argument($activityname));
+        $url = new moodle_url('/local/unifiedgrader/view_feedback.php', ['cmid' => $cmid]);
+        $this->execute('behat_general::i_visit', [$url]);
+    }
+
+    /**
+     * Resolve the cmid of an assignment, forum, quiz or BigBlueButton activity
+     * by its name.
+     *
+     * @param string $name Activity name.
+     * @return int
+     */
+    protected function get_supported_cmid_by_name(string $name): int {
+        global $DB;
+        foreach (['assign', 'forum', 'quiz', 'bigbluebuttonbn'] as $modname) {
+            $cmid = $DB->get_field_sql(
+                "SELECT cm.id
+                   FROM {course_modules} cm
+                   JOIN {modules} m ON m.id = cm.module AND m.name = :modname
+                   JOIN {{$modname}} a ON a.id = cm.instance
+                  WHERE a.name = :name",
+                ['modname' => $modname, 'name' => $name],
+            );
+            if ($cmid) {
+                return (int) $cmid;
+            }
+        }
+        throw new Exception("No activity named '{$name}' found");
     }
 
     /**
