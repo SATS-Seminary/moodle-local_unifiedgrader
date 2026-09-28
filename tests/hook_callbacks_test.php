@@ -190,6 +190,71 @@ final class hook_callbacks_test extends \advanced_testcase {
     }
 
     /**
+     * Run the hook for a graded forum student on the given forum page.
+     *
+     * @param string $path The page path, e.g. '/mod/forum/discuss.php'.
+     * @return string The JS the hook queued.
+     */
+    private function graded_forum_student_js_on(string $path): string {
+        global $PAGE;
+
+        set_config('enable_forum', 1, 'local_unifiedgrader');
+
+        $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $scenario = $plugingen->create_grading_scenario('forum', [
+            'studentcount' => 1,
+            'modparams' => ['grade_forum' => 100],
+        ]);
+        $student = $scenario->students[0];
+        $plugingen->create_forum_post($scenario->activity, $student->id, ['subject' => 'My post']);
+
+        $this->setUser($scenario->teacher);
+        adapter\adapter_factory::create($scenario->cm->id)->save_grade($student->id, 90.0, 'Well argued');
+
+        $this->setUser($student);
+
+        // Reset $PAGE after course creation to avoid boost_union theme init conflict.
+        $PAGE = new \moodle_page();
+
+        $PAGE->set_cm($scenario->cm);
+        $PAGE->set_context($scenario->context);
+        $PAGE->set_url(new \moodle_url($path, ['id' => $scenario->cm->id]));
+
+        hook_callbacks::before_standard_top_of_body_html($this->create_hook());
+
+        return $PAGE->requires->get_end_code();
+    }
+
+    /**
+     * A student can open a forum discussion without passing through the list of discussions,
+     * so the feedback banner must be on the discussion page as well as the list.
+     */
+    public function test_student_graded_gets_feedback_banner_in_forum_discussion(): void {
+        $this->resetAfterTest();
+
+        $this->assertStringContainsString(
+            'local_unifiedgrader/feedback_banner',
+            $this->graded_forum_student_js_on('/mod/forum/view.php'),
+        );
+        $this->assertStringContainsString(
+            'local_unifiedgrader/feedback_banner',
+            $this->graded_forum_student_js_on('/mod/forum/discuss.php'),
+        );
+    }
+
+    /**
+     * Forum pages other than the list and a discussion, such as the reply form, stay untouched.
+     */
+    public function test_forum_post_page_skipped(): void {
+        $this->resetAfterTest();
+
+        $this->assertStringNotContainsString(
+            'local_unifiedgrader/',
+            $this->graded_forum_student_js_on('/mod/forum/post.php'),
+        );
+    }
+
+    /**
      * Test that student without released grade gets assessment_criteria JS (if rubric exists).
      */
     public function test_student_ungraded_does_not_get_feedback_banner(): void {

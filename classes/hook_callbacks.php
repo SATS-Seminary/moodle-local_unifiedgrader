@@ -85,13 +85,18 @@ class hook_callbacks {
         }
 
         // For quiz, forum, and BBB activities, only act on the overview page — not subpages.
+        // Forums also act on the discussion page: a student may open a discussion without
+        // passing through the list of discussions, and would then never see the feedback
+        // banner. The other scripts find nothing to attach to there and do nothing.
         if ($modname === 'quiz' || $modname === 'forum' || $modname === 'bigbluebuttonbn') {
             try {
                 $pagepath = $PAGE->url->get_path();
             } catch (\Throwable $e) {
                 return;
             }
-            if (strpos($pagepath, '/mod/' . $modname . '/view.php') === false) {
+            $onoverview = strpos($pagepath, '/mod/' . $modname . '/view.php') !== false;
+            $ondiscussion = $modname === 'forum' && strpos($pagepath, '/mod/forum/discuss.php') !== false;
+            if (!$onoverview && !$ondiscussion) {
                 return;
             }
         }

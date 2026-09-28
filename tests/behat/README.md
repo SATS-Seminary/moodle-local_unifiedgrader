@@ -33,6 +33,7 @@ they're flagged for follow-up rather than left as broken tests.
 | `grade_reset.feature` | `-` clears grade, `--` clears grade + orphan submission, stray characters don't throw |
 | `group_filter.feature` | Default group selection + per-cmid persistence across refreshes |
 | `student_feedback_view.feature` | The student feedback page loads for assignments, forums, quizzes and BBB — the v2.12.1 quiz crash |
+| `forum_feedback_banner.feature` | A graded student sees the feedback banner inside a forum discussion, not only on the list of discussions |
 | `annotation_toolbar_after_zoom.feature` | Tool clicks still dispatch to the active annotation layer after a zoom — the v2.5.1 / v2.5.2 stuck-tool regression |
 
 Worth adding next (not in this scaffold):

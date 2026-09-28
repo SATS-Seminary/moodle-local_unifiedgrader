@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.12.4 (2026092801)
+
+### Forum feedback banner missing inside a discussion
+
+The "Your teacher has graded your forum participation" banner only appeared on the forum's list of discussions (`mod/forum/view.php`). A student who opened a discussion from elsewhere never passed through the list and could miss their feedback entirely. format_simple 1.1.3 makes this common: it opens a Q&A forum's only discussion straight from the course page.
+
+The output hook now also acts on `mod/forum/discuss.php`, so the banner sits at the top of every discussion as well. The other scripts it loads there (the "View grades" override, the comments bubble, the teacher's grade button) find nothing to attach to on that page and do nothing. Other forum pages, such as the reply form, are still left alone. Covered by `tests/hook_callbacks_test.php` and `tests/behat/forum_feedback_banner.feature`, both of which fail on v2.12.3.
+
 ## v2.12.3 (2026092800)
 
 ### Quiz feedback page crashed for every student
