@@ -231,7 +231,7 @@ final class quiz_adapter_test extends \advanced_testcase {
         };
         $this->assertTrue($hasevent(), 'The extension is a personal calendar event');
 
-        // As overrides_extensions.php: push the close date out to the extension.
+        // As the Dates & extensions dialogue does: push the close date out to the extension.
         $quizobj = \mod_quiz\quiz_settings::create($quizid);
         $quizobj->get_override_manager()->save_override([
             'quiz' => $quizid,

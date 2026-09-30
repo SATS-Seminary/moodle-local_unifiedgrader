@@ -130,6 +130,16 @@ if ($hassiteconfig) {
         60
     ));
 
+    // Quick extension buttons in the Dates & extensions dialogue, in days.
+    $settings->add(new admin_setting_configtext(
+        'local_unifiedgrader/extensionpresets',
+        get_string('setting_extensionpresets', 'local_unifiedgrader'),
+        get_string('setting_extensionpresets_desc', 'local_unifiedgrader'),
+        '1, 2, 3, 7',
+        '/^\s*[1-9][0-9]{0,2}(\s*,\s*[1-9][0-9]{0,2})*\s*$/',
+        20
+    ));
+
     // Late penalties. From Moodle 5.3 Unified Grader owns them for
     // assignments, forums and quizzes.
     if (\local_unifiedgrader\penalty\compat::unified()) {

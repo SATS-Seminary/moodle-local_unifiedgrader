@@ -239,10 +239,21 @@ abstract class base_adapter {
      * no effective due date, or when their work was on time.
      *
      * @param int $userid The student user ID.
+     * @param int|null $duedate A due date to test instead of the student's effective one (a preview).
      * @return array|null ['percentage' => int, 'dayslate' => int], or null.
      */
-    public function calculate_late_penalty(int $userid): ?array {
+    public function calculate_late_penalty(int $userid, ?int $duedate = null): ?array {
         return null;
+    }
+
+    /**
+     * When the student's work counts as submitted, for deciding whether it was late.
+     *
+     * @param int $userid The student user ID.
+     * @return int Timestamp, or 0 when nothing has been submitted.
+     */
+    public function get_late_reference_time(int $userid): int {
+        return 0;
     }
 
     /**

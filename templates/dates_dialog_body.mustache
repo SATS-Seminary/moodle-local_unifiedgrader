@@ -1,0 +1,133 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_unifiedgrader/dates_dialog_body
+
+    Body of the "Dates & extensions" dialogue: the student, what their dates
+    mean for lateness, the extension controls, and every date setting with the
+    class default beside the student's own value.
+
+    Example context (json):
+    {
+        "fullname": "Stu Dent",
+        "profileimageurl": "https://example.com/pic.png",
+        "activityname": "Quiz 1",
+        "status": {"show": true, "tone": "warning", "title": "Submitted late: −10% late penalty",
+            "body": "Submitted Wed 19 Aug 2026, 14:02, 2 days after the due date."},
+        "extension": {"available": true, "editable": true, "reason": "", "classtext": "Mon 17 Aug 2026, 23:59",
+            "classvalue": "2026-08-17T23:59", "pickvalue": "",
+            "presets": [{"days": 1, "label": "+1 day", "pressed": false}]},
+        "rows": [{"key": "timelimit", "label": "Time limit", "classtext": "45 mins", "changed": true,
+            "replaced": true, "showtext": false, "displayvalue": "", "editing": true, "isduration": true,
+            "isdatetime": false, "isattempts": false, "inputvalue": "68", "inputid": "ug-dates-timelimit",
+            "badgeoverride": true, "badgeextension": false, "badgefollows": false, "same": false, "note": "",
+            "canreset": true, "canchange": false, "attemptoptions": []}]
+    }
+}}
+<div class="local-unifiedgrader-dates" data-region="dates-body">
+    <div class="ug-dates-student">
+        <img src="{{profileimageurl}}" alt="" class="rounded-circle" width="40" height="40">
+        <div>
+            <div class="ug-dates-student-name">{{fullname}}</div>
+            <div class="ug-dates-muted">{{activityname}}</div>
+        </div>
+    </div>
+
+    {{#status.show}}
+    <div class="ug-dates-status ug-dates-status-{{status.tone}}" role="status" aria-live="polite">
+        <div class="ug-dates-status-title">{{status.title}}</div>
+        <div>{{status.body}}</div>
+    </div>
+    {{/status.show}}
+
+    {{#extension.available}}
+    <section class="ug-dates-extend" aria-labelledby="ug-dates-extend-heading">
+        <div class="ug-dates-extend-head">
+            <h3 id="ug-dates-extend-heading" class="ug-dates-heading">{{#str}} dates_extend_heading, local_unifiedgrader {{/str}}</h3>
+            <span class="ug-dates-muted">{{#str}} dates_classdue, local_unifiedgrader {{/str}} {{extension.classtext}}</span>
+        </div>
+        {{#extension.editable}}
+        <div class="ug-dates-extend-controls">
+            {{#extension.presets}}
+            <button type="button" class="ug-dates-chip{{#pressed}} is-pressed{{/pressed}}" data-action="preset" data-days="{{days}}"
+                aria-pressed="{{#pressed}}true{{/pressed}}{{^pressed}}false{{/pressed}}">{{label}}</button>
+            {{/extension.presets}}
+            <label class="ug-dates-pick">
+                <span class="ug-dates-muted">{{#str}} dates_pick, local_unifiedgrader {{/str}}</span>
+                <input type="datetime-local" class="form-control ug-dates-input" data-action="pick"
+                    value="{{extension.pickvalue}}" min="{{extension.classvalue}}">
+            </label>
+        </div>
+        {{/extension.editable}}
+    </section>
+    {{/extension.available}}
+    {{^extension.available}}
+    {{#extension.reason}}
+    <p class="ug-dates-muted">{{extension.reason}}</p>
+    {{/extension.reason}}
+    {{/extension.available}}
+
+    <table class="ug-dates-table">
+        <thead>
+            <tr>
+                <th scope="col">{{#str}} dates_col_setting, local_unifiedgrader {{/str}}</th>
+                <th scope="col">{{#str}} dates_col_class, local_unifiedgrader {{/str}}</th>
+                <th scope="col">{{fullname}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#rows}}
+            <tr class="{{#changed}}is-changed{{/changed}}">
+                <th scope="row">{{#editing}}<label for="{{inputid}}">{{label}}</label>{{/editing}}{{^editing}}{{label}}{{/editing}}</th>
+                <td class="ug-dates-default{{#replaced}} is-replaced{{/replaced}}">{{classtext}}</td>
+                <td>
+                    <div class="ug-dates-cell">
+                        {{#showtext}}<span class="ug-dates-value">{{displayvalue}}</span>{{/showtext}}
+                        {{#editing}}
+                            {{#isdatetime}}
+                            <input type="datetime-local" id="{{inputid}}" class="form-control ug-dates-input" data-action="edit" data-key="{{key}}" value="{{inputvalue}}">
+                            {{/isdatetime}}
+                            {{#isduration}}
+                            <input type="number" id="{{inputid}}" min="1" step="1" class="form-control ug-dates-input ug-dates-number" data-action="edit" data-key="{{key}}" value="{{inputvalue}}">
+                            <span>{{#str}} dates_minutes, local_unifiedgrader {{/str}}</span>
+                            {{/isduration}}
+                            {{#isattempts}}
+                            <select id="{{inputid}}" class="form-select ug-dates-input" data-action="edit" data-key="{{key}}">
+                                {{#attemptoptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/attemptoptions}}
+                            </select>
+                            {{/isattempts}}
+                        {{/editing}}
+                        {{#badgeextension}}<span class="ug-dates-badge ug-dates-badge-extension">{{#str}} dates_badge_extension, local_unifiedgrader {{/str}}</span>{{/badgeextension}}
+                        {{#badgefollows}}<span class="ug-dates-badge ug-dates-badge-extension">{{#str}} dates_badge_follows, local_unifiedgrader {{/str}}</span>{{/badgefollows}}
+                        {{#badgeoverride}}<span class="ug-dates-badge ug-dates-badge-override">{{#str}} dates_badge_override, local_unifiedgrader {{/str}}</span>{{/badgeoverride}}
+                        {{#same}}<span class="ug-dates-muted">{{#str}} dates_same_as_class, local_unifiedgrader {{/str}}</span>{{/same}}
+                        {{#note}}<span class="ug-dates-muted">{{note}}</span>{{/note}}
+                        {{#canreset}}
+                        <button type="button" class="btn btn-link ug-dates-rowaction" data-action="reset" data-key="{{key}}"
+                            aria-label="{{#str}} dates_reset_label, local_unifiedgrader, {{label}} {{/str}}">{{#str}} dates_reset, local_unifiedgrader {{/str}}</button>
+                        {{/canreset}}
+                        {{#canchange}}
+                        <button type="button" class="btn btn-outline-secondary ug-dates-rowaction" data-action="change" data-key="{{key}}"
+                            aria-label="{{#str}} dates_change_label, local_unifiedgrader, {{label}} {{/str}}">{{#str}} dates_change, local_unifiedgrader {{/str}}</button>
+                        {{/canchange}}
+                    </div>
+                </td>
+            </tr>
+            {{/rows}}
+        </tbody>
+    </table>
+</div>

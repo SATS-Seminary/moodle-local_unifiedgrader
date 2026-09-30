@@ -1362,9 +1362,10 @@ class quiz_adapter extends base_adapter {
      * penalty stays pegged across later attempts and is safe to recompute.
      *
      * @param int $userid The student user ID.
+     * @param int|null $duedate A due date to test instead of the student's effective one (a preview).
      * @return array|null ['percentage' => int, 'dayslate' => int], or null.
      */
-    public function calculate_late_penalty(int $userid): ?array {
+    public function calculate_late_penalty(int $userid, ?int $duedate = null): ?array {
         if (!compat::unified() || !activity_settings::is_enabled($this->cm)) {
             return null;
         }
@@ -1372,17 +1373,40 @@ class quiz_adapter extends base_adapter {
             return null;
         }
 
-        $duedate = $this->get_effective_duedate($userid);
+        $duedate = $duedate ?? $this->get_effective_duedate($userid);
         if ($duedate <= 0) {
             return null;
         }
 
-        $attempt = $this->find_first_genuine_attempt($userid);
-        if (!$attempt) {
+        $submitted = $this->get_late_reference_time($userid);
+        if ($submitted <= 0) {
             return null;
         }
 
-        return rules::late_penalty($this->cm, (int) $attempt->timefinish, $duedate);
+        return rules::late_penalty($this->cm, $submitted, $duedate);
+    }
+
+    /**
+     * When the student's quiz counts as submitted.
+     *
+     * From Moodle 5.3 the first genuine attempt (see find_first_genuine_attempt());
+     * before, as the quizaccess_duedate rule counts it, the first finished attempt.
+     *
+     * @param int $userid The student user ID.
+     * @return int Timestamp, or 0 when no attempt counts yet.
+     */
+    public function get_late_reference_time(int $userid): int {
+        global $DB;
+
+        if (compat::unified()) {
+            $attempt = $this->find_first_genuine_attempt($userid);
+            return $attempt ? (int) $attempt->timefinish : 0;
+        }
+        return (int) $DB->get_field_sql(
+            'SELECT MIN(timefinish) FROM {quiz_attempts}
+              WHERE quiz = :quizid AND userid = :userid AND preview = 0 AND timefinish > 0',
+            ['quizid' => $this->quiz->id, 'userid' => $userid],
+        );
     }
 
     /**

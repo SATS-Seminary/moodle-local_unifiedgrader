@@ -1,11 +1,11 @@
 @local @local_unifiedgrader @local_unifiedgrader_critical
 Feature: Moodle's activity navigation footer stays out of the grader
   As a teacher
-  I want the grader and its dialogues free of Moodle's "Previous / Next activity" footer
-  So that it does not cover the grading controls or the dialogue buttons
+  I want the grader free of Moodle's "Previous / Next activity" footer
+  So that it does not cover the grading controls
 
   # Moodle 5.3 adds a sticky "Previous / Next activity" footer to every page
-  # with an activity context. The grader and its dialogue pages switch it off.
+  # with an activity context. The grader switches it off.
   # The first check shows the footer really is on for this course.
 
   Background:
@@ -28,11 +28,9 @@ Feature: Moodle's activity navigation footer stays out of the grader
       | quiz     | Quiz 1 | TC101  | q1       |
       | page     | Page 2 | TC101  | p2       |
 
-  Scenario: The grader and the overrides dialogue have no activity navigation footer
+  Scenario: The grader has no activity navigation footer
     Given Moodle adds an activity navigation footer on this site
     When I am on the "Quiz 1" "quiz activity" page logged in as "teacher1"
     Then ".course-linear-navigation" "css_element" should exist
     When I am on the Unified Grader for activity "Quiz 1"
-    Then ".course-linear-navigation" "css_element" should not exist
-    When I am on the overrides and extensions page for "Stu Dent" on "Quiz 1"
     Then ".course-linear-navigation" "css_element" should not exist

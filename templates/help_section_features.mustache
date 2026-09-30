@@ -341,22 +341,30 @@ plagiarism card — they get the form, just not the flag.</p>
 
 {{! ----- Overrides & extensions ----- }}
 <section id="feature-overrides">
-<h3>Overrides &amp; extensions</h3>
+<h3>Dates &amp; extensions</h3>
 
 <p>Each adapter exposes the override / extension surface the underlying
 activity supports:</p>
 
 <ul>
     <li><strong>Assignment</strong>: user overrides (open / close / cut-off date), extensions, with auto-adjusting cut-off when an extension exceeds it.</li>
-    <li><strong>Quiz</strong>: native <code>quiz_overrides</code> rows, plus <code>quizaccess_duedate</code> extensions when that plugin is installed.</li>
+    <li><strong>Quiz</strong>: native <code>quiz_overrides</code> rows. Extensions are the override's due date from Moodle 5.3, and <code>quizaccess_duedate</code> extensions before that when the plugin is installed.</li>
     <li><strong>Forum</strong>: plugin-owned forum extensions (<code>local_unifiedgrader_fext</code>) — Moodle core forums don't have a native extension table.</li>
     <li><strong>BigBlueButton</strong>: no overrides / extensions (BBB has no per-user due dates).</li>
 </ul>
 
-<p>The <em>Overrides &amp; extensions</em> modal in the marking panel
-header surfaces all of the above through one form, regardless of activity
-type. A <em>Clear all</em> action removes overrides and extensions for the
-current student in one shot.</p>
+<p>The <em>Dates &amp; extensions</em> dialogue, opened from the student's
+status badge in the navigator, shows every date setting of the activity in
+one table: the class default beside the student's own value, with the default
+struck through when it is replaced. <em>Change</em> overrides a setting in its
+row and <em>Reset</em> restores the class default. The due date changes through
+an extension: preset buttons (the <code>extensionpresets</code> site setting,
++1 day, +2 days, +3 days and +1 week by default) or a picked date. A close or
+cut-off date that the extension passes moves with it. Before anything is
+saved, a banner says what the dates mean for the student: on time, late with
+the penalty it carries, or on time thanks to the extension. Save stays in view
+at the foot of the dialogue, beside a count of the changes and <em>Remove all
+overrides</em>.</p>
 
 <p>Granting an extension <em>after</em> the student has been graded
 opens a confirmation dialog asking whether to recalculate the late

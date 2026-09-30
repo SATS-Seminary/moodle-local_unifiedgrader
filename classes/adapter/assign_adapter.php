@@ -1581,11 +1581,10 @@ class assign_adapter extends base_adapter {
      * the grader can show the penalty that will apply.
      *
      * @param int $userid The student user ID.
+     * @param int|null $duedate A due date to test instead of the student's effective one (a preview).
      * @return array|null ['percentage' => int, 'dayslate' => int], or null.
      */
-    public function calculate_late_penalty(int $userid): ?array {
-        global $DB;
-
+    public function calculate_late_penalty(int $userid, ?int $duedate = null): ?array {
         if (!compat::unified() || !activity_settings::is_enabled($this->cm) || $this->core_penalty_active()) {
             return null;
         }
@@ -1595,6 +1594,36 @@ class assign_adapter extends base_adapter {
             return null;
         }
 
+        $submitted = $this->get_late_reference_time($userid);
+        if ($submitted <= 0) {
+            return null;
+        }
+
+        if ($duedate === null) {
+            $duedate = (int) ($this->assign->override_exists($userid)->duedate ?? $instance->duedate);
+            $flags = $this->assign->get_user_flags($userid, false);
+            if ($flags) {
+                $duedate = max((int) $flags->extensionduedate, $duedate);
+            }
+        }
+
+        return rules::late_penalty($this->cm, $submitted, $duedate);
+    }
+
+    /**
+     * When the student's work counts as submitted: the graded attempt's submission.
+     *
+     * The same submission core's penalty helper uses: the latest graded attempt
+     * (the group's, for team submissions), or the latest attempt before grading,
+     * by its last modification time.
+     *
+     * @param int $userid The student user ID.
+     * @return int Timestamp, or 0 when nothing has been submitted.
+     */
+    public function get_late_reference_time(int $userid): int {
+        global $DB;
+
+        $instance = $this->assign->get_instance();
         $attemptnumber = $DB->get_field_sql(
             'SELECT MAX(attemptnumber)
                FROM {assign_grades}
@@ -1607,16 +1636,9 @@ class assign_adapter extends base_adapter {
             ? $this->assign->get_group_submission($userid, 0, false, $attemptnumber)
             : $this->assign->get_user_submission($userid, false, $attemptnumber);
         if (!$submission || $submission->status === ASSIGN_SUBMISSION_STATUS_NEW || empty($submission->timemodified)) {
-            return null;
+            return 0;
         }
-
-        $duedate = (int) ($this->assign->override_exists($userid)->duedate ?? $instance->duedate);
-        $flags = $this->assign->get_user_flags($userid, false);
-        if ($flags) {
-            $duedate = max((int) $flags->extensionduedate, $duedate);
-        }
-
-        return rules::late_penalty($this->cm, (int) $submission->timemodified, $duedate);
+        return (int) $submission->timemodified;
     }
 
     /**

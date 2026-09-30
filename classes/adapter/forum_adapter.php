@@ -2123,17 +2123,38 @@ SCRIPT;
     }
 
     /**
+     * When the student's work counts as submitted: their first post.
+     *
+     * A student who posted on time but added follow-up posts after the due date
+     * is not late.
+     *
+     * @param int $userid Student user ID.
+     * @return int Timestamp, or 0 if they have not posted.
+     */
+    public function get_late_reference_time(int $userid): int {
+        global $DB;
+
+        $firstpost = $DB->get_field_sql(
+            "SELECT MIN(p.created)
+               FROM {forum_posts} p
+               JOIN {forum_discussions} d ON d.id = p.discussion
+              WHERE d.forum = :forumid AND p.userid = :userid AND p.deleted = 0",
+            ['forumid' => $this->forum->get_id(), 'userid' => $userid],
+        );
+        return (int) $firstpost;
+    }
+
+    /**
      * Calculate the late penalty for a student based on Moodle's penalty rules.
      *
      * Uses the gradepenalty_duedate plugin's configured rules (module → course → system
      * context hierarchy) to determine the penalty percentage for late forum submissions.
      *
      * @param int $userid Student user ID.
+     * @param int|null $duedate A due date to test instead of the student's effective one (a preview).
      * @return array|null Array with 'percentage' (int) and 'dayslate' (int), or null if not late/not applicable.
      */
-    public function calculate_late_penalty(int $userid): ?array {
-        global $DB;
-
+    public function calculate_late_penalty(int $userid, ?int $duedate = null): ?array {
         // From Moodle 5.3 each forum has its own penalty switch.
         if (compat::unified() && !activity_settings::is_enabled($this->cm)) {
             return null;
@@ -2144,8 +2165,9 @@ SCRIPT;
             return null;
         }
 
-        // Use effective due date (accounts for extensions).
-        $duedate = $this->get_effective_duedate($userid);
+        // Use effective due date (accounts for extensions), unless the caller
+        // is previewing another one.
+        $duedate = $duedate ?? $this->get_effective_duedate($userid);
         if ($duedate <= 0) {
             return null;
         }
@@ -2155,22 +2177,10 @@ SCRIPT;
             return null;
         }
 
-        // Use the first post time to determine lateness — a student who posted
-        // on time but added follow-up posts after the due date is NOT late.
-        $forumid = $this->forum->get_id();
-        $firstpost = $DB->get_field_sql(
-            "SELECT MIN(p.created)
-               FROM {forum_posts} p
-               JOIN {forum_discussions} d ON d.id = p.discussion
-              WHERE d.forum = :forumid AND p.userid = :userid AND p.deleted = 0",
-            ['forumid' => $forumid, 'userid' => $userid],
-        );
-
-        if (empty($firstpost)) {
+        $submissiontime = $this->get_late_reference_time($userid);
+        if ($submissiontime <= 0) {
             return null;
         }
-
-        $submissiontime = (int) $firstpost;
 
         // Not late.
         if ($submissiontime <= $duedate) {

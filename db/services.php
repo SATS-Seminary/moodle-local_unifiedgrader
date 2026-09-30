@@ -259,6 +259,24 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_get_student_dates' => [
+        'classname' => 'local_unifiedgrader\external\get_student_dates',
+        'description' => 'Load a student\'s dates, extension and overrides for the Dates & extensions dialogue.',
+        'type' => 'read',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_preview_student_dates' => [
+        'classname' => 'local_unifiedgrader\external\preview_student_dates',
+        'description' => 'Preview the lateness and late penalty a student would have with an extension.',
+        'type' => 'read',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_save_student_dates' => [
+        'classname' => 'local_unifiedgrader\external\save_student_dates',
+        'description' => 'Save a student\'s extension and overrides from the Dates & extensions dialogue.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
     'local_unifiedgrader_clear_all_overrides' => [
         'classname' => 'local_unifiedgrader\external\clear_all_overrides',
         'description' => 'Clear all user-level overrides and extensions for an activity.',

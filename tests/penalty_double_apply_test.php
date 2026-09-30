@@ -33,7 +33,8 @@ namespace local_unifiedgrader;
  *
  * The observed symptom was a 35% (7 days late) rule taking 70% off a student's
  * grade after an extension triggered a recalculation. The endpoints where this
- * happened (recalculate_penalty.php, extension.php) are web entry points guarded
+ * happened (recalculate_penalty.php, and the extension save that now lives in
+ * dates/student_dates.php) are web entry points guarded
  * by require_login()/require_sesskey(), so this is enforced structurally instead:
  * no plugin file may call apply_penalty_to_user() in the lines following an
  * assign_update_grades() call.
@@ -94,7 +95,7 @@ final class penalty_double_apply_test extends \advanced_testcase {
     public function test_guard_covers_the_penalty_recalculation_entry_points(): void {
         $scanned = array_map('basename', $this->plugin_php_files());
 
-        foreach (['recalculate_penalty.php', 'extension.php', 'overrides_extensions.php'] as $expected) {
+        foreach (['recalculate_penalty.php', 'student_dates.php'] as $expected) {
             $this->assertContains(
                 $expected,
                 $scanned,
