@@ -251,6 +251,24 @@ if ($feedbackcommentsenabled && $editor instanceof \editor_tiny\editor) {
     $templatedata['draftitemid'] = $draftitemid;
 }
 
+// TinyMCE configuration for the quiz's per-question comment editors, which the
+// marking panel creates for each student. Uses the options Moodle's own manual
+// grading page gives the comment editor. The draft item IDs are placeholders:
+// each editor gets its question's draft area, from prepare_feedback_draft.
+// Without it (another preferred editor) the comments stay plain textareas.
+$templatedata['questioncommenteditor'] = '';
+if ($cm->modname === 'quiz' && $editor instanceof \editor_tiny\editor) {
+    require_once($CFG->dirroot . '/repository/lib.php');
+    require_once($CFG->dirroot . '/question/engine/lib.php');
+    $templatedata['questioncommenteditor'] = json_encode(
+        (new \local_unifiedgrader\tiny_editor_config())->get_config(
+            $context,
+            \question_utils::get_editor_options($context),
+            \question_utils::get_filepicker_options($context, 0),
+        ),
+    );
+}
+
 // Feedback files filemanager setup (assignfeedback_file).
 $feedbackfileshtml = '';
 $feedbackfilesdraftid = 0;

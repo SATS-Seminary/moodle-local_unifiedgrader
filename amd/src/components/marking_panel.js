@@ -26,7 +26,7 @@ import Templates from 'core/templates';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
 import {get_string as getString} from 'core/str';
-import {getInstanceForElementId} from 'editor_tiny/editor';
+import {getInstanceForElementId, setupForTarget} from 'editor_tiny/editor';
 import CommentLibraryPopout from 'local_unifiedgrader/components/comment_library_popout';
 import PenaltyPopout from 'local_unifiedgrader/components/penalty_popout';
 import * as DirtyTracker from 'local_unifiedgrader/dirty_tracker';
@@ -116,6 +116,10 @@ export default class extends BaseComponent {
         this._rangedControls = {};
         this._guideScores = {};
         this._guideRemarks = {};
+        // Quiz question comment editors (TinyMCE) and their draft areas, keyed
+        // by slot. Empty when the comments are plain textareas.
+        this._guideCommentEditors = {};
+        this._guideCommentDrafts = {};
         // The teacher owns the editable form. The server is authoritative for
         // *derived* display (penalty badges, percentage, late indicators) but
         // it must never reach into editable inputs after a save success — that
@@ -2130,7 +2134,7 @@ export default class extends BaseComponent {
         if (definition.method === 'rubric' || definition.method === 'rubric_ranges') {
             this._renderRubric(definition, fillData, isFreshRender);
         } else if (definition.method === 'guide' || definition.method === 'quizmanual') {
-            this._renderGuide(definition, fillData, isFreshRender);
+            this._renderGuide(definition, fillData, isFreshRender, this._getQuestionCommentDrafts(state, definition));
         }
 
         section.classList.remove('d-none');
@@ -2709,8 +2713,10 @@ export default class extends BaseComponent {
      *                                fill values applied to the DOM. Other render triggers
      *                                (post-save, penalty save, extension grant) leave the
      *                                already-rendered inputs alone so in-progress edits survive.
+     * @param {object|null} commentDrafts Quizzes only: {slot: {draftitemid, html}} for the questions
+     *                                    whose comment gets a rich-text editor, or null for textareas.
      */
-    _renderGuide(definition, fillData, isFreshRender = false) {
+    _renderGuide(definition, fillData, isFreshRender = false, commentDrafts = null) {
         const body = this.getElement(this.selectors.RUBRIC_BODY);
         if (!body) {
             return;
@@ -2741,7 +2747,13 @@ export default class extends BaseComponent {
             const newIds = new Set(definition.criteria.map((c) => String(c.id)));
             const sameStructure = existingIds.size === newIds.size
                 && [...existingIds].every((id) => newIds.has(id));
-            if (sameStructure) {
+            // A new student or attempt comes with new draft areas, which the
+            // comment editors cannot switch to, so rebuild those rows instead.
+            // Editors still showing the previous student's comments are always
+            // rebuilt too, so they can never be saved to this student.
+            const hasCommentEditors = commentDrafts !== null
+                || Object.keys(this._guideCommentEditors).length > 0;
+            if (sameStructure && !(isFreshRender && hasCommentEditors)) {
                 if (isFreshRender) {
                     this._updateGuideValues(body, definition, currentFill);
                 }
@@ -2750,9 +2762,13 @@ export default class extends BaseComponent {
         }
 
         // Full rebuild path (first render, or definition changed).
+        this._removeQuestionCommentEditors();
         body.innerHTML = '';
         this._guideScores = {};
         this._guideRemarks = {};
+        this._guideCommentDrafts = {};
+        // Comment editors to set up once their rows are in the page.
+        const pendingEditors = [];
 
         definition.criteria.forEach((criterion) => {
             const row = document.createElement('div');
@@ -2878,6 +2894,15 @@ export default class extends BaseComponent {
             remarkInput.textContent = currentFill[criterion.id]?.remark ?? '';
             remarkInput.dataset.criterionid = criterion.id;
 
+            // A quiz question comment gets the rich-text editor Moodle's own
+            // manual grading page gives it, working on the comment's draft area.
+            const commentDraft = commentDrafts?.[String(criterion.id)] ?? null;
+            if (commentDraft) {
+                remarkInput.id = 'local-unifiedgrader-qcomment-' + criterion.id + '-' + commentDraft.draftitemid;
+                remarkInput.value = commentDraft.html;
+                this._guideCommentDrafts[criterion.id] = commentDraft.draftitemid;
+            }
+
             this._guideRemarks[criterion.id] = remarkInput.value;
 
             remarkInput.addEventListener('input', () => {
@@ -2904,7 +2929,18 @@ export default class extends BaseComponent {
             });
 
             controls.appendChild(scoreInput);
-            controls.appendChild(remarkInput);
+            if (commentDraft) {
+                // The editor replaces the textarea with its own container, which
+                // must be free to shrink in the flex row, or it overflows the panel.
+                const editorWrapper = document.createElement('div');
+                editorWrapper.className = 'flex-grow-1';
+                editorWrapper.style.minWidth = '0';
+                remarkInput.classList.remove('flex-grow-1');
+                editorWrapper.appendChild(remarkInput);
+                controls.appendChild(editorWrapper);
+            } else {
+                controls.appendChild(remarkInput);
+            }
             controls.appendChild(clibBtn);
             row.appendChild(controls);
             row.appendChild(scoreError);
@@ -2913,16 +2949,135 @@ export default class extends BaseComponent {
             // anomalies introduced by older grading paths that didn't cap.
             this._validateGuideScore(criterion, scoreInput, scoreError);
 
-            // Attach autocomplete from comment library to the remark textarea.
-            this._attachAutocomplete(remarkInput);
+            if (commentDraft) {
+                pendingEditors.push({textarea: remarkInput, id: criterion.id, draftitemid: commentDraft.draftitemid});
+            } else {
+                // Attach autocomplete from comment library to the remark textarea.
+                this._attachAutocomplete(remarkInput);
+            }
 
             body.appendChild(row);
+        });
+
+        pendingEditors.forEach(({textarea, id, draftitemid}) => {
+            this._setupQuestionCommentEditor(textarea, id, draftitemid);
         });
 
         // Capture the quizmanual base total BEFORE _updateGuideTotal so its
         // delta (current total − base) is zero at render — see the helper.
         this._recomputeGuideBaseTotal();
         this._updateGuideTotal();
+    }
+
+    /**
+     * Get the draft-backed comment of each manually marked quiz question.
+     *
+     * @param {object} state Current state.
+     * @param {object} definition Grading definition.
+     * @return {object|null} {slot: {draftitemid, html}}, or null when the comments
+     *                       stay plain textareas (not a quiz, or no TinyMCE).
+     */
+    _getQuestionCommentDrafts(state, definition) {
+        if (definition.method !== 'quizmanual' || !state.ui?.questionCommentEditor) {
+            return null;
+        }
+        let list = [];
+        try {
+            list = JSON.parse(state.grade?.questioncomments || '[]');
+        } catch {
+            return null;
+        }
+        const drafts = {};
+        list.forEach((item) => {
+            if (item.draftitemid) {
+                drafts[String(item.slot)] = {draftitemid: item.draftitemid, html: item.html || ''};
+            }
+        });
+        return Object.keys(drafts).length ? drafts : null;
+    }
+
+    /**
+     * Set up TinyMCE on a quiz question's comment textarea.
+     *
+     * Clones the configuration the page ships for these editors and points its
+     * file picker (images, media, recorded audio) at this comment's draft area.
+     *
+     * @param {HTMLTextAreaElement} textarea The comment textarea, already in the page.
+     * @param {number} criterionId The question slot.
+     * @param {number} draftitemid The comment's draft area item ID.
+     */
+    async _setupQuestionCommentEditor(textarea, criterionId, draftitemid) {
+        let options;
+        try {
+            options = JSON.parse(this.reactive.state.ui.questionCommentEditor);
+        } catch {
+            this._attachAutocomplete(textarea);
+            return;
+        }
+        options.draftitemid = draftitemid;
+        Object.values(options.filepicker || {}).forEach((fp) => {
+            fp.itemid = draftitemid;
+            // The file picker reuses the instance (and so the draft area) of a
+            // client_id it has seen, so each editor needs its own.
+            fp.client_id = (fp.client_id || 'ug') + '_' + draftitemid;
+        });
+
+        let editor;
+        try {
+            editor = await setupForTarget(textarea, options);
+        } catch (error) {
+            Notification.exception(error);
+            return;
+        }
+        // The rows were rebuilt (another student) while the editor loaded.
+        if (!textarea.isConnected) {
+            editor.remove();
+            return;
+        }
+        this._guideCommentEditors[criterionId] = editor;
+        // The editor may normalise the loaded HTML; compare edits against that.
+        this._guideRemarks[criterionId] = editor.getContent();
+
+        editor.on('focus', () => {
+            this._lastFocusedField = textarea;
+        });
+        editor.on('input change keyup paste SetContent', () => {
+            const html = editor.getContent();
+            if (html !== this._guideRemarks[criterionId]) {
+                this._guideRemarks[criterionId] = html;
+                DirtyTracker.markDirty('grade');
+                this._cacheGradeValue();
+            }
+        });
+        // The editor lives in an iframe, so leaving it never reaches the
+        // rubric body's focusout handler. Same rule as there: save once focus
+        // has left the marking guide, but not for the comment library.
+        editor.on('blur', () => {
+            setTimeout(() => {
+                const active = document.activeElement;
+                const rubricBody = this.getElement(this.selectors.RUBRIC_BODY);
+                if (active && rubricBody && rubricBody.contains(active)) {
+                    return;
+                }
+                if (active && active.closest && (
+                    active.closest('.local-unifiedgrader-clib-popout')
+                    || active.closest('[data-action="toggle-comment-library"]')
+                )) {
+                    return;
+                }
+                this._debouncedAutoSave();
+            }, 0);
+        });
+    }
+
+    /**
+     * Remove the quiz question comment editors before their rows are rebuilt.
+     */
+    _removeQuestionCommentEditors() {
+        Object.values(this._guideCommentEditors).forEach((editor) => {
+            editor.remove();
+        });
+        this._guideCommentEditors = {};
     }
 
     /**
@@ -3432,9 +3587,13 @@ export default class extends BaseComponent {
             const questions = {};
             for (const criterion of this._gradingDefinition.criteria) {
                 const id = criterion.id;
+                const editor = this._guideCommentEditors[id];
                 questions[id] = {
                     mark: this._guideScores[id] || '',
-                    comment: this._guideRemarks[id] || '',
+                    comment: editor ? editor.getContent() : (this._guideRemarks[id] || ''),
+                    // The comment editor's draft area, whose files are saved
+                    // with the comment. 0 for a plain textarea.
+                    draftitemid: this._guideCommentDrafts[id] || 0,
                 };
             }
             return JSON.stringify({method: 'quizmanual', questions});

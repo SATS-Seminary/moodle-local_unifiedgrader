@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.13.0 (2026093000)
+
+### Rich-text comments on manually marked quiz questions
+
+The comment on each manually marked quiz question was a plain textarea, so a teacher could not format it or add images or recorded audio, which Moodle's own manual grading page allows. It is now the same TinyMCE editor, with the options that page uses and the same file handling. Each question's editor works on its own draft area, which holds the files already attached to the comment. On save, those files are stored with the grading step in `question/response_bf_comment`, where the quiz serves them to students. A save that changes neither the text nor the files still adds no grading step.
+
+- `grade.php` ships one TinyMCE configuration for these editors (built by the new `tiny_editor_config`, since `use_editor()` can only set up a textarea already in the page). The marking panel clones it for each question and points the file picker at that question's draft area.
+- `prepare_feedback_draft` takes a new `questioncomments` flag. When a student or attempt loads, it also prepares a draft area for each question comment (`quiz_adapter::prepare_question_comment_drafts()`). Autosaves leave the flag off, so they create no draft areas.
+- A comment saved from the old textarea was plain text stored as HTML, so its line breaks were never shown. When the editor loads such a comment, its line breaks become `<br>`.
+- The attempt preview now resolves `@@PLUGINFILE@@` links in comments, so their images and audio display there.
+- A teacher whose preferred editor is not TinyMCE keeps the plain textarea.
+
+Covered by `tests/adapter/quiz_comment_files_test.php`.
+
 ## v2.12.5 (2026092802)
 
 ### Re-edited feedback sometimes stayed open after saving

@@ -30,6 +30,7 @@ namespace local_unifiedgrader\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
+use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
 use local_unifiedgrader\adapter\adapter_factory;
@@ -53,6 +54,12 @@ class prepare_feedback_draft extends external_api {
                 VALUE_DEFAULT,
                 -1,
             ),
+            'questioncomments' => new external_value(
+                PARAM_BOOL,
+                'Also prepare a draft area for each manually marked quiz question comment',
+                VALUE_DEFAULT,
+                false,
+            ),
         ]);
     }
 
@@ -63,14 +70,22 @@ class prepare_feedback_draft extends external_api {
      * @param int $userid
      * @param int $draftitemid
      * @param int $attemptnumber
+     * @param bool $questioncomments
      * @return array
      */
-    public static function execute(int $cmid, int $userid, int $draftitemid, int $attemptnumber = -1): array {
+    public static function execute(
+        int $cmid,
+        int $userid,
+        int $draftitemid,
+        int $attemptnumber = -1,
+        bool $questioncomments = false,
+    ): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'userid' => $userid,
             'draftitemid' => $draftitemid,
             'attemptnumber' => $attemptnumber,
+            'questioncomments' => $questioncomments,
         ]);
 
         $context = \context_module::instance($params['cmid']);
@@ -84,7 +99,18 @@ class prepare_feedback_draft extends external_api {
 
         $adapter = adapter_factory::create($params['cmid']);
 
-        return $adapter->prepare_feedback_draft($params['userid'], $params['draftitemid'], $params['attemptnumber']);
+        $result = $adapter->prepare_feedback_draft($params['userid'], $params['draftitemid'], $params['attemptnumber']);
+
+        // Only requested when a student or attempt loads: each call makes new
+        // draft areas, and the marking panel keeps its editors until then.
+        if ($params['questioncomments'] && $adapter instanceof \local_unifiedgrader\adapter\quiz_adapter) {
+            $result['questioncomments'] = $adapter->prepare_question_comment_drafts(
+                $params['userid'],
+                $params['attemptnumber'],
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -94,6 +120,15 @@ class prepare_feedback_draft extends external_api {
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'feedbackhtml' => new external_value(PARAM_RAW, 'Feedback HTML with draft URLs'),
+            'questioncomments' => new external_multiple_structure(
+                new external_single_structure([
+                    'slot' => new external_value(PARAM_INT, 'Question slot'),
+                    'draftitemid' => new external_value(PARAM_INT, 'Draft area item ID for the comment editor'),
+                    'html' => new external_value(PARAM_RAW, 'Comment HTML with draft URLs'),
+                ]),
+                'Manually marked quiz question comments',
+                VALUE_OPTIONAL,
+            ),
         ]);
     }
 }

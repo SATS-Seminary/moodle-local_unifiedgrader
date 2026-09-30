@@ -98,7 +98,7 @@ export default class {
             if (draftitemid) {
                 calls.push(Ajax.call([{
                     methodname: 'local_unifiedgrader_prepare_feedback_draft',
-                    args: {cmid, userid, draftitemid, attemptnumber: -1},
+                    args: {cmid, userid, draftitemid, attemptnumber: -1, questioncomments: true},
                 }])[0]);
             }
 
@@ -161,6 +161,7 @@ export default class {
             Object.assign(stateManager.state.submission, submissionData);
             Object.assign(stateManager.state.grade, gradeData);
             stateManager.state.grade.feedbackdraft = feedbackDraft.feedbackhtml;
+            stateManager.state.grade.questioncomments = JSON.stringify(feedbackDraft.questioncomments || []);
             // Notes is a StateMap (array with id fields) — must replace entirely.
             // Watcher uses state.notes:updated to catch this.
             stateManager.state.notes = notes;
@@ -237,7 +238,7 @@ export default class {
             if (draftitemid) {
                 calls.push(Ajax.call([{
                     methodname: 'local_unifiedgrader_prepare_feedback_draft',
-                    args: {cmid, userid, draftitemid, attemptnumber},
+                    args: {cmid, userid, draftitemid, attemptnumber, questioncomments: true},
                 }])[0]);
             }
 
@@ -263,6 +264,7 @@ export default class {
             Object.assign(stateManager.state.submission, submissionData);
             Object.assign(stateManager.state.grade, gradeData);
             stateManager.state.grade.feedbackdraft = feedbackDraft.feedbackhtml;
+            stateManager.state.grade.questioncomments = JSON.stringify(feedbackDraft.questioncomments || []);
             stateManager.state.submissionComments.count = submissionData.commentcount || 0;
             stateManager.state.submissionComments.loaded = false;
             stateManager.state.ui.loading = false;

@@ -752,6 +752,83 @@ class quiz_adapter extends base_adapter {
     }
 
     /**
+     * Prepare a draft area for the comment on each manually marked question.
+     *
+     * Moodle's own manual grading page does this for its comment editors: the
+     * files already attached to the latest comment are copied into a new draft
+     * area, where the editor can add more (images, recorded audio), and the
+     * comment's @@PLUGINFILE@@ links are rewritten to point at the draft copies.
+     * The draft item ID then comes back with the comment on save, see
+     * save_manual_question_grades().
+     *
+     * @param int $userid The student user ID.
+     * @param int $attemptnumber Attempt number (1-based), or -1 for latest.
+     * @return array List of ['slot' => int, 'draftitemid' => int, 'html' => string].
+     */
+    public function prepare_question_comment_drafts(int $userid, int $attemptnumber = -1): array {
+        if ($attemptnumber >= 1) {
+            $attempt = $this->get_attempt_by_number($userid, $attemptnumber);
+        } else {
+            $attempt = $this->get_latest_finished_attempt($userid);
+        }
+        if (!$attempt) {
+            return [];
+        }
+
+        $quba = question_engine::load_questions_usage_by_activity($attempt->uniqueid);
+        $result = [];
+        foreach ($quba->get_slots() as $slot) {
+            $qa = $quba->get_question_attempt($slot);
+            if ($qa->get_behaviour_name() !== 'manualgraded') {
+                continue;
+            }
+
+            [$comment, $commentformat, $step] = $qa->get_manual_comment();
+            if ($step === null) {
+                $draftitemid = file_get_unused_draft_itemid();
+                $html = '';
+            } else {
+                [$draftitemid, $html] = $step->prepare_response_files_draft_itemid_with_text(
+                    'bf_comment',
+                    $this->context->id,
+                    $comment ?? '',
+                );
+                $html = $this->comment_to_editor_html((string) $html, (int) ($commentformat ?? FORMAT_HTML));
+            }
+
+            $result[] = [
+                'slot' => (int) $slot,
+                'draftitemid' => (int) $draftitemid,
+                'html' => $html,
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Convert a stored question comment to HTML the editor can load.
+     *
+     * Before the grader had an editor for these comments it saved the plain
+     * text of a textarea as FORMAT_HTML, so their line breaks never showed. Such
+     * a comment (no tags, but line breaks) gets them back as <br>, which is how
+     * the teacher typed it. Comments in another format are converted to HTML.
+     *
+     * @param string $text The stored comment.
+     * @param int $format Its format, one of the FORMAT_* constants.
+     * @return string
+     */
+    private function comment_to_editor_html(string $text, int $format): string {
+        if ($format !== (int) FORMAT_HTML) {
+            return format_text($text, $format, ['context' => $this->context, 'filter' => false, 'para' => false]);
+        }
+        $trimmed = trim(preg_replace('/<!-- File hash: \w+ -->\s*$/', '', $text));
+        if ($trimmed !== strip_tags($trimmed) || !preg_match('/\R/', $trimmed)) {
+            return $text;
+        }
+        return nl2br($trimmed, false);
+    }
+
+    /**
      * Get editor options for the feedback editor.
      *
      * @return array Editor options compatible with file_save_draft_area_files.
@@ -1430,7 +1507,9 @@ class quiz_adapter extends base_adapter {
      * Save manual grades for individual questions in an attempt.
      *
      * @param \stdClass $attempt The attempt record.
-     * @param array $questions Per-slot grading data: {slot: {mark, comment}, ...}.
+     * @param array $questions Per-slot grading data: {slot: {mark, comment, draftitemid}, ...}.
+     *                         draftitemid is the comment editor's draft area, see
+     *                         prepare_question_comment_drafts(); 0 for a plain textarea.
      */
     private function save_manual_question_grades(\stdClass $attempt, array $questions): void {
         global $DB;
@@ -1444,7 +1523,17 @@ class quiz_adapter extends base_adapter {
         foreach ($questions as $slot => $data) {
             $slot = (int) $slot;
             $mark = isset($data['mark']) && $data['mark'] !== '' ? (float) $data['mark'] : null;
-            $comment = $data['comment'] ?? '';
+            $commenttext = (string) ($data['comment'] ?? '');
+            $draftitemid = (int) ($data['draftitemid'] ?? 0);
+
+            // A comment from the editor saves its draft area's files (images,
+            // recorded audio) with the grading step, as Moodle's manual grading
+            // page does. The saver also turns the draft links into @@PLUGINFILE@@
+            // ones, and appends a hash of the files, so the question engine
+            // discards a save that changes neither the text nor the files.
+            $comment = $draftitemid > 0
+                ? new \question_file_saver($draftitemid, 'question', 'response_bf_comment', $commenttext)
+                : $commenttext;
 
             $qa = $quba->get_question_attempt($slot);
             $maxmark = (float) $qa->get_max_mark();
@@ -1456,7 +1545,7 @@ class quiz_adapter extends base_adapter {
                 // Mark provided — save both mark and comment.
                 $quba->manual_grade($slot, $comment, $mark, FORMAT_HTML);
                 $gradedslots[$slot] = (int) $qa->get_question_id();
-            } else if (!empty($comment)) {
+            } else if (trim($commenttext) !== '') {
                 // Comment-only update — reuse the existing mark if available.
                 // When $existingmark is null (never graded), manual_grade() with
                 // null mark saves just the comment via the question engine's
@@ -1657,6 +1746,9 @@ class quiz_adapter extends base_adapter {
                 $html .= '<div class="border-top pt-2 mt-2">';
                 $html .= '<div class="small fw-bold mb-1">'
                     . get_string('teachercomment', 'local_unifiedgrader') . ':</div>';
+                // Point @@PLUGINFILE@@ links (images, recorded audio) at the
+                // comment's files, as the question engine's format_comment() does.
+                $comment = $qa->rewrite_response_pluginfile_urls($comment, $this->context->id, 'bf_comment', $commentstep);
                 $html .= '<div class="small text-muted">'
                     . format_text($comment, $commentformat ?? FORMAT_HTML, ['context' => $this->context])
                     . '</div>';
