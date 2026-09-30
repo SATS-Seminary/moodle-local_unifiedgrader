@@ -36,6 +36,7 @@ they're flagged for follow-up rather than left as broken tests.
 | `forum_feedback_banner.feature` | A graded student sees the feedback banner inside a forum discussion, not only on the list of discussions |
 | `quiz_question_comment_editor.feature` | A manually marked quiz question's comment is a TinyMCE editor, and a formatted comment saves and reloads |
 | `annotation_toolbar_after_zoom.feature` | Tool clicks still dispatch to the active annotation layer after a zoom — the v2.5.1 / v2.5.2 stuck-tool regression |
+| `navigation_footer.feature` | Moodle 5.3+ only: the "Previous / Next activity" footer is absent from the grader and its overrides dialogue (and present on the activity itself, so the check means something) |
 | `late_penalties.feature` | Moodle 5.3+ only (skipped before): the quiz settings' late penalty switch, a late attempt penalised in the grader and gradebook with no marking, a due date override on the quiz's own page removing it, and no penalty with the switch off |
 
 Worth adding next (not in this scaffold):
@@ -92,6 +93,8 @@ the critical tag:
 - `Unified Grader manages late penalties on this site` — skips the scenario below Moodle 5.3
 - `the following late penalty rules exist:` — site-wide `gradepenalty_duedate` tiers (`overdue by (days)`, `penalty`)
 - `late penalties are applied to "<name>"` — ticks the activity's "Apply late penalties" switch
+- `Moodle adds an activity navigation footer on this site` — skips the scenario below Moodle 5.3
+- `I am on the overrides and extensions page for "<student>" on "<name>"` — opens the page the grader's overrides dialogue shows
 
 Everything else uses core Moodle steps (`behat_general`, `behat_forms`,
 `behat_navigation`, `behat_data_generators`). Prefer extending core

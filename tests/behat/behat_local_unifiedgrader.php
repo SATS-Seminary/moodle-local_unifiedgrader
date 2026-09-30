@@ -539,6 +539,64 @@ class behat_local_unifiedgrader extends behat_base {
     }
 
     /**
+     * Skip the scenario on Moodle versions without the activity navigation footer.
+     *
+     * Moodle 5.3 added a sticky "Previous / Next activity" footer to activity pages.
+     *
+     * Example:
+     *   Given Moodle adds an activity navigation footer on this site
+     *
+     * @Given /^Moodle adds an activity navigation footer on this site$/
+     * @throws \Moodle\BehatExtension\Exception\SkippedException
+     */
+    public function moodle_adds_an_activity_navigation_footer(): void {
+        if (!method_exists(\moodle_page::class, 'set_show_navigation_footer')) {
+            throw new \Moodle\BehatExtension\Exception\SkippedException(
+                'Moodle adds the activity navigation footer from 5.3.',
+            );
+        }
+    }
+
+    /**
+     * Open the overrides and extensions page the grader shows in its dialogue.
+     *
+     * Example:
+     *   When I am on the overrides and extensions page for "Stu Dent" on "Quiz 1"
+     *
+     * @When /^I am on the overrides and extensions page for "(?P<fullname>[^"]+)" on "(?P<activityname>[^"]+)"$/
+     * @param string $fullname The student's full name.
+     * @param string $activityname The activity name.
+     */
+    public function i_am_on_the_overrides_and_extensions_page(string $fullname, string $activityname): void {
+        global $DB;
+
+        $userid = null;
+        foreach ($DB->get_records('user', ['deleted' => 0], '', 'id, firstname, lastname') as $user) {
+            if (trim($user->firstname . ' ' . $user->lastname) === $fullname) {
+                $userid = (int) $user->id;
+                break;
+            }
+        }
+        if (!$userid) {
+            throw new Exception("No user named '{$fullname}' found");
+        }
+
+        foreach (\local_unifiedgrader\penalty\activity_settings::MODULES as $modname) {
+            $instanceid = $DB->get_field($modname, 'id', ['name' => $activityname]);
+            if ($instanceid) {
+                $cm = get_coursemodule_from_instance($modname, $instanceid, 0, false, MUST_EXIST);
+                $url = new moodle_url('/local/unifiedgrader/overrides_extensions.php', [
+                    'cmid' => $cm->id,
+                    'userid' => $userid,
+                ]);
+                $this->execute('behat_general::i_visit', [$url]);
+                return;
+            }
+        }
+        throw new Exception("No assignment, forum or quiz named '{$activityname}' found");
+    }
+
+    /**
      * Create site-wide due date penalty rules (gradepenalty_duedate).
      *
      * Rows are tiers, in order: work overdue by up to "overdue by (days)" loses

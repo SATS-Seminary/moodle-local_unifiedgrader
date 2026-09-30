@@ -41,6 +41,11 @@ require_login($course, false, $cm);
 require_capability('local/unifiedgrader:grade', $context);
 
 $PAGE->set_pagelayout('embedded');
+// Moodle 5.3 adds a "Previous / Next activity" footer to activity pages, which
+// makes no sense inside the grader or its modals.
+if (method_exists($PAGE, 'set_show_navigation_footer')) {
+    $PAGE->set_show_navigation_footer(false);
+}
 $PAGE->set_url(new moodle_url('/local/unifiedgrader/override.php', [
     'cmid' => $cmid,
     'userid' => $userid,

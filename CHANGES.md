@@ -17,6 +17,10 @@ Moodle 5.3 gives quizzes their own due date and due date overrides (MDL-82521), 
 
 Covered by `tests/penalty/unified_penalties_test.php` and `tests/behat/late_penalties.feature` (both skipped below 5.3).
 
+### No "Previous / Next activity" footer in the grader on Moodle 5.3
+
+Moodle 5.3 adds a sticky "Previous / Next activity" footer to every page with an activity context. It appeared at the foot of the grader and inside its dialogues, including the overrides and extensions modal, where it has nothing to do with the task. The grader and its dialogue pages (`grade.php`, `overrides_extensions.php`, `override.php`, `extension.php`, `quiz_extension.php`, `forum_extension.php`, `preview_submission.php`) now switch it off with `$PAGE->set_show_navigation_footer(false)`, guarded for Moodle 5.0, which has no such footer. Covered by `tests/behat/navigation_footer.feature`.
+
 ## v2.13.0 (2026093000)
 
 ### Rich-text comments on manually marked quiz questions
