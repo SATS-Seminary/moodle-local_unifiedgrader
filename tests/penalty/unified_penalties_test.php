@@ -150,6 +150,66 @@ final class unified_penalties_test extends \advanced_testcase {
         $this->assertEqualsWithDelta(60, $grade->finalgrade, 0.001);
     }
 
+    /**
+     * A restored pin is recognised by the access rule's feedback, and that feedback is cleared.
+     *
+     * A course backup and restore rewrites the grade history, so the only trace
+     * of quizaccess_duedate left on the cell is the text it wrote with the pin.
+     */
+    public function test_writer_releases_restored_pin_by_its_feedback(): void {
+        [$item, $userid, $cmid] = $this->graded_assign_cell(70);
+        $item->update_final_grade($userid, 59.5, 'restore', 'Late penalty of 15% applied.', FORMAT_HTML);
+        // The activity keeps pushing its raw grade under the override.
+        $item->update_raw_grade($userid, 70, 'mod/quiz');
+
+        service::resync($cmid, $userid, false);
+        $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $userid]);
+        $this->assertEmpty($grade->overridden);
+        $this->assertEqualsWithDelta(70, $grade->finalgrade, 0.001);
+        $this->assertEmpty($grade->feedback);
+    }
+
+    /**
+     * The entry that set the override decides, not the activity's later pushes.
+     */
+    public function test_writer_finds_who_set_the_override(): void {
+        [$item, $userid, $cmid] = $this->graded_assign_cell(70);
+        $item->update_final_grade($userid, 40, 'quizaccess_duedate', 'Penalised.', FORMAT_HTML);
+        $item->update_raw_grade($userid, 70, 'mod/quiz');
+        $item->update_raw_grade($userid, 72, 'mod/quiz');
+
+        service::resync($cmid, $userid, false);
+        $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $userid]);
+        $this->assertEmpty($grade->overridden);
+        $this->assertEqualsWithDelta(72, $grade->finalgrade, 0.001);
+        // Feedback the rule did not write is the marker's, and stays.
+        $this->assertSame('Penalised.', $grade->feedback);
+    }
+
+    /**
+     * A teacher's override stays, however many raw pushes came after it.
+     */
+    public function test_writer_keeps_teacher_override_under_later_pushes(): void {
+        [$item, $userid, $cmid] = $this->graded_assign_cell(70);
+        $item->update_final_grade($userid, 65, 'gradebook', 'Moderated.', FORMAT_HTML);
+        $item->update_raw_grade($userid, 71, 'mod/quiz');
+
+        service::resync($cmid, $userid, false);
+        $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $userid]);
+        $this->assertNotEmpty($grade->overridden);
+        $this->assertEqualsWithDelta(65, $grade->finalgrade, 0.001);
+    }
+
+    /**
+     * Only the access rule's exact wording counts as its feedback.
+     */
+    public function test_legacy_penalty_feedback_detection(): void {
+        $this->assertTrue(gradebook_writer::is_legacy_penalty_feedback('Late penalty of 15% applied.'));
+        $this->assertTrue(gradebook_writer::is_legacy_penalty_feedback('<p>Late penalty of 7.5% applied.</p>'));
+        $this->assertFalse(gradebook_writer::is_legacy_penalty_feedback('Late penalty of 15% applied. Good essay otherwise.'));
+        $this->assertFalse(gradebook_writer::is_legacy_penalty_feedback(''));
+    }
+
     // Quiz: the first genuine attempt decides.
 
     /**

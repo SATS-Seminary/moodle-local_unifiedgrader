@@ -126,10 +126,20 @@ class gradebook_writer {
     /**
      * Lift an override that only existed to hold a pre-5.3 late penalty.
      *
-     * Only the latest history entry is trusted: if a teacher overrode the cell
-     * after the pin, the override is theirs and stays. Released lazily, the
-     * first time a student's grade is resynced, so grades in courses nobody
-     * touches again keep the penalty they were given.
+     * A cell counts as such a pin when either:
+     *
+     * - its feedback is exactly the text quizaccess_duedate wrote with the pin
+     *   ("Late penalty of 15% applied."), which survives a course backup and
+     *   restore even though the grade history there only says "restore"; or
+     * - the history entry that set the override came from quizaccess_duedate or
+     *   from this plugin. That is the first entry of the current run of
+     *   overridden entries, not the latest: the quiz keeps adding entries under
+     *   an override every time it pushes its raw grade.
+     *
+     * Anything else is a teacher's override and stays. That auto-written
+     * feedback is cleared with the pin, since it no longer describes the grade.
+     * Released lazily, the first time a student's grade is resynced, so grades
+     * in courses nobody touches again keep the penalty they were given.
      *
      * The raw grade underneath an override keeps following the activity, so
      * once the flag is cleared the caller can work the final grade out from it.
@@ -138,24 +148,58 @@ class gradebook_writer {
      * @return bool True if the override was lifted.
      */
     private static function release_legacy_pin(\grade_grade $grade): bool {
+        $autofeedback = self::is_legacy_penalty_feedback((string) $grade->feedback);
+        if (!$autofeedback && !in_array(self::pin_source($grade), self::LEGACY_PIN_SOURCES, true)) {
+            return false;
+        }
+
+        if ($autofeedback) {
+            $grade->feedback = null;
+            $grade->feedbackformat = FORMAT_MOODLE;
+        }
+        $grade->set_overridden(false, false);
+        return true;
+    }
+
+    /**
+     * Whether gradebook feedback is the text quizaccess_duedate wrote with its penalty.
+     *
+     * That plugin ships in English only, so its wording is fixed.
+     *
+     * @param string $feedback The cell's feedback.
+     * @return bool
+     */
+    public static function is_legacy_penalty_feedback(string $feedback): bool {
+        $text = trim(html_entity_decode(strip_tags($feedback), ENT_QUOTES, 'UTF-8'));
+        return (bool) preg_match('/^Late penalty of \d+(\.\d+)?% applied\.?$/', $text);
+    }
+
+    /**
+     * The source of the history entry that set a cell's current override.
+     *
+     * @param \grade_grade $grade An overridden grade.
+     * @return string The source, or '' when the history does not say.
+     */
+    private static function pin_source(\grade_grade $grade): string {
         global $DB;
 
-        $latest = $DB->get_records_sql(
-            'SELECT id, source
+        $history = $DB->get_records_sql(
+            'SELECT id, source, overridden
                FROM {grade_grades_history}
               WHERE oldid = :oldid
            ORDER BY timemodified DESC, id DESC',
             ['oldid' => $grade->id],
             0,
-            1,
+            200,
         );
-        $latest = reset($latest);
-        if (!$latest || !in_array($latest->source, self::LEGACY_PIN_SOURCES, true)) {
-            return false;
+        $source = '';
+        foreach ($history as $entry) {
+            if (empty($entry->overridden)) {
+                break;
+            }
+            $source = (string) $entry->source;
         }
-
-        $grade->set_overridden(false, false);
-        return true;
+        return $source;
     }
 
     /**
