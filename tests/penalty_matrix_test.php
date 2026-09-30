@@ -57,6 +57,18 @@ use local_unifiedgrader\external\delete_penalty;
  */
 final class penalty_matrix_test extends \advanced_testcase {
     /**
+     * Skip a test of the pre-5.3 quiz behaviour on Moodle 5.3 and later.
+     *
+     * On 5.3 a quiz deduction is recorded in grade_grades.deductedmark instead of pinning the
+     * cell with an override (see penalty/unified_penalties_test.php).
+     */
+    private function skip_on_moodle_53(): void {
+        if (\local_unifiedgrader\penalty\compat::unified()) {
+            $this->markTestSkipped('Moodle 5.3 records quiz deductions in deductedmark instead of pinning the cell.');
+        }
+    }
+
+    /**
      * Build a course with one activity, a teacher and a student.
      *
      * @param string $modname 'assign' or 'quiz'.
@@ -509,6 +521,7 @@ final class penalty_matrix_test extends \advanced_testcase {
      * module recomputing from the engine and wiping the penalised mark.
      */
     public function test_quiz_late_penalty_pins_the_cell(): void {
+        $this->skip_on_moodle_53();
         $this->resetAfterTest();
 
         $s = $this->scenario('quiz', 10.0);
@@ -524,6 +537,7 @@ final class penalty_matrix_test extends \advanced_testcase {
      * The override survives a later engine recalculation - that is its purpose.
      */
     public function test_quiz_override_survives_an_engine_recalculation(): void {
+        $this->skip_on_moodle_53();
         $this->resetAfterTest();
         global $DB, $CFG;
         require_once($CFG->dirroot . '/mod/quiz/lib.php');
@@ -570,6 +584,7 @@ final class penalty_matrix_test extends \advanced_testcase {
      * disappears silently.
      */
     public function test_quiz_manual_penalty_survives_an_engine_recalculation(): void {
+        $this->skip_on_moodle_53();
         $this->resetAfterTest();
         global $CFG;
         require_once($CFG->dirroot . '/mod/quiz/lib.php');
@@ -665,6 +680,7 @@ final class penalty_matrix_test extends \advanced_testcase {
      * recalculation. Both halves have to happen.
      */
     public function test_quiz_write_to_a_pinned_cell_lifts_and_restores_the_override(): void {
+        $this->skip_on_moodle_53();
         $this->resetAfterTest();
 
         $s = $this->scenario('quiz', 10.0);

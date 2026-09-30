@@ -517,4 +517,80 @@ class behat_local_unifiedgrader extends behat_base {
             $previous = $submission;
         }
     }
+
+    /**
+     * Skip the scenario unless Unified Grader owns late penalties (Moodle 5.3+).
+     *
+     * Before 5.3 late penalties still come from core (assignments) and the
+     * quizaccess_duedate rule (quizzes), so these scenarios do not apply.
+     *
+     * Example:
+     *   Given Unified Grader manages late penalties on this site
+     *
+     * @Given /^Unified Grader manages late penalties on this site$/
+     * @throws \Moodle\BehatExtension\Exception\SkippedException
+     */
+    public function unified_grader_manages_late_penalties(): void {
+        if (!\local_unifiedgrader\penalty\compat::unified()) {
+            throw new \Moodle\BehatExtension\Exception\SkippedException(
+                'Unified Grader manages late penalties from Moodle 5.3.',
+            );
+        }
+    }
+
+    /**
+     * Create site-wide due date penalty rules (gradepenalty_duedate).
+     *
+     * Rows are tiers, in order: work overdue by up to "overdue by (days)" loses
+     * "penalty" percent; anything later than the last tier loses its penalty.
+     *
+     * Example:
+     *   And the following late penalty rules exist:
+     *     | overdue by (days) | penalty |
+     *     | 1                 | 5       |
+     *     | 7                 | 10      |
+     *
+     * @Given /^the following late penalty rules exist:$/
+     * @param \Behat\Gherkin\Node\TableNode $table
+     */
+    public function the_following_late_penalty_rules_exist(\Behat\Gherkin\Node\TableNode $table): void {
+        global $DB;
+
+        $systemid = \context_system::instance()->id;
+        foreach (array_values($table->getHash()) as $i => $row) {
+            $DB->insert_record('gradepenalty_duedate_rule', (object) [
+                'contextid' => $systemid,
+                'sortorder' => $i,
+                'overdueby' => (int) $row['overdue by (days)'] * DAYSECS,
+                'penalty' => (float) $row['penalty'],
+                'usermodified' => 0,
+                'timecreated' => time(),
+                'timemodified' => time(),
+            ]);
+        }
+    }
+
+    /**
+     * Switch on "Apply late penalties" for an activity, as its settings form would.
+     *
+     * Example:
+     *   And late penalties are applied to "Quiz 1"
+     *
+     * @Given /^late penalties are applied to "(?P<activityname>(?:[^"]|\\")*)"$/
+     * @param string $activityname
+     */
+    public function late_penalties_are_applied_to(string $activityname): void {
+        global $DB;
+        $activityname = $this->unescape_argument($activityname);
+
+        foreach (\local_unifiedgrader\penalty\activity_settings::MODULES as $modname) {
+            $instanceid = $DB->get_field($modname, 'id', ['name' => $activityname]);
+            if ($instanceid) {
+                $cm = get_coursemodule_from_instance($modname, $instanceid, 0, false, MUST_EXIST);
+                \local_unifiedgrader\penalty\activity_settings::set_enabled((int) $cm->id, true);
+                return;
+            }
+        }
+        throw new Exception("No assignment, forum or quiz named '{$activityname}' found");
+    }
 }

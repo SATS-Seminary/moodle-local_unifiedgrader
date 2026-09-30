@@ -69,9 +69,13 @@ class get_penalties extends external_api {
         // does not write to $SESSION.
         \core\session\manager::write_close();
 
-        // Auto-sync late penalty for forums before returning penalties.
+        // Auto-sync late penalty before returning penalties: forums only before
+        // Moodle 5.3, every type Unified Grader penalises from 5.3. The raw grade
+        // is not pushed, so viewing penalties never rewrites a grade.
         $cm = get_coursemodule_from_id('', $params['cmid'], 0, false, MUST_EXIST);
-        if ($cm->modname === 'forum') {
+        if (\local_unifiedgrader\penalty\compat::unified()) {
+            \local_unifiedgrader\penalty\service::resync($params['cmid'], $params['userid'], false);
+        } else if ($cm->modname === 'forum') {
             $adapter = adapter_factory::create($params['cmid']);
             $lateinfo = $adapter->calculate_late_penalty($params['userid']);
             penalty_manager::sync_late_penalty(

@@ -39,6 +39,9 @@ namespace local_unifiedgrader\adapter;
 
 defined('MOODLE_INTERNAL') || die();
 
+use local_unifiedgrader\penalty\activity_settings;
+use local_unifiedgrader\penalty\compat;
+use local_unifiedgrader\penalty\gradebook_writer;
 use local_unifiedgrader\submission_comment_manager;
 
 global $CFG;
@@ -232,7 +235,7 @@ class forum_adapter extends base_adapter {
             'hasduedateplugin' => false,
             'canmanageextensions' => has_capability('local/unifiedgrader:grade', $this->context),
             'maxattempts' => 1,
-            'gradepenaltyenabled' => false,
+            'gradepenaltyenabled' => compat::unified() && activity_settings::is_enabled($this->cm),
         ];
     }
 
@@ -1887,6 +1890,23 @@ SCRIPT;
 
         $rawgrade = (float) $graderecord->grade;
 
+        // Moodle 5.3: push the mark as given and record the deduction beside it
+        // in the gradebook. A course still frozen on the pre-5.3 penalty maths
+        // falls through to the reduced push below.
+        if (compat::unified()) {
+            forum_grade_item_update($this->forumrecord, null, [
+                $userid => (object) [
+                    'userid' => $userid,
+                    'rawgrade' => $rawgrade,
+                    'datesubmitted' => 0,
+                    'dategraded' => (int) $graderecord->timemodified,
+                ],
+            ]);
+            if ($this->apply_gradebook_deduction($userid) !== gradebook_writer::LEGACY) {
+                return;
+            }
+        }
+
         // Calculate penalty deduction. A negative grade_for_forum is a scale id,
         // not a maximum — deducting percentage points from a scale index is
         // meaningless, so scales are left alone here exactly as they are in
@@ -2088,6 +2108,21 @@ SCRIPT;
     }
 
     /**
+     * The maximum whole-forum grade, which penalty percentages are taken of.
+     *
+     * 0 in rating mode, where the gradebook value belongs to the ratings, and
+     * for a scale (a negative grade_for_forum is a scale id).
+     *
+     * @return float
+     */
+    protected function get_penalty_max_grade(): float {
+        if ($this->is_rating_mode()) {
+            return 0.0;
+        }
+        return max(0.0, (float) $this->forum->get_grade_for_forum());
+    }
+
+    /**
      * Calculate the late penalty for a student based on Moodle's penalty rules.
      *
      * Uses the gradepenalty_duedate plugin's configured rules (module → course → system
@@ -2098,6 +2133,11 @@ SCRIPT;
      */
     public function calculate_late_penalty(int $userid): ?array {
         global $DB;
+
+        // From Moodle 5.3 each forum has its own penalty switch.
+        if (compat::unified() && !activity_settings::is_enabled($this->cm)) {
+            return null;
+        }
 
         // No penalty if gradepenalty_duedate plugin is not installed.
         if (!class_exists('\gradepenalty_duedate\penalty_calculator')) {

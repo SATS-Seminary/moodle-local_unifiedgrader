@@ -129,8 +129,9 @@ class feedback_data_helper {
         // For quizzes, detect late penalty applied by quizaccess_duedate plugin.
         // Calculate directly from settings + attempt time (same logic as the observer).
         // Cannot rely on gradebook feedback text — teachers may overwrite it.
+        // Before Moodle 5.3 only: from 5.3 the late penalty is one of the rows above.
         $cm = get_coursemodule_from_id('', $cmid, 0, false, MUST_EXIST);
-        if ($cm->modname === 'quiz' && class_exists('\quizaccess_duedate\override_manager')) {
+        if ($cm->modname === 'quiz' && \local_unifiedgrader\penalty\compat::use_quizaccess_duedate()) {
             global $DB;
             $settings = $DB->get_record('quizaccess_duedate_instances', ['quizid' => $cm->instance]);
             if ($settings && $settings->penaltyenabled && $settings->duedate) {

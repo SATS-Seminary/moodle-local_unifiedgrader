@@ -17,8 +17,9 @@
 /**
  * Embedded quiz extension form page for the unified grader.
  *
- * Renders a date/time picker for granting or editing a quiz due date extension
- * via the quizaccess_duedate plugin. Uses embedded layout (no chrome) for use
+ * Renders a date/time picker for granting or editing a quiz due date extension:
+ * the due date on the student's core quiz override from Moodle 5.3, via the
+ * quizaccess_duedate plugin before that. Uses embedded layout (no chrome) for use
  * inside an iframe modal. Communicates results back via postMessage.
  *
  * @package    local_unifiedgrader
@@ -38,12 +39,16 @@ $context = context_module::instance($cm->id);
 
 require_login($course, false, $cm);
 
-// Verify the duedate plugin is installed.
-if (!class_exists('\quizaccess_duedate\override_manager')) {
-    throw new moodle_exception('quiz_extension_plugin_missing', 'local_unifiedgrader');
+$unified = \local_unifiedgrader\penalty\compat::unified();
+if ($unified) {
+    require_capability('mod/quiz:manageoverrides', $context);
+} else {
+    // Verify the duedate plugin is installed.
+    if (!class_exists('\quizaccess_duedate\override_manager')) {
+        throw new moodle_exception('quiz_extension_plugin_missing', 'local_unifiedgrader');
+    }
+    require_capability('quizaccess/duedate:manageoverrides', $context);
 }
-
-require_capability('quizaccess/duedate:manageoverrides', $context);
 
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_url(new moodle_url('/local/unifiedgrader/quiz_extension.php', [
@@ -57,8 +62,12 @@ $adapter = new \local_unifiedgrader\adapter\quiz_adapter($cm, $context, $course)
 
 // Get the quiz-level duedate for reference and validation.
 $quiz = $DB->get_record('quiz', ['id' => $cm->instance], '*', MUST_EXIST);
-$settings = $DB->get_record('quizaccess_duedate_instances', ['quizid' => $quiz->id]);
-$quizduedate = $settings ? (int) $settings->duedate : 0;
+if ($unified) {
+    $quizduedate = (int) $quiz->duedate;
+} else {
+    $settings = $DB->get_record('quizaccess_duedate_instances', ['quizid' => $quiz->id]);
+    $quizduedate = $settings ? (int) $settings->duedate : 0;
+}
 
 // Load existing extension (if any) for pre-populating the form.
 $existing = $adapter->get_duedate_extension($userid);

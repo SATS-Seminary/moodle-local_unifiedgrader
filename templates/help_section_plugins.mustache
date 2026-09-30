@@ -238,6 +238,13 @@ and the native <code>quiz_overrides</code> table.</p>
 <p>This integration is checked at runtime via
 <code>class_exists('\quizaccess_duedate\override_manager')</code> — no
 configuration needed beyond installing the plugin.</p>
+
+<p><strong>Moodle 5.3 and later</strong> have quiz due dates and due date
+overrides in core (MDL-82521), and the Unified Grader uses those instead,
+ignoring this plugin even if it is still installed. Its settings would collide
+with core's own due date. Before uninstalling it, run
+<code>php local/unifiedgrader/cli/migrate_penalties.php</code> (or wait for the
+hourly task) so quizzes that had late penalties switched on keep them.</p>
 </section>
 
 {{! ----- gradepenalty_duedate ----- }}

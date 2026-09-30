@@ -232,6 +232,52 @@ abstract class base_adapter {
     }
 
     /**
+     * Work out a student's late penalty from the due date penalty rules.
+     *
+     * Used from Moodle 5.3, when Unified Grader owns late penalties. Adapters
+     * return null when the activity's penalty switch is off, when the student has
+     * no effective due date, or when their work was on time.
+     *
+     * @param int $userid The student user ID.
+     * @return array|null ['percentage' => int, 'dayslate' => int], or null.
+     */
+    public function calculate_late_penalty(int $userid): ?array {
+        return null;
+    }
+
+    /**
+     * The maximum grade penalty percentages are taken of.
+     *
+     * 0 for scales and "no grade", where a percentage of the maximum means nothing.
+     *
+     * @return float
+     */
+    protected function get_penalty_max_grade(): float {
+        return 0.0;
+    }
+
+    /**
+     * Write the student's total penalty deduction to the gradebook (Moodle 5.3+).
+     *
+     * Leaves the raw grade alone, so call it after the activity's raw mark has
+     * been pushed.
+     *
+     * @param int $userid The student user ID.
+     * @return string A gradebook_writer result constant.
+     */
+    public function apply_gradebook_deduction(int $userid): string {
+        $gradeitem = $this->fetch_grade_item();
+        if (!$gradeitem) {
+            return \local_unifiedgrader\penalty\gradebook_writer::SKIPPED;
+        }
+        $maxgrade = $this->get_penalty_max_grade();
+        $deduction = $maxgrade > 0
+            ? \local_unifiedgrader\penalty_manager::get_total_deduction((int) $this->cm->id, $userid, $maxgrade)
+            : 0.0;
+        return \local_unifiedgrader\penalty\gradebook_writer::apply($gradeitem, $userid, $deduction);
+    }
+
+    /**
      * Whether plagiarism scanning can say anything meaningful about a file.
      *
      * Plagiarism services extract and compare text, so a recording, image or

@@ -106,6 +106,77 @@ function local_unifiedgrader_extend_settings_navigation(
 }
 
 /**
+ * Whether the activity settings form should show the late penalty switch.
+ *
+ * Moodle 5.3+ only, for the activity types whose late penalties Unified Grader
+ * owns. Not for assignments while core still penalises them: core's own
+ * "Apply penalties" setting is on the form then, and remains in charge.
+ *
+ * @param string $modname Module name.
+ * @return bool
+ */
+function local_unifiedgrader_shows_latepenalty_switch(string $modname): bool {
+    if (!\local_unifiedgrader\penalty\compat::unified()) {
+        return false;
+    }
+    if (!\local_unifiedgrader\penalty\activity_settings::supports($modname)) {
+        return false;
+    }
+    return $modname !== 'assign' || !\core_grades\penalty_manager::is_penalty_enabled_for_module('assign');
+}
+
+/**
+ * Add the "Apply late penalties" switch to the activity settings form.
+ *
+ * @param moodleform_mod $formwrapper The activity settings form.
+ * @param MoodleQuickForm $mform The form's QuickForm.
+ */
+function local_unifiedgrader_coursemodule_standard_elements($formwrapper, $mform): void {
+    $current = $formwrapper->get_current();
+    $modname = (string) ($current->modulename ?? '');
+    if (!local_unifiedgrader_shows_latepenalty_switch($modname)) {
+        return;
+    }
+
+    $mform->addElement('header', 'local_unifiedgrader_latepenaltyhdr', get_string('latepenalty_header', 'local_unifiedgrader'));
+    $mform->addElement(
+        'advcheckbox',
+        'local_unifiedgrader_latepenalty',
+        get_string('latepenalty_enable', 'local_unifiedgrader'),
+    );
+    $mform->addHelpButton('local_unifiedgrader_latepenalty', 'latepenalty_enable', 'local_unifiedgrader');
+
+    // A new activity starts with late penalties off.
+    $cm = $formwrapper->get_coursemodule();
+    $enabled = $cm ? \local_unifiedgrader\penalty\activity_settings::is_enabled($cm) : false;
+    $mform->setDefault('local_unifiedgrader_latepenalty', (int) $enabled);
+}
+
+/**
+ * Save the "Apply late penalties" switch when the activity settings are saved.
+ *
+ * Saving the setting raises course_module_updated, whose observer resyncs the
+ * activity's penalties.
+ *
+ * @param stdClass $data Data from the activity settings form.
+ * @param stdClass $course The course.
+ * @return stdClass The data, unchanged.
+ */
+function local_unifiedgrader_coursemodule_edit_post_actions($data, $course) {
+    if (!isset($data->local_unifiedgrader_latepenalty) || empty($data->coursemodule)) {
+        return $data;
+    }
+    if (!local_unifiedgrader_shows_latepenalty_switch((string) ($data->modulename ?? ''))) {
+        return $data;
+    }
+    \local_unifiedgrader\penalty\activity_settings::set_enabled(
+        (int) $data->coursemodule,
+        !empty($data->local_unifiedgrader_latepenalty),
+    );
+    return $data;
+}
+
+/**
  * Serve files from the local_unifiedgrader file areas.
  *
  * Called by Moodle's pluginfile.php when a URL with component=local_unifiedgrader

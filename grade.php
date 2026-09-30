@@ -98,6 +98,7 @@ if ($groupmode != NOGROUPS) {
 
 // Load initial data server-side to avoid loading flash.
 $activityinfo = $adapter->get_activity_info();
+$activityinfo['latepenaltyisrow'] = \local_unifiedgrader\penalty\compat::late_penalty_is_row($adapter->get_type());
 // Resolve initial group IDs for participant fetch.
 $initialgroupids = [];
 if ($currentgroup === '-1') {

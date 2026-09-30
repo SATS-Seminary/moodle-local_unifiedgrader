@@ -237,6 +237,11 @@ function local_unifiedgrader_handle_quiz_override($cm, $context, $course, $useri
     // Prepare form defaults.
     $data = $override ? clone $override : new stdClass();
     $keys = ['timeopen', 'timeclose', 'timelimit', 'attempts', 'password'];
+    if (\local_unifiedgrader\penalty\compat::unified()) {
+        // Moodle 5.3's override form has a due date field too. Saving raises
+        // an override event, whose observer resyncs the student's penalties.
+        $keys[] = 'duedate';
+    }
     foreach ($keys as $key) {
         if (!isset($data->{$key})) {
             $data->{$key} = $quiz->{$key};

@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.0.0 (2026100100)
+
+### Unified Grader owns late penalties on Moodle 5.3
+
+Moodle 5.3 gives quizzes their own due date and due date overrides (MDL-82521), and records a gradebook deduction separately from the raw grade (MDL-88407). On 5.3 and later, Unified Grader now applies late penalties itself for assignments, forums and quizzes, from the core `gradepenalty_duedate` rules, so all three behave the same way. Moodle 5.0 keeps the behaviour of 2.13 unchanged. The switch is made at runtime (`penalty\compat::unified()`, true once `mod_quiz` is at 2026083100 or later), so one release serves both.
+
+- **One switch per activity.** An "Apply late penalties" box in the assignment, forum and quiz settings, stored in the new `local_unifiedgrader_penset` table and carried through backup and restore. Until it is saved, an activity keeps the behaviour it had: assignments follow their own "Apply penalties" setting, forums are on, and quizzes are on only if `quizaccess_duedate` penalised them. New activities start off.
+- **Quiz due dates and extensions come from core.** The quiz due date is `quiz.duedate`, and an extension is the `duedate` on the student's core override, saved through the quiz's override manager with the close time raised to match. `quizaccess_duedate` is ignored on 5.3 even if still installed, since its `duedate` form field and settings query collide with core's. A quiz without a due date is never late; the close time is no longer used in its place.
+- **Quizzes: the first genuine attempt decides.** Only the first submitted attempt in which the student answered at least `quizgenuineattemptpct` of the scoring questions (new setting, default 50%) counts. On time, and later attempts can reach full marks. Late, and its penalty comes off the quiz grade whatever later attempts score. An attempt submitted empty no longer secures an on-time attempt.
+- **Deductions go to `grade_grades.deductedmark`** (`penalty\gradebook_writer`). The raw grade stays the mark as given, the gradebook shows its penalty icon, and nothing is pinned with an override, so quiz regrades and new attempts flow through. Teacher overrides and locked cells are left alone. A cell pinned by the old quiz penalty path is released the next time that student's grade is resynced, so grades in closed courses are not recalculated. Courses still frozen on the pre-5.3 penalty maths fall back to the old reduced push.
+- **Penalties survive grading outside the grader.** New observers resync penalties (`penalty\service::resync()`) on `user_graded`, quiz attempt submission, assignment extensions, and assignment and quiz user and group overrides. Changes to an activity's settings resync the whole activity in an adhoc task (`task\resync_penalties`). Before this, a mark saved on Moodle's own assignment grading page discarded Unified Grader's manual penalties from the gradebook.
+- **Assignments no longer rely on core's late penalty.** While an administrator leaves Assignment on under Grade penalties: supported modules, Unified Grader leaves the late penalty to core for assignments with "Apply penalties" ticked, and the plugin settings page asks for it to be switched off. Core's assignment pages show the penalised grade and penalty icon from the gradebook. `assign_grades.penalty` is left to core, which resets it on every grade push, so previous attempts listed there show their unpenalised marks.
+- **Late penalty is a penalty row everywhere.** The grader shows it read-only, like forum late penalties, and it changes only when an extension, override or due date changes. The client no longer reads a separate late figure or old "Late penalty of N% applied" feedback text on 5.3 (new `latepenaltyisrow` activity flag).
+- **Migration.** The hourly `task\migrate_penalties` (or `cli/migrate_penalties.php`) saves the late penalty switch `quizaccess_duedate` held for each quiz. It runs once, on 5.3. Run it before uninstalling the access rule. Moving the rule's due dates and extensions into core is left to the rule's own final release.
+
+Covered by `tests/penalty/unified_penalties_test.php` and `tests/behat/late_penalties.feature` (both skipped below 5.3).
+
 ## v2.13.0 (2026093000)
 
 ### Rich-text comments on manually marked quiz questions

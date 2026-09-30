@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Plugin version and other metadata.
+ * Scheduled tasks for local_unifiedgrader.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
@@ -24,8 +24,14 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_unifiedgrader';
-$plugin->version   = 2026100100; // YYYYMMDDXX format.
-$plugin->release   = '3.0.0';
-$plugin->requires  = 2025041400; // Moodle 5.0+.
-$plugin->maturity  = MATURITY_STABLE;
+$tasks = [
+    [
+        'classname' => '\local_unifiedgrader\task\migrate_penalties',
+        'blocking' => 0,
+        'minute' => 'R',
+        'hour' => '*',
+        'day' => '*',
+        'month' => '*',
+        'dayofweek' => '*',
+    ],
+];

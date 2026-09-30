@@ -465,5 +465,24 @@ function xmldb_local_unifiedgrader_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026071601, 'local', 'unifiedgrader');
     }
 
+    if ($oldversion < 2026100100) {
+        // Per-activity late penalty switch, used from Moodle 5.3 when Unified
+        // Grader takes over late penalties for assignments, forums and quizzes.
+        // Activities without a row fall back to their type's default, so there
+        // is nothing to backfill here.
+        $table = new xmldb_table('local_unifiedgrader_penset');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('enabled', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_index('uix_cmid', XMLDB_INDEX_UNIQUE, ['cmid']);
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026100100, 'local', 'unifiedgrader');
+    }
+
     return true;
 }

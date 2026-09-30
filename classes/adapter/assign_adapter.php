@@ -29,6 +29,10 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/assign/locallib.php');
 require_once($CFG->dirroot . '/grade/grading/lib.php');
+use local_unifiedgrader\penalty\activity_settings;
+use local_unifiedgrader\penalty\compat;
+use local_unifiedgrader\penalty\gradebook_writer;
+use local_unifiedgrader\penalty\rules;
 use local_unifiedgrader\submission_comment_manager;
 
 /**
@@ -102,7 +106,9 @@ class assign_adapter extends base_adapter {
             'blindmarking' => (bool) $instance->blindmarking,
             'canmanageoverrides' => has_capability('mod/assign:manageoverrides', $this->context),
             'maxattempts' => (int) $instance->maxattempts,
-            'gradepenaltyenabled' => !empty($instance->gradepenalty),
+            'gradepenaltyenabled' => compat::unified()
+                ? activity_settings::is_enabled($this->cm)
+                : !empty($instance->gradepenalty),
         ];
     }
 
@@ -562,8 +568,13 @@ class assign_adapter extends base_adapter {
         // extension was granted after the student submitted). The penalty field
         // in assign_grades is not recalculated by Moodle core when extensions
         // change, so we must cross-check against the effective due date.
+        //
+        // From Moodle 5.3 the late penalty is one of this plugin's own penalty
+        // rows and reaches the client with the others, unless core still
+        // penalises this assignment.
         $latepenaltypct = null;
-        if ($grade && isset($grade->penalty) && $grade->penalty > 0 && $grade->grade > 0) {
+        $corepenalty = !compat::unified() || $this->core_penalty_active();
+        if ($corepenalty && $grade && isset($grade->penalty) && $grade->penalty > 0 && $grade->grade > 0) {
             $effectiveduedate = $this->get_effective_duedate($userid);
             $submission = $this->get_submission($userid);
             // Use timemodified (final submit) for the lateness comparison,
@@ -1476,8 +1487,13 @@ class assign_adapter extends base_adapter {
         // forum_adapter already handles this correctly with a ternary.
         $penalised = max(0, (float) $grade->grade - $deduction);
 
+        // Moodle 5.3: push the mark as given and record the deduction beside it
+        // in the gradebook. Not while core still penalises this assignment: its
+        // late deduction is written to the same field, and would be erased.
+        $unified = compat::unified() && !$this->core_penalty_active();
+
         $gradebookgrade = [
-            'rawgrade' => $penalised,
+            'rawgrade' => $unified ? (float) $grade->grade : $penalised,
             'userid' => $userid,
             'usermodified' => (int) $grade->grader,
             'datesubmitted' => null,
@@ -1495,6 +1511,112 @@ class assign_adapter extends base_adapter {
         $updateinstance->cmidnumber = $this->cm->idnumber;
         $updateinstance->gradefeedbackenabled = $this->assign->is_gradebook_feedback_enabled();
         assign_grade_item_update($updateinstance, $gradebookgrade);
+
+        if (!$unified) {
+            return;
+        }
+        if ($this->apply_gradebook_deduction($userid) === gradebook_writer::LEGACY) {
+            // A course frozen on the pre-5.3 penalty maths: push the reduced mark.
+            $gradebookgrade['rawgrade'] = $penalised;
+            assign_grade_item_update($updateinstance, $gradebookgrade);
+        }
+    }
+
+    /**
+     * Whether core's own late penalty still applies to this assignment.
+     *
+     * Only while an administrator leaves 'assign' switched on under Site
+     * administration > Grades > Grade penalties and the assignment's own
+     * "Apply penalties" box is ticked. Unified Grader then leaves the late
+     * penalty to core rather than deducting it twice.
+     *
+     * @return bool
+     */
+    public function core_penalty_active(): bool {
+        // The per-assignment half mirrors \mod_assign\penalty\helper::is_penalty_enabled();
+        // the site half is checked by core's penalty_manager before it deducts anything.
+        $instance = $this->assign->get_instance();
+        return !empty($instance->gradepenalty)
+            && !empty($instance->duedate)
+            && (float) $instance->grade >= GRADE_TYPE_VALUE
+            && \core_grades\penalty_manager::is_penalty_enabled_for_module('assign');
+    }
+
+    /**
+     * Write the student's total penalty deduction to the gradebook (Moodle 5.3+).
+     *
+     * Skipped while core still penalises this assignment: core writes its late
+     * deduction to the same field, and this would overwrite it.
+     *
+     * assign_grades.penalty is not mirrored. Core's assignment pages show the
+     * current grade from the gradebook, which carries this deduction and its
+     * penalty icon; core resets that field itself whenever a grade is pushed.
+     *
+     * @param int $userid The student user ID.
+     * @return string A gradebook_writer result constant.
+     */
+    public function apply_gradebook_deduction(int $userid): string {
+        if ($this->core_penalty_active()) {
+            return gradebook_writer::SKIPPED;
+        }
+        return parent::apply_gradebook_deduction($userid);
+    }
+
+    /**
+     * The assignment's maximum grade; 0 for scales and "no grade".
+     *
+     * @return float
+     */
+    protected function get_penalty_max_grade(): float {
+        return max(0.0, (float) $this->assign->get_instance()->grade);
+    }
+
+    /**
+     * Work out a student's late penalty from the due date penalty rules (Moodle 5.3+).
+     *
+     * Uses the same inputs as core's \mod_assign\penalty\helper::apply_penalty_to_user():
+     * the graded attempt's submission (the group's, for team submissions), its last
+     * modification time, the user or group override due date, and the later of that
+     * and any extension. Before a grade exists, the latest submission is used, so
+     * the grader can show the penalty that will apply.
+     *
+     * @param int $userid The student user ID.
+     * @return array|null ['percentage' => int, 'dayslate' => int], or null.
+     */
+    public function calculate_late_penalty(int $userid): ?array {
+        global $DB;
+
+        if (!compat::unified() || !activity_settings::is_enabled($this->cm) || $this->core_penalty_active()) {
+            return null;
+        }
+
+        $instance = $this->assign->get_instance();
+        if ((float) $instance->grade <= 0) {
+            return null;
+        }
+
+        $attemptnumber = $DB->get_field_sql(
+            'SELECT MAX(attemptnumber)
+               FROM {assign_grades}
+              WHERE assignment = :assignid AND userid = :userid AND grade >= 0',
+            ['assignid' => $instance->id, 'userid' => $userid],
+        );
+        $attemptnumber = ($attemptnumber === false || $attemptnumber === null) ? -1 : (int) $attemptnumber;
+
+        $submission = $instance->teamsubmission
+            ? $this->assign->get_group_submission($userid, 0, false, $attemptnumber)
+            : $this->assign->get_user_submission($userid, false, $attemptnumber);
+        if (!$submission || $submission->status === ASSIGN_SUBMISSION_STATUS_NEW || empty($submission->timemodified)) {
+            return null;
+        }
+
+        $duedate = (int) ($this->assign->override_exists($userid)->duedate ?? $instance->duedate);
+        $flags = $this->assign->get_user_flags($userid, false);
+        if ($flags) {
+            $duedate = max((int) $flags->extensionduedate, $duedate);
+        }
+
+        return rules::late_penalty($this->cm, (int) $submission->timemodified, $duedate);
     }
 
     /**

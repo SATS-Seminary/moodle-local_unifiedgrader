@@ -107,16 +107,22 @@ class clear_all_overrides extends external_api {
                 $adapter->delete_forum_extension($params['userid']);
             }
 
-            // Re-sync penalties.
-            $lateinfo = $adapter->calculate_late_penalty($params['userid']);
-            \local_unifiedgrader\penalty_manager::sync_late_penalty(
-                $params['cmid'],
-                $params['userid'],
-                $lateinfo['percentage'] ?? null,
-                $lateinfo['dayslate'] ?? 0,
-            );
-            $adapter->sync_gradebook_penalty($params['userid']);
+            // Re-sync penalties (from Moodle 5.3 this happens below, for every type).
+            if (!\local_unifiedgrader\penalty\compat::unified()) {
+                $lateinfo = $adapter->calculate_late_penalty($params['userid']);
+                \local_unifiedgrader\penalty_manager::sync_late_penalty(
+                    $params['cmid'],
+                    $params['userid'],
+                    $lateinfo['percentage'] ?? null,
+                    $lateinfo['dayslate'] ?? 0,
+                );
+                $adapter->sync_gradebook_penalty($params['userid']);
+            }
         }
+
+        // Moodle 5.3: with the due date back to the activity's own, work the late
+        // penalty out again and update the gradebook.
+        \local_unifiedgrader\penalty\service::resync($params['cmid'], $params['userid']);
 
         return ['success' => true];
     }

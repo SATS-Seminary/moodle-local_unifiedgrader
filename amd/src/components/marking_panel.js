@@ -1997,6 +1997,14 @@ export default class extends BaseComponent {
     _getLatePenaltyPct() {
         const state = this.reactive.state;
 
+        // From Moodle 5.3 the late penalty is one of the plugin's own penalty
+        // rows, already listed and counted with the others. Reading an external
+        // figure too (or old "Late penalty of N% applied" feedback text) would
+        // count it twice.
+        if (state.activity?.latepenaltyisrow) {
+            return 0;
+        }
+
         // If the submission is no longer late (e.g. extension granted after submission),
         // suppress the penalty badge even if assign_grades.penalty is still set.
         // Use the canonical submittedat so this matches what the late

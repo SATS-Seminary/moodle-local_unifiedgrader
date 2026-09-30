@@ -48,10 +48,98 @@ class observer {
     /**
      * Handle core user graded event.
      *
+     * From Moodle 5.3, puts the student's penalty deduction back after an
+     * activity pushes a new raw grade (which resets it in the gradebook). This
+     * is what keeps penalties in place when a mark is saved outside the grader:
+     * core's assignment grading page, quiz auto-grading, a regrade, manual
+     * question grading, or whole-forum grading.
+     *
      * @param \core\event\user_graded $event
      */
     public static function handle_user_graded(\core\event\user_graded $event): void {
-        // Future: invalidate cached data when a grade changes via gradebook.
+        global $CFG;
+
+        if (!penalty\compat::unified() || penalty\service::is_syncing() || empty($event->relateduserid)) {
+            return;
+        }
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $grade = $event->get_grade();
+        $gradeitem = \grade_item::fetch(['id' => $grade->itemid]);
+        if (!$gradeitem || $gradeitem->itemtype !== 'mod' || !penalty\activity_settings::supports($gradeitem->itemmodule)) {
+            return;
+        }
+
+        $cm = get_coursemodule_from_instance($gradeitem->itemmodule, $gradeitem->iteminstance, $gradeitem->courseid);
+        if (!$cm) {
+            return;
+        }
+        penalty\service::resync((int) $cm->id, (int) $event->relateduserid, false);
+    }
+
+    /**
+     * Resync one student after something changed their effective due date.
+     *
+     * Registered for assignment extensions and user overrides on assignments
+     * and quizzes. Moodle 5.3+ only.
+     *
+     * @param \core\event\base $event An event with a module context and a related user.
+     */
+    public static function handle_user_duedate_changed(\core\event\base $event): void {
+        if (!penalty\compat::unified() || empty($event->relateduserid) || empty($event->contextinstanceid)) {
+            return;
+        }
+        penalty\service::resync((int) $event->contextinstanceid, (int) $event->relateduserid);
+    }
+
+    /**
+     * Work out the late penalty as soon as a quiz attempt is submitted.
+     *
+     * An attempt that still needs manual grading may not change the quiz grade,
+     * so no user_graded event follows it; this makes sure its late penalty is
+     * recorded all the same. The raw grade is not pushed: the quiz saves it
+     * itself. Moodle 5.3+ only.
+     *
+     * @param \mod_quiz\event\attempt_submitted $event
+     */
+    public static function handle_attempt_submitted(\mod_quiz\event\attempt_submitted $event): void {
+        if (!penalty\compat::unified() || empty($event->relateduserid) || empty($event->contextinstanceid)) {
+            return;
+        }
+        penalty\service::resync((int) $event->contextinstanceid, (int) $event->relateduserid, false);
+    }
+
+    /**
+     * Resync a group's members in the background after a group override changed.
+     *
+     * Moodle 5.3+ only.
+     *
+     * @param \core\event\base $event A group override event, with other['groupid'].
+     */
+    public static function handle_group_override_changed(\core\event\base $event): void {
+        if (!penalty\compat::unified() || empty($event->contextinstanceid)) {
+            return;
+        }
+        $groupid = (int) ($event->other['groupid'] ?? 0);
+        $userids = $groupid ? array_keys(groups_get_members($groupid, 'u.id')) : [];
+        if ($userids) {
+            penalty\service::resync_later((int) $event->contextinstanceid, $userids);
+        }
+    }
+
+    /**
+     * Resync an activity's students in the background after its settings changed.
+     *
+     * A changed due date or penalty switch can change every student's penalty.
+     * Moodle 5.3+ only.
+     *
+     * @param \core\event\course_module_updated $event
+     */
+    public static function handle_course_module_updated(\core\event\course_module_updated $event): void {
+        if (!penalty\compat::unified() || !penalty\activity_settings::supports($event->other['modulename'] ?? '')) {
+            return;
+        }
+        penalty\service::resync_later((int) $event->objectid);
     }
 
     /**
@@ -104,11 +192,15 @@ class observer {
     public static function handle_course_module_deleted(\core\event\course_module_deleted $event): void {
         global $DB;
 
-        if (($event->other['modulename'] ?? '') !== 'assign') {
-            return;
-        }
         $cmid = (int) $event->objectid;
         if ($cmid <= 0) {
+            return;
+        }
+
+        // The late penalty switch is stored for any supported activity.
+        penalty\activity_settings::delete($cmid);
+
+        if (($event->other['modulename'] ?? '') !== 'assign') {
             return;
         }
         $DB->delete_records('local_unifiedgrader_segcomment', ['cmid' => $cmid]);

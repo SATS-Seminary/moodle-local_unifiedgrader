@@ -65,7 +65,9 @@ class get_activity_info extends external_api {
         \core\session\manager::write_close();
 
         $adapter = adapter_factory::create($cmid);
-        return $adapter->get_activity_info();
+        $info = $adapter->get_activity_info();
+        $info['latepenaltyisrow'] = \local_unifiedgrader\penalty\compat::late_penalty_is_row($adapter->get_type());
+        return $info;
     }
 
     /**
@@ -137,7 +139,13 @@ class get_activity_info extends external_api {
             ),
             'hasduedateplugin' => new external_value(
                 PARAM_BOOL,
-                'Whether quizaccess_duedate plugin is installed',
+                'Whether quiz due date extensions are available (core from Moodle 5.3, quizaccess_duedate before)',
+                VALUE_DEFAULT,
+                false,
+            ),
+            'latepenaltyisrow' => new external_value(
+                PARAM_BOOL,
+                'Whether the late penalty is one of the plugin\'s own penalty rows (Moodle 5.3+)',
                 VALUE_DEFAULT,
                 false,
             ),

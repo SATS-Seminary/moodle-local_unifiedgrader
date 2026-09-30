@@ -279,6 +279,30 @@ or moderator can see at a glance that the saved grade was reduced.</p>
 
 <p>For <strong>scale-based grading</strong>, manual penalties are hidden
 (percentage deductions don't make sense on a discrete scale).</p>
+
+<h4>Moodle 5.3 and later: one late penalty system</h4>
+<p>From Moodle 5.3 the Unified Grader applies late penalties itself for
+assignments, forums and quizzes, from the <code>gradepenalty_duedate</code>
+rules (activity &gt; course &gt; site).</p>
+<ul>
+    <li><strong>Per activity:</strong> an <em>Apply late penalties</em> box in the
+        activity settings. Until it is saved, assignments follow their own
+        <em>Apply penalties</em> setting, forums are on, and quizzes are on only
+        if <code>quizaccess_duedate</code> penalised them.</li>
+    <li><strong>In the gradebook:</strong> the mark as given stays the raw grade,
+        and the total of all penalties is recorded beside it, so the gradebook
+        shows its penalty icon and regrades keep the deduction. Nothing is pinned
+        with an override.</li>
+    <li><strong>Graded anywhere:</strong> penalties are reapplied when a mark is saved
+        on Moodle's own pages, when a quiz is auto-graded or regraded, and when an
+        extension, override or due date changes.</li>
+    <li><strong>Changed only by extensions:</strong> the late penalty cannot be edited
+        by hand. Grant an extension or override to excuse a student.</li>
+    <li><strong>Assignments:</strong> switch off Moodle's own assignment penalties
+        (Grade penalties: supported modules). While they are on, the Unified Grader
+        leaves the late penalty to Moodle for assignments with <em>Apply penalties</em>
+        ticked, so nothing is deducted twice.</li>
+</ul>
 </section>
 
 {{! ----- Academic-integrity referral ----- }}

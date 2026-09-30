@@ -27,6 +27,18 @@ namespace local_unifiedgrader\adapter;
  */
 final class quiz_adapter_test extends \advanced_testcase {
     /**
+     * Skip a test of the pre-5.3 quiz behaviour on Moodle 5.3 and later.
+     *
+     * On 5.3 the quiz has its own due date, and timeclose is no longer used as one
+     * (see penalty/unified_penalties_test.php).
+     */
+    private function skip_on_moodle_53(): void {
+        if (\local_unifiedgrader\penalty\compat::unified()) {
+            $this->markTestSkipped('Moodle 5.3 quizzes have their own due date; timeclose is not a due date.');
+        }
+    }
+
+    /**
      * Helper: create a quiz scenario and return the adapter.
      *
      * @param array $options Scenario options.
@@ -126,6 +138,7 @@ final class quiz_adapter_test extends \advanced_testcase {
      * Test get_effective_duedate returns timeclose when no override.
      */
     public function test_get_effective_duedate_no_override(): void {
+        $this->skip_on_moodle_53();
         $this->resetAfterTest();
 
         $timeclose = time() + DAYSECS * 7;
@@ -145,6 +158,7 @@ final class quiz_adapter_test extends \advanced_testcase {
      * Test get_effective_duedate with native quiz override.
      */
     public function test_get_effective_duedate_native_override(): void {
+        $this->skip_on_moodle_53();
         global $DB;
         $this->resetAfterTest();
 

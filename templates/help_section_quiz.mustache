@@ -71,11 +71,28 @@ to control mark visibility). Scheduling a future post date is not supported
 for quizzes — review options are state-based, not date-based.</p>
 
 <h4>Quiz extensions</h4>
-<p>If the <code>quizaccess_duedate</code> plugin is installed, the Unified
-Grader integrates with its override system. Extensions show inline,
-overrides can be cleared, and the effective due date for late-penalty
-calculation comes from the plugin's resolver (user override &gt; group
-override &gt; quiz default).</p>
+<p><strong>Moodle 5.3 and later:</strong> quizzes have their own due date, and an
+extension is the due date on the student's quiz override. Extensions show
+inline and can be granted or cleared from the grader. The effective due date is
+Moodle's own: user override &gt; group override &gt; quiz due date. A quiz
+without a due date is never late; its close time only ends access.</p>
+
+<p><strong>Earlier versions:</strong> if the <code>quizaccess_duedate</code> plugin
+is installed, the Unified Grader integrates with its override system. Extensions
+show inline, overrides can be cleared, and the effective due date for
+late-penalty calculation comes from the plugin's resolver (user override &gt;
+group override &gt; quiz default).</p>
+
+<h4>Quiz late penalties (Moodle 5.3 and later)</h4>
+<p>With <em>Apply late penalties</em> ticked in the quiz settings, the student's
+<strong>first genuine attempt</strong> decides the penalty: the first submitted
+attempt in which they answered at least the share of questions set in
+<code>quizgenuineattemptpct</code> (50% by default). An attempt submitted empty
+does not count, so it cannot secure an on-time attempt.</p>
+<ul>
+    <li>Submitted by the due date: no penalty, and later attempts can reach full marks even if they are late.</li>
+    <li>Submitted after it: the grade penalty rules set the penalty from how late it was, and it comes off the quiz grade whatever later attempts score. A first genuine attempt two days late under a 10% rule caps the quiz at 90%.</li>
+</ul>
 
 <div class="local-unifiedgrader-help-screenshot">
     <i class="fa fa-image" aria-hidden="true"></i>

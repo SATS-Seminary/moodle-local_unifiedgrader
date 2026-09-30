@@ -86,15 +86,20 @@ if ($modname === 'assign') {
     }
 } else if ($modname === 'quiz') {
     $quiz = $DB->get_record('quiz', ['id' => $cm->instance], '*', MUST_EXIST);
-    $hasduedateplugin = class_exists('\quizaccess_duedate\override_manager');
+    // From Moodle 5.3 the quiz has its own due date and extensions are core
+    // override due dates; before that they need the quizaccess_duedate plugin.
+    $unified = \local_unifiedgrader\penalty\compat::unified();
+    $hasduedateplugin = \local_unifiedgrader\penalty\compat::use_quizaccess_duedate();
 
     $defaults = [
         'timeopen' => (int) $quiz->timeopen,
         'timeclose' => (int) $quiz->timeclose,
         'timelimit' => (int) $quiz->timelimit,
         'attempts' => (int) $quiz->attempts,
-        'hasduedateplugin' => $hasduedateplugin,
-        'duedate' => 0,
+        // Named for the plugin, but means "quiz extensions are available".
+        'hasduedateplugin' => $unified || $hasduedateplugin,
+        'unifiedquizduedate' => $unified,
+        'duedate' => $unified ? (int) $quiz->duedate : 0,
     ];
 
     // Get quiz-level duedate from plugin.
@@ -115,7 +120,7 @@ if ($modname === 'assign') {
     }
 
     // Load existing duedate extension.
-    if ($hasduedateplugin) {
+    if ($unified || $hasduedateplugin) {
         $ext = $adapter->get_duedate_extension($userid);
         if ($ext) {
             $overrides['extensionduedate'] = (int) $ext['duedate'];
@@ -330,9 +335,16 @@ function local_unifiedgrader_save_quiz_overrides($adapter, $cm, $userid, $fromfo
     global $DB;
 
     $extensiondate = 0;
+    $unified = !empty($defaults['unifiedquizduedate']);
+
+    // Moodle 5.3: the extension is the override's own due date, saved below
+    // with the rest of the override.
+    if ($unified && !empty($fromform->override_extensionduedate)) {
+        $extensiondate = (int) $fromform->extensionduedate;
+    }
 
     // Handle duedate extension (via quizaccess_duedate plugin).
-    if (!empty($defaults['hasduedateplugin'])) {
+    if (!$unified && !empty($defaults['hasduedateplugin'])) {
         if (!empty($fromform->override_extensionduedate)) {
             $extensiondate = (int) $fromform->extensionduedate;
             $adapter->save_duedate_extension($userid, $extensiondate);
@@ -385,6 +397,11 @@ function local_unifiedgrader_save_quiz_overrides($adapter, $cm, $userid, $fromfo
     // Password is not exposed in this form — preserve existing value.
     $overridedata['password'] = null;
 
+    if ($unified) {
+        $overridedata['duedate'] = $extensiondate > 0 ? $extensiondate : null;
+        $hasanyoverride = $hasanyoverride || $extensiondate > 0;
+    }
+
     $overrideid = $existingoverrides['overrideid'] ?? 0;
 
     if ($hasanyoverride) {
@@ -394,6 +411,7 @@ function local_unifiedgrader_save_quiz_overrides($adapter, $cm, $userid, $fromfo
         $quizobj = \mod_quiz\quiz_settings::create_for_cmid($cm->id);
         $quizobj->get_override_manager()->save_override($overridedata);
         \local_unifiedgrader\adapter\quiz_adapter::refresh_duedate_calendar_events((int) $cm->instance);
+        \local_unifiedgrader\penalty\service::resync((int) $cm->id, (int) $userid);
     } else if ($overrideid) {
         // All checkboxes unchecked — delete existing override.
         $adapter->delete_user_override($userid);

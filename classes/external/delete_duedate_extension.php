@@ -17,7 +17,8 @@
 /**
  * External function: delete a quiz duedate extension.
  *
- * Removes the user's due date override from the quizaccess_duedate plugin,
+ * Removes the user's due date extension (from Moodle 5.3 the due date on their
+ * core quiz override; before that, the quizaccess_duedate plugin's override),
  * recalculates grades, and cleans up calendar events.
  *
  * @package    local_unifiedgrader
@@ -64,7 +65,11 @@ class delete_duedate_extension extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
-        require_capability('quizaccess/duedate:manageoverrides', $context);
+        // From Moodle 5.3 a quiz extension is a core override due date.
+        require_capability(
+            \local_unifiedgrader\penalty\compat::unified() ? 'mod/quiz:manageoverrides' : 'quizaccess/duedate:manageoverrides',
+            $context,
+        );
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler

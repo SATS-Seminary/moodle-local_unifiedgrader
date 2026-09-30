@@ -130,6 +130,42 @@ if ($hassiteconfig) {
         60
     ));
 
+    // Late penalties. From Moodle 5.3 Unified Grader owns them for
+    // assignments, forums and quizzes.
+    if (\local_unifiedgrader\penalty\compat::unified()) {
+        $settings->add(new admin_setting_heading(
+            'local_unifiedgrader/latepenalties',
+            get_string('setting_latepenalties_heading', 'local_unifiedgrader'),
+            get_string('setting_latepenalties_heading_desc', 'local_unifiedgrader'),
+        ));
+
+        // Core still penalising assignments means two systems deduct for the
+        // same thing. Unified Grader stands back for those assignments, but the
+        // administrator should switch core's off.
+        if (\core_grades\penalty_manager::is_penalty_enabled_for_module('assign')) {
+            $settings->add(new admin_setting_heading(
+                'local_unifiedgrader/coreassignpenalty',
+                '',
+                html_writer::div(
+                    get_string('setting_core_assign_penalty_warning', 'local_unifiedgrader', (new moodle_url(
+                        '/admin/settings.php',
+                        ['section' => 'supportedplugins'],
+                    ))->out(false)),
+                    'alert alert-warning',
+                ),
+            ));
+        }
+
+        $settings->add(new admin_setting_configtext(
+            'local_unifiedgrader/quizgenuineattemptpct',
+            get_string('setting_quizgenuineattemptpct', 'local_unifiedgrader'),
+            get_string('setting_quizgenuineattemptpct_desc', 'local_unifiedgrader'),
+            50,
+            '/^(100|[1-9]?[0-9])$/',
+            5
+        ));
+    }
+
     $ADMIN->add('local_unifiedgrader_cat', $settings);
 
     // External page: manage system-default tags and comments. Sibling of

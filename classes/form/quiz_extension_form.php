@@ -18,7 +18,8 @@
  * Quiz extension form for the unified grader.
  *
  * A simple date/time picker form for granting or editing a quiz due date
- * extension via the quizaccess_duedate plugin.
+ * extension: a core override due date from Moodle 5.3, via the
+ * quizaccess_duedate plugin before that.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
