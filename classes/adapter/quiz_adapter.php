@@ -47,7 +47,6 @@ use mod_quiz\quiz_attempt;
 use mod_quiz\quiz_settings;
 use mod_quiz\grade_calculator;
 use question_engine;
-use question_state;
 
 /**
  * Concrete adapter wrapping mod_quiz's grading API.
@@ -157,6 +156,9 @@ class quiz_adapter extends base_adapter {
         global $DB, $PAGE;
 
         $groupids = $this->get_group_ids($filters);
+        if ($groupids === null) {
+            return [];
+        }
 
         // Get enrolled users who can attempt quizzes (active enrolments only).
         $enrolledusers = $this->get_enrolled_users_multigroup(
@@ -218,6 +220,14 @@ class quiz_adapter extends base_adapter {
 
         $globaltimeclose = (int) ($this->quiz->timeclose ?? 0);
 
+        // Everyone's effective due date at once, where group overrides can
+        // set it; asking for it student by student costs queries for each.
+        $effectiveduedates = ($unified || $hasduedateplugin)
+            ? $this->get_effective_duedates(array_map('intval', array_keys($enrolledusers)))
+            : [];
+
+        $this->attach_user_contextids($enrolledusers);
+
         $result = [];
         foreach ($enrolledusers as $user) {
             $userid = (int) $user->id;
@@ -232,13 +242,8 @@ class quiz_adapter extends base_adapter {
 
             // Effective due date. On 5.3: core user override > group override > quiz due date.
             // Before: duedate plugin (if installed) > native override > global timeclose.
-            if ($unified) {
-                $effectiveduedate = $this->get_effective_duedate($userid);
-            } else if ($hasduedateplugin) {
-                $effectiveduedate = (int) \quizaccess_duedate\override_manager::get_effective_duedate(
-                    $this->quiz->id,
-                    $userid
-                );
+            if ($unified || $hasduedateplugin) {
+                $effectiveduedate = $effectiveduedates[$userid] ?? 0;
             } else {
                 $effectiveduedate = $overrideset[$userid] ?? $globaltimeclose;
             }
@@ -296,7 +301,7 @@ class quiz_adapter extends base_adapter {
             return $sortdir === 'desc' ? -$cmp : $cmp;
         });
 
-        return $result;
+        return $this->attach_grade_hidden($result);
     }
 
     /**
@@ -982,6 +987,23 @@ class quiz_adapter extends base_adapter {
             return false;
         }
 
+        // A pending feedback walk opens this page even while the cell, and the
+        // quiz review options, still hide the mark. The attempt review page is
+        // unchanged. A finished walk keeps this page open, and shows that
+        // student's gradebook mark, without flipping those options.
+        if (\local_unifiedgrader\friction\service::is_pending_user($this, $userid)) {
+            return true;
+        }
+        if (\local_unifiedgrader\friction\service::is_released_user($this, $userid)) {
+            return true;
+        }
+
+        // The gradebook cell stays hidden until the class review options reveal
+        // marks, and a cell can be held back on its own after that.
+        if ($this->grade_is_withheld($userid)) {
+            return false;
+        }
+
         // Review option bit constants from \mod_quiz\question\display_options.
         $laterwhileopen = 0x00100;
         $afterclose     = 0x00010;
@@ -994,6 +1016,15 @@ class quiz_adapter extends base_adapter {
         }
         // Quiz is still open (or no close date) — check LATER_WHILE_OPEN bit.
         return (bool) ($reviewmarks & $laterwhileopen);
+    }
+
+    /**
+     * A finished walk releases Unified Grader feedback while the item stays hidden.
+     *
+     * @return bool
+     */
+    public function release_outlives_hidden_item(): bool {
+        return true;
     }
 
     /**
@@ -1025,14 +1056,31 @@ class quiz_adapter extends base_adapter {
      * their attempts, they must enable reviewattempt themselves — UG
      * deliberately does not flip that switch.
      *
-     * Scheduling (hidden > 1) is not supported because review options are
-     * state-based (open/closed), not date-based.
+     * Scheduling (hidden > 1) is not supported for the whole class, because review
+     * options are state-based (open/closed), not date-based. A student or group
+     * post does not touch those options: it writes the gradebook cell only, and
+     * a timestamp on that cell is allowed.
      *
-     * @param int $hidden 0 = post (visible), 1 = hide. Timestamps not supported.
-     * @throws \moodle_exception If a timestamp is passed (scheduling not supported).
+     * @param int $hidden 0 = post (visible), 1 = hide, or a Unix timestamp for one student or group.
+     * @param int[] $userids Students to change. Empty for the whole class.
+     * @return array{posted:bool,partial:bool,hidden:int,postedcount:int,total:int,lifted:bool}
+     * @throws \moodle_exception If a timestamp is passed for the whole class.
      */
-    public function set_grades_posted(int $hidden): void {
+    public function set_grades_posted(int $hidden, array $userids = []): array {
         global $DB;
+
+        $userids = array_values(array_unique(array_filter(
+            array_map('intval', $userids),
+            fn(int $id): bool => $id > 0,
+        )));
+        if ($userids) {
+            // Cells only. The review options, and the item flag they own, stay as they are.
+            $status = \local_unifiedgrader\grades\release::apply($this, $hidden, $userids, false);
+            \local_unifiedgrader\friction\service::settle($this, $hidden, $userids);
+            $fresh = $this->posting_status();
+            $fresh['lifted'] = !empty($status['lifted']);
+            return $fresh;
+        }
 
         if ($hidden > 1) {
             throw new \moodle_exception('quiz_post_grades_no_schedule', 'local_unifiedgrader');
@@ -1060,9 +1108,24 @@ class quiz_adapter extends base_adapter {
         }
 
         $DB->update_record('quiz', $quiz);
+        $this->quiz = $quiz;
+
+        // Cells first. The grade sync below rewrites the item flag from the
+        // review options, and a finished walk puts that flag back while its
+        // cell is open. Hiding the cells first leaves a class hide hidden.
+        $item = $this->fetch_grade_item();
+        if ($item && $hidden === 0) {
+            // A class post clears cells that a previous per-student hide had set.
+            \local_unifiedgrader\grades\release::set_every_cell($item, 0);
+        } else if ($item) {
+            \local_unifiedgrader\grades\release::set_every_cell($item, 1);
+        }
 
         // Re-sync grade item hidden status with the updated review options.
         quiz_grade_item_update($quiz);
+
+        \local_unifiedgrader\friction\service::settle($this, $hidden, []);
+        return $this->posting_status();
     }
 
     /**
@@ -1105,6 +1168,84 @@ class quiz_adapter extends base_adapter {
         }
 
         return $globaltimeclose;
+    }
+
+    /**
+     * The effective due date of each listed student, in a fixed number of queries.
+     *
+     * Gives each student what get_effective_duedate() gives them, without
+     * asking for them one at a time. It follows the same order: the student's
+     * own override, then their groups' overrides, then the quiz's due date.
+     * Among several group overrides the latest wins; on Moodle 5.3 one set to
+     * "no due date" (0) wins over any date, as it does in core.
+     *
+     * Only for Moodle 5.3, or earlier with the quizaccess_duedate rule.
+     *
+     * @param int[] $userids The students.
+     * @return int[] Due date (0 = none), keyed by user ID.
+     */
+    public function get_effective_duedates(array $userids): array {
+        global $DB;
+
+        $unified = compat::unified();
+        if ($unified) {
+            $default = (int) $this->quiz->duedate;
+            $overrides = $DB->get_records_select(
+                'quiz_overrides',
+                'quiz = :quizid AND duedate IS NOT NULL',
+                ['quizid' => $this->quiz->id],
+                '',
+                'id, userid, groupid, duedate',
+            );
+        } else {
+            // The rule gives no due date to anyone when the quiz itself has none.
+            $default = $this->get_duedate_plugin_duedate();
+            if ($default <= 0) {
+                return array_fill_keys($userids, 0);
+            }
+            $overrides = \quizaccess_duedate\override_manager::get_overrides((int) $this->quiz->id);
+        }
+
+        $userdates = [];
+        $groupdates = [];
+        foreach ($overrides as $override) {
+            if (!empty($override->userid)) {
+                $userdates[(int) $override->userid] = (int) $override->duedate;
+            } else if (!empty($override->groupid)) {
+                $groupdates[(int) $override->groupid] = (int) $override->duedate;
+            }
+        }
+
+        // Who is in the groups that have an override. Usually there are none.
+        $datesbyuser = [];
+        if ($groupdates) {
+            [$insql, $params] = $DB->get_in_or_equal(array_keys($groupdates), SQL_PARAMS_NAMED);
+            $params['courseid'] = $this->course->id;
+            $members = $DB->get_recordset_sql(
+                "SELECT gm.id, gm.userid, gm.groupid
+                   FROM {groups_members} gm
+                   JOIN {groups} g ON g.id = gm.groupid
+                  WHERE g.courseid = :courseid AND gm.groupid {$insql}",
+                $params,
+            );
+            foreach ($members as $member) {
+                $datesbyuser[(int) $member->userid][] = $groupdates[(int) $member->groupid];
+            }
+            $members->close();
+        }
+
+        $result = [];
+        foreach ($userids as $userid) {
+            if (isset($userdates[$userid])) {
+                $result[$userid] = $userdates[$userid];
+            } else if (!empty($datesbyuser[$userid])) {
+                $dates = $datesbyuser[$userid];
+                $result[$userid] = ($unified && in_array(0, $dates, true)) ? 0 : max($dates);
+            } else {
+                $result[$userid] = $default;
+            }
+        }
+        return $result;
     }
 
     /**

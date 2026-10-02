@@ -21,13 +21,12 @@ use core_external\external_api;
 /**
  * Tests for activity-related web service external functions.
  *
- * Covers get_activity_info, get_participants, get_submission_data, and get_grade_data.
+ * Covers get_participants, get_submission_data, and get_grade_data.
  *
  * @package    local_unifiedgrader
  * @category   test
  * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers \local_unifiedgrader\external\get_activity_info
  * @covers \local_unifiedgrader\external\get_participants
  * @covers \local_unifiedgrader\external\get_submission_data
  * @covers \local_unifiedgrader\external\get_grade_data
@@ -44,75 +43,6 @@ final class activity_webservices_test extends \advanced_testcase {
         $scenario = $plugingen->create_grading_scenario('assign', $options);
         $this->setUser($scenario->teacher);
         return $scenario;
-    }
-
-    // Get_activity_info tests.
-
-    /**
-     * Test get_activity_info returns correct data for a teacher.
-     */
-    public function test_get_activity_info_happy_path(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario();
-        $result = get_activity_info::execute($scenario->cm->id);
-
-        $this->assertEquals($scenario->cm->id, $result['id']);
-        $this->assertEquals('assign', $result['type']);
-        $this->assertArrayHasKey('name', $result);
-        $this->assertArrayHasKey('duedate', $result);
-        $this->assertArrayHasKey('maxgrade', $result);
-        $this->assertArrayHasKey('gradingmethod', $result);
-    }
-
-    /**
-     * Test get_activity_info throws when user lacks the grade capability.
-     */
-    public function test_get_activity_info_no_capability(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario();
-        $this->setUser($scenario->students[0]);
-
-        $this->expectException(\required_capability_exception::class);
-        get_activity_info::execute($scenario->cm->id);
-    }
-
-    /**
-     * Test get_activity_info return value passes clean_returnvalue validation.
-     */
-    public function test_get_activity_info_return_validation(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario();
-        $result = get_activity_info::execute($scenario->cm->id);
-
-        $cleaned = external_api::clean_returnvalue(
-            get_activity_info::execute_returns(),
-            $result,
-        );
-
-        $this->assertEquals($scenario->cm->id, $cleaned['id']);
-        $this->assertIsString($cleaned['type']);
-        $this->assertIsBool($cleaned['teamsubmission']);
-        $this->assertIsBool($cleaned['blindmarking']);
-    }
-
-    /**
-     * Test get_activity_info with blind marking enabled returns the correct flag.
-     */
-    public function test_get_activity_info_blind_marking(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario(['modparams' => ['blindmarking' => 1]]);
-        $result = get_activity_info::execute($scenario->cm->id);
-
-        $cleaned = external_api::clean_returnvalue(
-            get_activity_info::execute_returns(),
-            $result,
-        );
-
-        $this->assertTrue($cleaned['blindmarking']);
     }
 
     // Get_participants tests.

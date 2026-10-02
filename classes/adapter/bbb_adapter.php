@@ -140,6 +140,9 @@ class bbb_adapter extends base_adapter {
         global $DB, $PAGE;
 
         $groupids = $this->get_group_ids($filters);
+        if ($groupids === null) {
+            return [];
+        }
         $bbbid = (int) $this->bbb->id;
 
         // Get enrolled users who can join meetings (active enrolments only).
@@ -174,6 +177,8 @@ class bbb_adapter extends base_adapter {
                 }
             }
         }
+
+        $this->attach_user_contextids($enrolledusers);
 
         $result = [];
         foreach ($enrolledusers as $user) {
@@ -251,7 +256,7 @@ class bbb_adapter extends base_adapter {
             return $sortdir === 'desc' ? -$cmp : $cmp;
         });
 
-        return $result;
+        return $this->attach_grade_hidden($result);
     }
 
     /**
@@ -929,7 +934,7 @@ class bbb_adapter extends base_adapter {
         if (!$gradeitem) {
             return false;
         }
-        if ($gradeitem->is_hidden()) {
+        if ($this->withheld_blocks_release($userid)) {
             return false;
         }
         $gradegrade = \grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $userid]);

@@ -67,6 +67,10 @@
 <div class="local-unifiedgrader-feedback" data-region="feedback-viewer"
      data-cmid="{{cmid}}">
 
+    {{#frictionactive}}
+        {{> local_unifiedgrader/friction_walk }}
+    {{/frictionactive}}
+
     {{! Header bar with back button, activity name, attempt selector, download, grade badge }}
     <div class="d-flex align-items-center justify-content-between border-bottom py-2 px-3 mb-3">
         <div class="d-flex align-items-center gap-2">

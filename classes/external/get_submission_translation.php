@@ -80,6 +80,7 @@ class get_submission_translation extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
+        \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
 
         // Release the PHP session lock so concurrent grader AJAX does not serialize
         // behind this request. This handler does not write to $SESSION.

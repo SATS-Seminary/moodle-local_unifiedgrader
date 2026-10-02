@@ -60,6 +60,8 @@ class get_shared_library extends external_api {
 
         $context = \context_system::instance();
         self::validate_context($context);
+        // The comment library is for people who grade, not for every logged-in user.
+        \local_unifiedgrader\access::require_library_access();
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler

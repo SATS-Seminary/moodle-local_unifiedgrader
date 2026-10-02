@@ -78,6 +78,10 @@ class retry_file_conversion extends external_api {
         if (!$file) {
             throw new \moodle_exception('error_file_not_found', 'local_unifiedgrader');
         }
+        // The capability was checked for this activity, so the file must be in it.
+        if ((int) $file->get_contextid() !== (int) $context->id) {
+            throw new \moodle_exception('error_file_not_found', 'local_unifiedgrader');
+        }
 
         // Online-text PDFs live in our own filearea and don't use Moodle's
         // file_conversion table. Delete the cached PDF so the next

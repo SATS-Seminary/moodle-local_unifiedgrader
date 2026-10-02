@@ -32,10 +32,7 @@
     - pdffiles: Array of PDF files
     - hasmultiplefiles: Whether there are multiple PDF files
     - pdffilesjson: JSON-encoded array of PDF files
-    - hasannotatedpdf: Whether an annotated PDF exists for the selected file
-    - annotatedpdfurl: URL of the annotated PDF (for inline viewer)
     - downloadfilename: Suggested filename for the feedback PDF download
-    - annotatedpdfmapjson: JSON map of fileid to annotated PDF URL
     - feedbackdownloadurl: URL to download the combined feedback summary + annotated PDF
     - userid: Current student user ID
     - hasfeedbackfiles: Whether there are feedback files to display
@@ -81,10 +78,7 @@
         ],
         "hasmultiplefiles": false,
         "pdffilesjson": "[]",
-        "hasannotatedpdf": true,
-        "annotatedpdfurl": "https://example.com/annotated.pdf",
         "downloadfilename": "feedback.pdf",
-        "annotatedpdfmapjson": "{}",
         "feedbackdownloadurl": "https://example.com/download",
         "userid": 2,
         "hasfeedbackfiles": false,
@@ -115,8 +109,11 @@
 <div class="local-unifiedgrader-feedback" data-region="feedback-viewer"
      data-cmid="{{cmid}}" data-fileid="{{selectedfileid}}"
      data-userid="{{userid}}" data-attempt="{{selectedattempt}}"
-     data-pdfurl="{{selectedfileurl}}" data-pdffiles="{{pdffilesjson}}"
-     data-annotatedpdfmap="{{annotatedpdfmapjson}}">
+     data-pdfurl="{{selectedfileurl}}" data-pdffiles="{{pdffilesjson}}">
+
+    {{#frictionactive}}
+        {{> local_unifiedgrader/friction_walk }}
+    {{/frictionactive}}
 
     {{! Header bar with back button, activity name, download, grade badge, comments icon }}
     <div class="d-flex align-items-center justify-content-between border-bottom py-2 px-3 mb-3">

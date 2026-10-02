@@ -70,6 +70,7 @@ class resolve_referral extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:refer', $context);
+        \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler

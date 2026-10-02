@@ -45,7 +45,26 @@ class forum_helper {
         if (empty($cm->modname) || $cm->modname !== 'forum') {
             return false;
         }
-        $type = $DB->get_field('forum', 'type', ['id' => $cm->instance]);
-        return $type === 'news';
+
+        // Asked on every forum page a student opens, and a forum's type all but
+        // never changes. Stored as 1 or 0, because a cache miss is false.
+        $cache = \cache::make('local_unifiedgrader', 'newsforum');
+        $cached = $cache->get((int) $cm->id);
+        if ($cached !== false) {
+            return (bool) $cached;
+        }
+
+        $isnews = $DB->get_field('forum', 'type', ['id' => $cm->instance]) === 'news';
+        $cache->set((int) $cm->id, (int) $isnews);
+        return $isnews;
+    }
+
+    /**
+     * Forget the cached forum type of an activity. Called when its settings are saved.
+     *
+     * @param int $cmid Course module ID.
+     */
+    public static function invalidate(int $cmid): void {
+        \cache::make('local_unifiedgrader', 'newsforum')->delete($cmid);
     }
 }

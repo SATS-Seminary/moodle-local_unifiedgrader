@@ -111,4 +111,8 @@ $observers = [
         'eventname' => '\mod_quiz\event\attempt_submitted',
         'callback' => '\local_unifiedgrader\observer::handle_attempt_submitted',
     ],
+    [
+        'eventname' => '\core\event\grade_item_updated',
+        'callback' => '\local_unifiedgrader\observer::handle_grade_item_updated',
+    ],
 ];

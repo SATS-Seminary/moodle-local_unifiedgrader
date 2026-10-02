@@ -68,7 +68,15 @@ feedback on or off. The two layers compose cleanly.</p>
 <p>Gated by the admin setting <code>enable_quiz_post_grades</code> (off by
 default; enable it only when your workflow explicitly relies on the toggle
 to control mark visibility). Scheduling a future post date is not supported
-for quizzes — review options are state-based, not date-based.</p>
+for the whole quiz — review options are state-based, not date-based.</p>
+
+<p>Posting one student or one group writes that gradebook cell and the
+Unified Grader feedback only. The attempt review page stays on the quiz
+review options. While those options still hide marks, the gradebook hides
+the mark as well. Friction Feedback is the exception: when that student
+finishes the walk, their mark is shown in the gradebook and the review
+options are left as they are. The gradebook eye cannot show the quiz item
+itself, because the quiz owns that flag.</p>
 
 <h4>Quiz extensions</h4>
 <p><strong>Moodle 5.3 and later:</strong> quizzes have their own due date, and an

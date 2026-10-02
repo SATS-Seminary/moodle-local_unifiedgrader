@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * External function: delete all annotations for a student submission file.
+ * External function: set an activity's Friction Feedback mode.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
@@ -28,21 +28,21 @@ use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use local_unifiedgrader\annotation_manager;
+use local_unifiedgrader\friction\service;
 
 /**
- * Deletes all annotations for a specific file.
+ * Stores whether one activity follows the site, forces the walk on, or forces it off.
  */
-class delete_annotations extends external_api {
+class set_friction_mode extends external_api {
     /**
      * Parameter definition.
+     *
      * @return external_function_parameters
      */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
-            'userid' => new external_value(PARAM_INT, 'Student user ID'),
-            'fileid' => new external_value(PARAM_INT, 'File ID'),
+            'mode' => new external_value(PARAM_ALPHA, 'inherit, on, or off'),
         ]);
     }
 
@@ -50,42 +50,37 @@ class delete_annotations extends external_api {
      * Execute the function.
      *
      * @param int $cmid
-     * @param int $userid
-     * @param int $fileid
-     * @return array
+     * @param string $mode
+     * @return array{mode:string,enabled:bool}
      */
-    public static function execute(int $cmid, int $userid, int $fileid): array {
+    public static function execute(int $cmid, string $mode): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
-            'userid' => $userid,
-            'fileid' => $fileid,
+            'mode' => $mode,
         ]);
 
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
-
-        // Release the PHP session lock so concurrent AJAX from the same
-        // teacher does not serialize behind this request. This handler
-        // does not write to $SESSION.
         \core\session\manager::write_close();
 
-        annotation_manager::delete_annotations(
-            $params['cmid'],
-            $params['userid'],
-            $params['fileid'],
-        );
+        service::set_mode($params['cmid'], $params['mode']);
 
-        return ['success' => true];
+        return [
+            'mode' => service::mode($params['cmid']),
+            'enabled' => service::applies($params['cmid']),
+        ];
     }
 
     /**
      * Return definition.
+     *
      * @return external_single_structure
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'success' => new external_value(PARAM_BOOL, 'Whether deletion succeeded'),
+            'mode' => new external_value(PARAM_ALPHA, 'inherit, on, or off'),
+            'enabled' => new external_value(PARAM_BOOL, 'Whether a post on this activity holds the mark'),
         ]);
     }
 }

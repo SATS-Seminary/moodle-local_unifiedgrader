@@ -2709,24 +2709,6 @@ export default class PdfViewer extends BaseComponent {
     // ──────────────────────────────────────────────
 
     /**
-     * Get the currently active page number.
-     *
-     * @returns {number} Current page (1-based).
-     */
-    getCurrentPage() {
-        return this._activePageNum;
-    }
-
-    /**
-     * Get the total number of pages.
-     *
-     * @returns {number} Total pages.
-     */
-    getTotalPages() {
-        return this._totalPages;
-    }
-
-    /**
      * Set annotation data for a specific page.
      * Used by feedback_viewer.js to load read-only annotations.
      *

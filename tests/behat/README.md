@@ -36,7 +36,7 @@ they're flagged for follow-up rather than left as broken tests.
 | `forum_feedback_banner.feature` | A graded student sees the feedback banner inside a forum discussion, not only on the list of discussions |
 | `quiz_question_comment_editor.feature` | A manually marked quiz question's comment is a TinyMCE editor, and a formatted comment saves and reloads |
 | `annotation_toolbar_after_zoom.feature` | Tool clicks still dispatch to the active annotation layer after a zoom — the v2.5.1 / v2.5.2 stuck-tool regression |
-| `navigation_footer.feature` | Moodle 5.3+ only: the "Previous / Next activity" footer is absent from the grader (and present on the activity itself, so the check means something) |
+| `navigation_footer.feature` | Moodle 5.3+ only: the "Previous / Next activity" footer is absent from the grader and from the student feedback page, released or not (and present on the activity itself, so the check means something) |
 | `late_penalties.feature` | Moodle 5.3+ only (skipped before): the quiz settings' late penalty switch, a late attempt penalised in the grader and gradebook with no marking, a due date override on the quiz's own page removing it, and no penalty with the switch off |
 
 Worth adding next (not in this scaffold):

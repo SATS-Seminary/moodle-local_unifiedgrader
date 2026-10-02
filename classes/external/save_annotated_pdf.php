@@ -78,6 +78,7 @@ class save_annotated_pdf extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
+        \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler
@@ -88,6 +89,11 @@ class save_annotated_pdf extends external_api {
         $pdfbytes = base64_decode($params['pdfdata'], true);
         if ($pdfbytes === false) {
             throw new \invalid_parameter_exception('Invalid base64 PDF data.');
+        }
+        // This file is later served to the student, so it must be what it says:
+        // a PDF, under a PDF's name. Anything else could be served as a web page.
+        if (!str_starts_with($pdfbytes, '%PDF-') || !preg_match('/\.pdf$/i', $params['filename'])) {
+            throw new \invalid_parameter_exception('The annotated file must be a PDF.');
         }
 
         $fs = get_file_storage();

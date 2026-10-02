@@ -25,12 +25,6 @@
 defined('MOODLE_INTERNAL') || die();
 
 $functions = [
-    'local_unifiedgrader_get_activity_info' => [
-        'classname' => 'local_unifiedgrader\external\get_activity_info',
-        'description' => 'Get activity metadata for the grading interface.',
-        'type' => 'read',
-        'ajax' => true,
-    ],
     'local_unifiedgrader_get_participants' => [
         'classname' => 'local_unifiedgrader\external\get_participants',
         'description' => 'Get filtered and sorted participant list with submission status.',
@@ -151,12 +145,6 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
-    'local_unifiedgrader_delete_annotations' => [
-        'classname' => 'local_unifiedgrader\external\delete_annotations',
-        'description' => 'Delete all annotations for a student submission file.',
-        'type' => 'write',
-        'ajax' => true,
-    ],
     'local_unifiedgrader_get_student_annotations' => [
         'classname' => 'local_unifiedgrader\external\get_student_annotations',
         'description' => 'Get annotations for the current student\'s own submission file (read-only).',
@@ -220,24 +208,6 @@ $functions = [
     'local_unifiedgrader_submission_action' => [
         'classname' => 'local_unifiedgrader\external\submission_action',
         'description' => 'Perform a submission status action (revert to draft, remove, lock, unlock).',
-        'type' => 'write',
-        'ajax' => true,
-    ],
-    'local_unifiedgrader_delete_user_override' => [
-        'classname' => 'local_unifiedgrader\external\delete_user_override',
-        'description' => 'Delete a user-level override for an activity.',
-        'type' => 'write',
-        'ajax' => true,
-    ],
-    'local_unifiedgrader_delete_duedate_extension' => [
-        'classname' => 'local_unifiedgrader\external\delete_duedate_extension',
-        'description' => 'Delete a quiz duedate extension for a user.',
-        'type' => 'write',
-        'ajax' => true,
-    ],
-    'local_unifiedgrader_delete_forum_extension' => [
-        'classname' => 'local_unifiedgrader\external\delete_forum_extension',
-        'description' => 'Delete a forum due date extension for a user.',
         'type' => 'write',
         'ajax' => true,
     ],
@@ -359,6 +329,18 @@ $functions = [
         'classname' => 'local_unifiedgrader\external\get_post_context',
         'description' => 'Get the threaded discussion context around a student\'s forum posts.',
         'type' => 'read',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_set_friction_mode' => [
+        'classname' => 'local_unifiedgrader\external\set_friction_mode',
+        'description' => 'Set whether an activity uses Friction Feedback.',
+        'type' => 'write',
+        'ajax' => true,
+    ],
+    'local_unifiedgrader_advance_friction' => [
+        'classname' => 'local_unifiedgrader\external\advance_friction',
+        'description' => 'Record that the current student has seen the current feedback step.',
+        'type' => 'write',
         'ajax' => true,
     ],
 ];

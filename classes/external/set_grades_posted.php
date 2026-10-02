@@ -26,12 +26,17 @@ namespace local_unifiedgrader\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
+use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_unifiedgrader\access;
 use local_unifiedgrader\adapter\adapter_factory;
+use local_unifiedgrader\grades\release;
 
 /**
- * Posts or unposts grades for an activity (hides/unhides the grade item).
+ * Posts or hides grades for an activity, for one student, for groups, or for the class.
+ *
+ * Callers that send only cmid and hidden keep the class-wide behaviour.
  *
  * The hidden parameter supports three modes:
  *   0 = post grades (visible to students immediately)
@@ -50,6 +55,24 @@ class set_grades_posted extends external_api {
                 PARAM_INT,
                 '0 = post (visible), 1 = hide permanently, or Unix timestamp = hide until',
             ),
+            'scope' => new external_value(
+                PARAM_ALPHA,
+                'class (default), user, or groups',
+                VALUE_DEFAULT,
+                'class',
+            ),
+            'userid' => new external_value(
+                PARAM_INT,
+                'Student user id when scope is user',
+                VALUE_DEFAULT,
+                0,
+            ),
+            'groupids' => new external_multiple_structure(
+                new external_value(PARAM_INT, 'Group id'),
+                'Group ids when scope is groups',
+                VALUE_DEFAULT,
+                [],
+            ),
         ]);
     }
 
@@ -58,12 +81,24 @@ class set_grades_posted extends external_api {
      *
      * @param int $cmid
      * @param int $hidden
+     * @param string $scope class, user, or groups
+     * @param int $userid
+     * @param int[] $groupids
      * @return array
      */
-    public static function execute(int $cmid, int $hidden): array {
+    public static function execute(
+        int $cmid,
+        int $hidden,
+        string $scope = 'class',
+        int $userid = 0,
+        array $groupids = [],
+    ): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
             'hidden' => $hidden,
+            'scope' => $scope,
+            'userid' => $userid,
+            'groupids' => $groupids,
         ]);
 
         $context = \context_module::instance($params['cmid']);
@@ -88,13 +123,14 @@ class set_grades_posted extends external_api {
         }
 
         $adapter = adapter_factory::create($params['cmid']);
-        $adapter->set_grades_posted($hidden);
+        $userids = self::resolve_userids($adapter, $cm, $context, $params['scope'], (int) $params['userid'], $params['groupids']);
+        if ($userids === null) {
+            // A group whose members include no student. Report the status and change nothing.
+            return self::format_status($adapter->posting_status());
+        }
 
-        return [
-            'success' => true,
-            'posted' => $adapter->are_grades_posted(),
-            'hidden' => $adapter->get_grades_hidden_value(),
-        ];
+        $status = $adapter->set_grades_posted($hidden, $userids);
+        return self::format_status($status);
     }
 
     /**
@@ -104,11 +140,91 @@ class set_grades_posted extends external_api {
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'success' => new external_value(PARAM_BOOL, 'Whether the operation succeeded'),
-            'posted' => new external_value(PARAM_BOOL, 'Whether grades are currently visible to students'),
+            'posted' => new external_value(PARAM_BOOL, 'Whether every visible student has a released grade'),
             'hidden' => new external_value(
                 PARAM_INT,
-                'Raw hidden value: 0 = visible, 1 = always hidden, >1 = hidden-until timestamp',
+                'Raw hidden value of the grade item: 0 = visible, 1 = always hidden, >1 = hidden-until timestamp',
             ),
+            'partial' => new external_value(PARAM_BOOL, 'Whether some, but not all, students have a released grade'),
+            'postedcount' => new external_value(PARAM_INT, 'How many students have a released grade'),
+            'total' => new external_value(PARAM_INT, 'How many students this user can post for'),
         ]);
+    }
+
+    /**
+     * The students a scope names.
+     *
+     * An empty array is the whole class. Null means the request named groups
+     * that contain no gradebook student, and the caller should change nothing.
+     *
+     * A separate-groups teacher who cannot access every group cannot post the
+     * class. That check lives here, not in the adapter, so a test can still
+     * post the class through the adapter directly.
+     *
+     * @param \local_unifiedgrader\adapter\base_adapter $adapter
+     * @param \stdClass $cm
+     * @param \context_module $context
+     * @param string $scope
+     * @param int $userid
+     * @param array $groupids
+     * @return int[]|null
+     */
+    private static function resolve_userids(
+        $adapter,
+        \stdClass $cm,
+        \context_module $context,
+        string $scope,
+        int $userid,
+        array $groupids,
+    ): ?array {
+        if ($scope === 'class') {
+            if (
+                (int) groups_get_activity_groupmode($cm) === SEPARATEGROUPS
+                && !has_capability('moodle/site:accessallgroups', $context)
+            ) {
+                throw new \moodle_exception('post_grades_class_denied', 'local_unifiedgrader');
+            }
+            return [];
+        }
+
+        if ($scope === 'user') {
+            access::require_student_access($context, $userid);
+            if (!in_array($userid, release::student_ids($adapter), true)) {
+                throw new \moodle_exception('nopermission', 'local_unifiedgrader');
+            }
+            return [$userid];
+        }
+
+        if ($scope !== 'groups') {
+            throw new \moodle_exception('invalidparameter');
+        }
+
+        $requested = array_values(array_unique(array_filter(array_map('intval', $groupids), fn(int $id): bool => $id > 0)));
+        if (!$requested) {
+            throw new \moodle_exception('invalidparameter');
+        }
+        $visible = access::visible_group_ids($cm, $context, $requested);
+        if ($visible === null) {
+            throw new \moodle_exception('nopermission', 'local_unifiedgrader');
+        }
+        $userids = release::students_in_groups($adapter, $visible);
+        return $userids ?: null;
+    }
+
+    /**
+     * The web-service return, without the adapter's internal keys.
+     *
+     * @param array $status
+     * @return array
+     */
+    private static function format_status(array $status): array {
+        return [
+            'success' => true,
+            'posted' => (bool) $status['posted'],
+            'hidden' => (int) $status['hidden'],
+            'partial' => (bool) $status['partial'],
+            'postedcount' => (int) $status['postedcount'],
+            'total' => (int) $status['total'],
+        ];
     }
 }

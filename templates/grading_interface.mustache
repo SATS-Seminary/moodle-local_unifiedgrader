@@ -47,6 +47,10 @@
         "allowmanualgradeoverride": false,
         "gradesposted": false,
         "gradeshidden": "",
+        "gradespartial": false,
+        "postedcount": 0,
+        "postedtotal": 0,
+        "canpostclass": true,
         "coursecode": "THE101",
         "canloginas": true,
         "coursefullname": "Theology 101",
@@ -86,6 +90,10 @@
      data-allowmanualgradeoverride="{{#allowmanualgradeoverride}}1{{/allowmanualgradeoverride}}{{^allowmanualgradeoverride}}0{{/allowmanualgradeoverride}}"
      data-gradesposted="{{#gradesposted}}1{{/gradesposted}}{{^gradesposted}}0{{/gradesposted}}"
      data-gradeshidden="{{gradeshidden}}"
+     data-gradespartial="{{#gradespartial}}1{{/gradespartial}}{{^gradespartial}}0{{/gradespartial}}"
+     data-postedcount="{{postedcount}}"
+     data-postedtotal="{{postedtotal}}"
+     data-canpostclass="{{#canpostclass}}1{{/canpostclass}}{{^canpostclass}}0{{/canpostclass}}"
      data-coursecode="{{coursecode}}"
      data-canloginas="{{#canloginas}}1{{/canloginas}}{{^canloginas}}0{{/canloginas}}"
      data-hassatsmail="{{#hassatsmail}}1{{/hassatsmail}}{{^hassatsmail}}0{{/hassatsmail}}"
@@ -179,17 +187,44 @@
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" data-region="post-grades-menu">
                     <li>
-                        <button class="dropdown-item" type="button" data-action="post-grades-now">
+                        <button class="dropdown-item" type="button" data-action="post-grades-student">
                             <i class="fa fa-eye fa-fw me-1"></i>
-                            {{#str}} post_grades, local_unifiedgrader {{/str}}
+                            {{#str}} post_grades_student, local_unifiedgrader {{/str}}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item" type="button" data-action="hide-grades-student">
+                            <i class="fa fa-eye-slash fa-fw me-1"></i>
+                            {{#str}} unpost_grades_student, local_unifiedgrader {{/str}}
+                        </button>
+                    </li>
+                    <li data-region="post-grades-group-actions" class="d-none">
+                        <button class="dropdown-item" type="button" data-action="post-grades-groups">
+                            <i class="fa fa-eye fa-fw me-1"></i>
+                            <span data-region="group-post-label"></span>
+                        </button>
+                    </li>
+                    <li data-region="post-grades-group-actions" class="d-none">
+                        <button class="dropdown-item" type="button" data-action="hide-grades-groups">
+                            <i class="fa fa-eye-slash fa-fw me-1"></i>
+                            <span data-region="group-hide-label"></span>
+                        </button>
+                    </li>
+                    {{#canpostclass}}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <button class="dropdown-item" type="button" data-action="post-grades-now">
+                            <i class="fa fa-users fa-fw me-1"></i>
+                            {{#str}} post_grades_class, local_unifiedgrader {{/str}}
                         </button>
                     </li>
                     <li>
                         <button class="dropdown-item" type="button" data-action="hide-grades">
                             <i class="fa fa-eye-slash fa-fw me-1"></i>
-                            {{#str}} unpost_grades, local_unifiedgrader {{/str}}
+                            {{#str}} unpost_grades_class, local_unifiedgrader {{/str}}
                         </button>
                     </li>
+                    {{/canpostclass}}
                     {{#showschedulepost}}
                     <li><hr class="dropdown-divider"></li>
                     <li>
@@ -198,6 +233,11 @@
                                 <i class="fa fa-clock-o fa-fw me-1"></i>
                                 {{#str}} schedule_post, local_unifiedgrader {{/str}}
                             </label>
+                            <select class="form-select form-select-sm mb-1" data-action="schedule-scope">
+                                <option value="class">{{#str}} schedule_scope_class, local_unifiedgrader {{/str}}</option>
+                                <option value="user">{{#str}} schedule_scope_student, local_unifiedgrader {{/str}}</option>
+                                <option value="groups">{{#str}} schedule_scope_groups, local_unifiedgrader {{/str}}</option>
+                            </select>
                             <input type="datetime-local"
                                    class="form-control form-control-sm"
                                    data-action="schedule-date-input">
@@ -213,6 +253,27 @@
             </div>
         </div>
         {{/showpostgrades}}
+
+        <div class="d-flex align-items-center px-2 border-start" data-region="friction-mode">
+            <label class="small text-muted mb-0 me-2 text-nowrap" for="ug-friction-mode-{{uniqid}}">
+                <i class="fa fa-book fa-fw" aria-hidden="true"></i>
+                {{#str}} friction_mode, local_unifiedgrader {{/str}}
+            </label>
+            <select id="ug-friction-mode-{{uniqid}}"
+                    class="form-select form-select-sm"
+                    data-action="friction-mode"
+                    data-cmid="{{cmid}}">
+                <option value="inherit" {{#frictioninherit}}selected{{/frictioninherit}}>
+                    {{#str}} friction_mode_inherit, local_unifiedgrader {{/str}}
+                </option>
+                <option value="on" {{#frictionon}}selected{{/frictionon}}>
+                    {{#str}} friction_mode_on, local_unifiedgrader {{/str}}
+                </option>
+                <option value="off" {{#frictionoff}}selected{{/frictionoff}}>
+                    {{#str}} friction_mode_off, local_unifiedgrader {{/str}}
+                </option>
+            </select>
+        </div>
 
         <div class="d-flex align-items-center px-2 border-start">
             <div class="btn-group btn-group-sm" role="group" data-region="layout-toggle">

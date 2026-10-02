@@ -176,6 +176,53 @@ if ($hassiteconfig) {
         ));
     }
 
+    $settings->add(new admin_setting_heading(
+        'local_unifiedgrader/friction_heading',
+        get_string('setting_friction_heading', 'local_unifiedgrader'),
+        get_string('setting_friction_heading_desc', 'local_unifiedgrader'),
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_unifiedgrader/friction_enable',
+        get_string('setting_friction_enable', 'local_unifiedgrader'),
+        get_string('setting_friction_enable_desc', 'local_unifiedgrader'),
+        0,
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_unifiedgrader/friction_seconds',
+        get_string('setting_friction_seconds', 'local_unifiedgrader'),
+        get_string('setting_friction_seconds_desc', 'local_unifiedgrader'),
+        20,
+        '/^\d{1,4}$/',
+        4,
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_unifiedgrader/friction_daysbeforeend',
+        get_string('setting_friction_daysbeforeend', 'local_unifiedgrader'),
+        get_string('setting_friction_daysbeforeend_desc', 'local_unifiedgrader'),
+        14,
+        '/^\d{1,3}$/',
+        3,
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_unifiedgrader/friction_daysafterpost',
+        get_string('setting_friction_daysafterpost', 'local_unifiedgrader'),
+        get_string('setting_friction_daysafterpost_desc', 'local_unifiedgrader'),
+        21,
+        '/^\d{1,3}$/',
+        3,
+    ));
+
+    $settings->add(new admin_setting_configtextarea(
+        'local_unifiedgrader/friction_invitation',
+        get_string('setting_friction_invitation', 'local_unifiedgrader'),
+        get_string('setting_friction_invitation_desc', 'local_unifiedgrader'),
+        '',
+    ));
+
     $ADMIN->add('local_unifiedgrader_cat', $settings);
 
     // External page: manage system-default tags and comments. Sibling of

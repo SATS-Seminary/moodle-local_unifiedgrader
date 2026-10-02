@@ -84,6 +84,7 @@ class save_penalty extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
+        \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler
@@ -103,6 +104,26 @@ class save_penalty extends external_api {
         // For 'other', label is required.
         if ($params['category'] === 'other' && trim($params['label']) === '') {
             throw new \invalid_parameter_exception('Label is required for other penalties');
+        }
+
+        // An existing penalty must be this student's, in this activity, and not the automatic late one.
+        if ($params['penaltyid'] > 0) {
+            global $DB;
+            $existing = $DB->get_record(
+                'local_unifiedgrader_penalty',
+                ['id' => $params['penaltyid']],
+                'id, cmid, userid, category',
+            );
+            if (
+                !$existing
+                || (int) $existing->cmid !== (int) $params['cmid']
+                || (int) $existing->userid !== (int) $params['userid']
+            ) {
+                throw new \invalid_parameter_exception('Penalty does not belong to the given activity and student');
+            }
+            if ($existing->category === 'late') {
+                throw new \moodle_exception('cannotdeleteautopenalty', 'local_unifiedgrader');
+            }
         }
 
         $id = penalty_manager::save_penalty(

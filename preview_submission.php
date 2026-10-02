@@ -57,6 +57,18 @@ if (!$cangrade && !$canviewfeedback) {
 if (!$cangrade && (int) $userid !== (int) $USER->id) {
     throw new moodle_exception('nopermissions', '', '', get_string('viewfeedback', 'local_unifiedgrader'));
 }
+if (!get_config('local_unifiedgrader', 'enable_' . $cm->modname)) {
+    throw new moodle_exception('invalidactivitytype', 'local_unifiedgrader');
+}
+if ($cangrade) {
+    // A teacher may only preview students they can see in this activity.
+    \local_unifiedgrader\access::require_student_access($context, $userid);
+} else if (!adapter_factory::create($cmid)->is_grade_released((int) $USER->id)) {
+    // This page is the student's feedback view of their own work. Before the
+    // grade is released it must show nothing: for a quiz it would otherwise
+    // reveal marks and which answers were right while the quiz hides them.
+    throw new moodle_exception('feedback_not_available', 'local_unifiedgrader');
+}
 
 // Set up a minimal embedded page (no navigation chrome).
 $PAGE->set_url(new moodle_url('/local/unifiedgrader/preview_submission.php', [
@@ -120,12 +132,16 @@ if ($cm->modname === 'assign') {
     if ($attempt) {
         $attemptobj = quiz_attempt::create($attempt->id);
 
-        // Configure display options for a read-only review.
+        // Configure display options for a read-only review. A teacher sees
+        // everything. A student sees what the quiz's own review options allow
+        // them at this point, and nothing more.
         $options = $attemptobj->get_display_options(true);
-        $options->marks = \question_display_options::MARK_AND_MAX;
-        $options->correctness = \question_display_options::VISIBLE;
-        $options->feedback = \question_display_options::VISIBLE;
-        $options->manualcomment = \question_display_options::VISIBLE;
+        if ($cangrade) {
+            $options->marks = \question_display_options::MARK_AND_MAX;
+            $options->correctness = \question_display_options::VISIBLE;
+            $options->feedback = \question_display_options::VISIBLE;
+            $options->manualcomment = \question_display_options::VISIBLE;
+        }
         $options->history = \question_display_options::HIDDEN;
         $options->flags = \question_display_options::HIDDEN;
         $options->generalfeedback = \question_display_options::HIDDEN;

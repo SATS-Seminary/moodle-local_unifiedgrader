@@ -168,11 +168,11 @@ final class annotated_pdf_webservices_test extends \advanced_testcase {
         $filename = 'annotated.pdf';
 
         // Save first version.
-        $pdfdata1 = base64_encode('Version 1');
+        $pdfdata1 = base64_encode('%PDF-1.7 Version 1');
         save_annotated_pdf::execute($scenario->cm->id, $student->id, $fileid, $pdfdata1, $filename);
 
         // Save second version (should overwrite).
-        $pdfdata2 = base64_encode('Version 2');
+        $pdfdata2 = base64_encode('%PDF-1.7 Version 2');
         $result = save_annotated_pdf::execute($scenario->cm->id, $student->id, $fileid, $pdfdata2, $filename);
         $this->assertTrue($result['success']);
 
@@ -187,7 +187,7 @@ final class annotated_pdf_webservices_test extends \advanced_testcase {
             $filename,
         );
         $this->assertNotFalse($file);
-        $this->assertEquals('Version 2', $file->get_content());
+        $this->assertEquals('%PDF-1.7 Version 2', $file->get_content());
     }
 
     // Delete_annotated_pdf tests.

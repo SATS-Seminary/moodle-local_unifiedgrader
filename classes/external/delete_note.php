@@ -67,6 +67,18 @@ class delete_note extends external_api {
         // does not write to $SESSION.
         \core\session\manager::write_close();
 
+        // The note must belong to this activity: the capability was checked here, not elsewhere.
+        global $DB;
+        $note = $DB->get_record('local_unifiedgrader_notes', ['id' => $params['noteid']], 'id, cmid, userid');
+        if (!$note) {
+            // Already gone: nothing to do.
+            return ['success' => true];
+        }
+        if ((int) $note->cmid !== (int) $params['cmid']) {
+            throw new \invalid_parameter_exception('Note does not belong to the given activity');
+        }
+        \local_unifiedgrader\access::require_student_access($context, (int) $note->userid);
+
         notes_manager::delete_note($params['noteid']);
 
         return ['success' => true];

@@ -178,6 +178,12 @@ class get_participants extends external_api {
                     VALUE_DEFAULT,
                     false,
                 ),
+                'gradehidden' => new external_value(
+                    PARAM_INT,
+                    'Effective grade hidden value: 0 visible, 1 hidden, or a hidden-until timestamp',
+                    VALUE_DEFAULT,
+                    0,
+                ),
             ]),
         );
     }

@@ -38,6 +38,8 @@ require_login();
 if (isguestuser()) {
     throw new moodle_exception('noguest');
 }
+// The comment library is for people who grade, not for every logged-in user.
+\local_unifiedgrader\access::require_library_access();
 
 $context = context_user::instance($USER->id);
 $action = optional_param('action', 'list', PARAM_ALPHA);

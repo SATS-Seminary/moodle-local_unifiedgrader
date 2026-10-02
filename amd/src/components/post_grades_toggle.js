@@ -16,6 +16,10 @@
 /**
  * Post grades dropdown component - allows teachers to post, hide, or schedule grade visibility.
  *
+ * The menu posts the open student, the groups in the current filter, or the
+ * whole class. Group actions are hidden while the filter is the whole class.
+ * Class actions are omitted from the page when this teacher cannot post the class.
+ *
  * @module     local_unifiedgrader/components/post_grades_toggle
  * @copyright  2026 South African Theological Seminary
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -35,7 +39,12 @@ export default class extends BaseComponent {
             STATUS_BTN: '[data-action="post-grades-status"]',
             POST_NOW: '[data-action="post-grades-now"]',
             HIDE_GRADES: '[data-action="hide-grades"]',
+            POST_STUDENT: '[data-action="post-grades-student"]',
+            HIDE_STUDENT: '[data-action="hide-grades-student"]',
+            POST_GROUPS: '[data-action="post-grades-groups"]',
+            HIDE_GROUPS: '[data-action="hide-grades-groups"]',
             SCHEDULE_INPUT: '[data-action="schedule-date-input"]',
+            SCHEDULE_SCOPE: '[data-action="schedule-scope"]',
             SCHEDULE_BTN: '[data-action="schedule-post"]',
             MENU: '[data-region="post-grades-menu"]',
         };
@@ -49,6 +58,7 @@ export default class extends BaseComponent {
     getWatchers() {
         return [
             {watch: 'ui:updated', handler: this._updateStatus},
+            {watch: 'filters:updated', handler: this._updateStatus},
         ];
     }
 
@@ -66,30 +76,39 @@ export default class extends BaseComponent {
      * Set up DOM event listeners.
      */
     _setupEventListeners() {
-        const postNow = this.getElement(this.selectors.POST_NOW);
-        const hideGrades = this.getElement(this.selectors.HIDE_GRADES);
-        const scheduleBtn = this.getElement(this.selectors.SCHEDULE_BTN);
-
-        if (postNow) {
-            postNow.addEventListener('click', (e) => this._handlePostNow(e));
+        const menu = this.getElement(this.selectors.MENU);
+        if (!menu) {
+            return;
         }
-        if (hideGrades) {
-            hideGrades.addEventListener('click', (e) => this._handleHide(e));
-        }
-        if (scheduleBtn) {
-            scheduleBtn.addEventListener('click', (e) => this._handleSchedule(e));
-        }
+        menu.addEventListener('click', (e) => {
+            const action = e.target.closest('[data-action]')?.dataset.action;
+            if (action === 'post-grades-now') {
+                this._handlePostNow(e);
+            } else if (action === 'hide-grades') {
+                this._handleHide(e);
+            } else if (action === 'post-grades-student') {
+                this._confirmAndPost(e, 0, 'user');
+            } else if (action === 'hide-grades-student') {
+                this._confirmAndPost(e, 1, 'user');
+            } else if (action === 'post-grades-groups') {
+                this._confirmAndPost(e, 0, 'groups');
+            } else if (action === 'hide-grades-groups') {
+                this._confirmAndPost(e, 1, 'groups');
+            } else if (action === 'schedule-post') {
+                this._handleSchedule(e);
+            }
+        });
     }
 
     /**
-     * Handle "Post grades now" click.
+     * Handle "Post the whole class" click.
      *
      * @param {Event} e Click event.
      */
     async _handlePostNow(e) {
         e.preventDefault();
         const state = this.reactive.state;
-        if (state.ui.posting) {
+        if (state.ui.posting || !state.ui.canPostClass) {
             return;
         }
 
@@ -105,18 +124,18 @@ export default class extends BaseComponent {
             return;
         }
 
-        this.reactive.dispatch('setGradesPosted', state.activity.cmid, 0);
+        this._dispatch(0, 'class');
     }
 
     /**
-     * Handle "Hide grades" click.
+     * Handle "Hide the whole class" click.
      *
      * @param {Event} e Click event.
      */
     async _handleHide(e) {
         e.preventDefault();
         const state = this.reactive.state;
-        if (state.ui.posting) {
+        if (state.ui.posting || !state.ui.canPostClass) {
             return;
         }
 
@@ -128,7 +147,48 @@ export default class extends BaseComponent {
             return;
         }
 
-        this.reactive.dispatch('setGradesPosted', state.activity.cmid, 1);
+        this._dispatch(1, 'class');
+    }
+
+    /**
+     * Confirm and post or hide the open student, or the groups in the filter.
+     *
+     * @param {Event} e Click event.
+     * @param {number} hidden 0 to post, 1 to hide.
+     * @param {string} scope user or groups.
+     */
+    async _confirmAndPost(e, hidden, scope) {
+        e.preventDefault();
+        const state = this.reactive.state;
+        if (state.ui.posting) {
+            return;
+        }
+        if (scope === 'groups' && this._groupsInView(state).length === 0) {
+            return;
+        }
+        if (scope === 'user' && !state.currentUser?.id) {
+            return;
+        }
+
+        const quiz = state.activity.type === 'quiz';
+        let stringkey;
+        let param = null;
+        if (scope === 'groups') {
+            stringkey = hidden === 0 ? 'confirm_post_grades_groups' : 'confirm_unpost_grades_groups';
+            if (quiz) {
+                stringkey = hidden === 0 ? 'confirm_post_grades_quiz_partial' : 'confirm_unpost_grades_quiz_partial';
+            }
+            param = this._groupsInView(state).map((group) => group.name).join(', ');
+        } else if (quiz) {
+            stringkey = hidden === 0 ? 'confirm_post_grades_quiz_partial' : 'confirm_unpost_grades_quiz_partial';
+        } else {
+            stringkey = hidden === 0 ? 'confirm_post_grades_student' : 'confirm_unpost_grades_student';
+        }
+        const confirmMsg = await getString(stringkey, 'local_unifiedgrader', param);
+        if (!window.confirm(confirmMsg)) {
+            return;
+        }
+        this._dispatch(hidden, scope);
     }
 
     /**
@@ -155,7 +215,51 @@ export default class extends BaseComponent {
             return;
         }
 
-        this.reactive.dispatch('setGradesPosted', state.activity.cmid, timestamp);
+        const scopeSelect = this.getElement(this.selectors.SCHEDULE_SCOPE);
+        let scope = scopeSelect ? scopeSelect.value : 'class';
+        if (scope === 'class' && !state.ui.canPostClass) {
+            scope = 'user';
+        }
+        if (scope === 'groups' && this._groupsInView(state).length === 0) {
+            scope = state.ui.canPostClass ? 'class' : 'user';
+        }
+        this._dispatch(timestamp, scope);
+    }
+
+    /**
+     * Send the post to the server.
+     *
+     * @param {number} hidden
+     * @param {string} scope class, user, or groups.
+     */
+    _dispatch(hidden, scope) {
+        const state = this.reactive.state;
+        const userid = scope === 'user' ? (state.currentUser?.id || 0) : 0;
+        const groupids = scope === 'groups' ? this._groupsInView(state).map((group) => group.id) : [];
+        this.reactive.dispatch('setGradesPosted', state.activity.cmid, hidden, scope, userid, groupids);
+    }
+
+    /**
+     * The groups named by the current filter.
+     *
+     * The whole class ("0") names none, so the group actions stay hidden.
+     * "All my groups" ("-1") names the teacher's own groups.
+     *
+     * @param {object} state
+     * @return {Array}
+     */
+    _groupsInView(state) {
+        const filter = String(state.filters?.group ?? '0');
+        if (filter === '0' || filter === '') {
+            return [];
+        }
+        const groups = [...state.groups.values()];
+        if (filter === '-1') {
+            const mine = (state.userGroupIds?.ids || []).map(String);
+            return groups.filter((group) => mine.includes(String(group.id)));
+        }
+        const ids = filter.split(',').filter(Boolean);
+        return groups.filter((group) => ids.includes(String(group.id)));
     }
 
     /**
@@ -176,6 +280,9 @@ export default class extends BaseComponent {
         const hideGrades = this.getElement(this.selectors.HIDE_GRADES);
         const scheduleInput = this.getElement(this.selectors.SCHEDULE_INPUT);
 
+        await this._updateGroupActions(state);
+        this._updateScheduleScope(state);
+
         // Spinner while posting.
         if (state.ui.posting) {
             btn.disabled = true;
@@ -189,7 +296,24 @@ export default class extends BaseComponent {
         btn.disabled = false;
         const hidden = state.ui.gradesHidden;
 
-        if (state.ui.gradesPosted) {
+        if (state.ui.gradesPartial) {
+            btn.className = 'btn btn-sm btn-outline-warning dropdown-toggle';
+            if (icon) {
+                icon.className = 'fa fa-eye';
+            }
+            if (label) {
+                label.textContent = await getString('grades_posted_count', 'local_unifiedgrader', {
+                    posted: state.ui.postedCount,
+                    total: state.ui.postedTotal,
+                });
+            }
+            if (postNow) {
+                postNow.classList.remove('disabled');
+            }
+            if (hideGrades) {
+                hideGrades.classList.remove('disabled');
+            }
+        } else if (state.ui.gradesPosted) {
             // Grades are visible.
             btn.className = 'btn btn-sm btn-outline-success dropdown-toggle';
             if (icon) {
@@ -234,7 +358,7 @@ export default class extends BaseComponent {
                 hideGrades.classList.remove('disabled');
             }
         } else {
-            // Grades are hidden (hidden === 1).
+            // Grades are hidden (hidden === 1, or nothing is released).
             btn.className = 'btn btn-sm btn-outline-warning dropdown-toggle';
             if (icon) {
                 icon.className = 'fa fa-eye-slash';
@@ -249,6 +373,59 @@ export default class extends BaseComponent {
             if (hideGrades) {
                 hideGrades.classList.add('disabled');
             }
+        }
+    }
+
+    /**
+     * Show the group actions when the filter names groups, and label them.
+     *
+     * @param {object} state
+     */
+    async _updateGroupActions(state) {
+        const groups = this._groupsInView(state);
+        const menu = this.getElement(this.selectors.MENU);
+        if (!menu) {
+            return;
+        }
+        menu.querySelectorAll('[data-region="post-grades-group-actions"]').forEach((item) => {
+            item.classList.toggle('d-none', groups.length === 0);
+        });
+        if (!groups.length) {
+            return;
+        }
+        const names = groups.map((group) => group.name).join(', ');
+        const postLabel = menu.querySelector('[data-region="group-post-label"]');
+        const hideLabel = menu.querySelector('[data-region="group-hide-label"]');
+        if (postLabel) {
+            postLabel.textContent = await getString('post_grades_groups', 'local_unifiedgrader', names);
+        }
+        if (hideLabel) {
+            hideLabel.textContent = await getString('unpost_grades_groups', 'local_unifiedgrader', names);
+        }
+    }
+
+    /**
+     * Offer a schedule scope only when that scope can be posted.
+     *
+     * @param {object} state
+     */
+    _updateScheduleScope(state) {
+        const select = this.getElement(this.selectors.SCHEDULE_SCOPE);
+        if (!select) {
+            return;
+        }
+        const classOption = select.querySelector('option[value="class"]');
+        const groupsOption = select.querySelector('option[value="groups"]');
+        if (classOption) {
+            classOption.hidden = !state.ui.canPostClass;
+        }
+        const groupsAvailable = this._groupsInView(state).length > 0;
+        if (groupsOption) {
+            groupsOption.hidden = !groupsAvailable;
+        }
+        const selected = select.options[select.selectedIndex];
+        if (selected && selected.hidden) {
+            select.value = state.ui.canPostClass ? 'class' : 'user';
         }
     }
 

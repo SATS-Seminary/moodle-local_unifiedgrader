@@ -40,6 +40,7 @@ if (\local_unifiedgrader\penalty\compat::unified()) {
     require_login($course, false, $cm);
     require_capability('local/unifiedgrader:grade', context_module::instance($cm->id));
     require_sesskey();
+    \local_unifiedgrader\access::require_student_access(context_module::instance($cm->id), $userid);
 
     \local_unifiedgrader\penalty\service::resync($cmid, $userid);
 
@@ -53,6 +54,7 @@ require_login($course, false, $cm);
 $context = context_module::instance($cm->id);
 require_capability('local/unifiedgrader:grade', $context);
 require_sesskey();
+\local_unifiedgrader\access::require_student_access($context, $userid);
 
 $assign = new assign($context, $cm, $course);
 $instance = clone $assign->get_instance();

@@ -50,6 +50,8 @@ final class provider_test extends provider_testcase {
         $this->assertContains('local_unifiedgrader_clib', $tables);
         $this->assertContains('local_unifiedgrader_cltag', $tables);
         $this->assertContains('local_unifiedgrader_penalty', $tables);
+        $this->assertContains('local_unifiedgrader_friction', $tables);
+        $this->assertContains('local_unifiedgrader_frictioncfg', $tables);
     }
 
     /**

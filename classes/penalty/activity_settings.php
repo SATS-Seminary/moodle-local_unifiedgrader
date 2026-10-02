@@ -46,6 +46,9 @@ class activity_settings {
     /** @var string[] Activity types whose late penalties Unified Grader owns. */
     public const MODULES = ['assign', 'forum', 'quiz'];
 
+    /** @var string Cache of the answer for each activity, keyed by course module ID. */
+    private const CACHE = 'penaltyswitch';
+
     /**
      * Whether Unified Grader manages late penalties for this activity type.
      *
@@ -68,11 +71,31 @@ class activity_settings {
         if (!self::supports((string) $cm->modname)) {
             return false;
         }
-        $enabled = $DB->get_field(self::TABLE, 'enabled', ['cmid' => (int) $cm->id]);
-        if ($enabled !== false) {
-            return (bool) $enabled;
+
+        // Every resync of every student asks this, so the answer is cached. It
+        // is stored as 1 or 0, because a cache miss is false.
+        $cache = \cache::make('local_unifiedgrader', self::CACHE);
+        $cached = $cache->get((int) $cm->id);
+        if ($cached !== false) {
+            return (bool) $cached;
         }
-        return self::get_default($cm);
+
+        $enabled = $DB->get_field(self::TABLE, 'enabled', ['cmid' => (int) $cm->id]);
+        $result = $enabled !== false ? (bool) $enabled : self::get_default($cm);
+        $cache->set((int) $cm->id, (int) $result);
+        return $result;
+    }
+
+    /**
+     * Forget the cached answer for an activity.
+     *
+     * Called whenever the saved value changes, and when the activity's own
+     * settings are saved, since the default is read from them.
+     *
+     * @param int $cmid Course module ID.
+     */
+    public static function invalidate(int $cmid): void {
+        \cache::make('local_unifiedgrader', self::CACHE)->delete($cmid);
     }
 
     /**
@@ -136,6 +159,7 @@ class activity_settings {
             $existing->enabled = (int) $enabled;
             $existing->timemodified = time();
             $DB->update_record(self::TABLE, $existing);
+            self::invalidate($cmid);
             return;
         }
         $DB->insert_record(self::TABLE, (object) [
@@ -143,17 +167,7 @@ class activity_settings {
             'enabled' => (int) $enabled,
             'timemodified' => time(),
         ]);
-    }
-
-    /**
-     * Whether a value has been saved for an activity.
-     *
-     * @param int $cmid Course module ID.
-     * @return bool
-     */
-    public static function has_saved_value(int $cmid): bool {
-        global $DB;
-        return $DB->record_exists(self::TABLE, ['cmid' => $cmid]);
+        self::invalidate($cmid);
     }
 
     /**
@@ -164,5 +178,6 @@ class activity_settings {
     public static function delete(int $cmid): void {
         global $DB;
         $DB->delete_records(self::TABLE, ['cmid' => $cmid]);
+        self::invalidate($cmid);
     }
 }

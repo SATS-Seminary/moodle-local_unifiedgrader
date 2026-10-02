@@ -41,6 +41,18 @@ use core_external\external_api;
  */
 final class comment_library_webservices_test extends \advanced_testcase {
     /**
+     * Create someone who may use the comment library: a teacher of a course.
+     *
+     * @return \stdClass The user.
+     */
+    private function create_teacher(): \stdClass {
+        $user = $this->getDataGenerator()->create_user();
+        $course = $this->getDataGenerator()->create_course();
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 'editingteacher');
+        return $user;
+    }
+
+    /**
      * Grant the sharecomments capability to a user at system context.
      *
      * @param int $userid The user ID.
@@ -59,7 +71,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_comments_happy_path(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -80,7 +92,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_comments_return_validation(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -107,7 +119,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_comments_filter_by_coursecode(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -126,7 +138,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_comments_filter_by_tag(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -147,7 +159,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_comments_empty(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $result = get_library_comments::execute();
@@ -162,8 +174,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_comments_excludes_other_users(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $plugingen->create_library_comment(['userid' => $user1->id, 'content' => 'User1 comment']);
@@ -184,7 +196,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_save_library_comment_create(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $result = save_library_comment::execute('BIB101', 'Great work on exegesis');
@@ -204,7 +216,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_save_library_comment_return_validation(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $result = save_library_comment::execute('BIB101', 'Test content');
@@ -220,7 +232,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_save_library_comment_update(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $result = save_library_comment::execute('BIB101', 'Original');
@@ -241,7 +253,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_save_library_comment_with_tags(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -265,7 +277,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_delete_library_comment_happy_path(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -284,7 +296,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_delete_library_comment_return_validation(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -304,8 +316,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $comment = $plugingen->create_library_comment(['userid' => $user1->id, 'content' => 'Protected']);
@@ -326,7 +338,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_tags_happy_path(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -347,7 +359,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_tags_return_validation(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -370,7 +382,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_tags_issystem_flag(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -392,8 +404,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_library_tags_excludes_other_users(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $plugingen->create_library_tag(['userid' => $user1->id, 'name' => 'User1 Tag']);
@@ -414,7 +426,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_save_library_tag_create(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $result = save_library_tag::execute('Grammar');
@@ -433,7 +445,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_save_library_tag_return_validation(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $result = save_library_tag::execute('Content');
@@ -449,7 +461,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_save_library_tag_update(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $result = save_library_tag::execute('Original');
@@ -470,7 +482,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_delete_library_tag_happy_path(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -489,7 +501,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_delete_library_tag_return_validation(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -508,7 +520,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_delete_library_tag_system_tag_throws(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user();
+        $user = $this->create_teacher();
         $this->setUser($user);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -524,8 +536,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_delete_library_tag_wrong_owner_throws(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $tag = $plugingen->create_library_tag(['userid' => $user1->id, 'name' => 'Private']);
@@ -544,7 +556,7 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_shared_library_happy_path(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
         $user2 = $this->getDataGenerator()->create_user(['firstname' => 'Alice', 'lastname' => 'Smith']);
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
@@ -566,8 +578,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_shared_library_return_validation(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $plugingen->create_library_comment(['userid' => $user2->id, 'content' => 'Shared', 'shared' => 1]);
@@ -591,8 +603,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_get_shared_library_excludes_own_and_private(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         // Own shared comment should not appear.
@@ -618,8 +630,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_import_shared_comment_happy_path(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $source = $plugingen->create_library_comment([
@@ -652,8 +664,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_import_shared_comment_return_validation(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $source = $plugingen->create_library_comment([
@@ -677,8 +689,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_import_shared_comment_nonshared_throws(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $private = $plugingen->create_library_comment([
@@ -700,8 +712,8 @@ final class comment_library_webservices_test extends \advanced_testcase {
     public function test_import_shared_comment_preserves_tags(): void {
         $this->resetAfterTest();
 
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        $user1 = $this->create_teacher();
+        $user2 = $this->create_teacher();
 
         $plugingen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
         $source = $plugingen->create_library_comment([

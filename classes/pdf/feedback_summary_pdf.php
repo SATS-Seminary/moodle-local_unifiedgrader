@@ -50,9 +50,6 @@ class feedback_summary_pdf extends \pdf {
     /** @var int Muted text color. */
     private const COLOR_MUTED = 0x6C757D;
 
-    /** @var int Light background color. */
-    private const COLOR_LIGHT_BG = 0xF8F9FA;
-
     /** @var int White. */
     private const COLOR_WHITE = 0xFFFFFF;
 

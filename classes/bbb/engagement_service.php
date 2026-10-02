@@ -94,17 +94,6 @@ class engagement_service {
     }
 
     /**
-     * Was this cmid ever successfully scraped?
-     *
-     * @param int $cmid
-     * @return bool
-     */
-    public static function is_cached(int $cmid): bool {
-        global $DB;
-        return $DB->record_exists('local_unifiedgrader_bbbeng', ['cmid' => $cmid]);
-    }
-
-    /**
      * Refresh the cached engagement metrics for a BBB activity.
      *
      * Fetches every published recording's "statistics" playback URL, parses

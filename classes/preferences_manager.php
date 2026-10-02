@@ -41,12 +41,32 @@ class preferences_manager {
      */
     public static function get_all(int $userid): array {
         global $DB;
-        $rec = $DB->get_record('local_unifiedgrader_prefs', ['userid' => $userid], 'preferences');
-        if (!$rec || empty($rec->preferences)) {
-            return [];
+
+        $cache = \cache::make('local_unifiedgrader', 'userprefs');
+        $cached = $cache->get($userid);
+        if (is_array($cached)) {
+            return $cached;
         }
-        $decoded = json_decode($rec->preferences, true);
-        return is_array($decoded) ? $decoded : [];
+
+        $prefs = [];
+        $rec = $DB->get_record('local_unifiedgrader_prefs', ['userid' => $userid], 'preferences');
+        if ($rec && !empty($rec->preferences)) {
+            $decoded = json_decode($rec->preferences, true);
+            $prefs = is_array($decoded) ? $decoded : [];
+        }
+        $cache->set($userid, $prefs);
+        return $prefs;
+    }
+
+    /**
+     * Forget the cached preferences of some users. Called when their rows are deleted.
+     *
+     * @param int[] $userids
+     */
+    public static function invalidate(array $userids): void {
+        if ($userids) {
+            \cache::make('local_unifiedgrader', 'userprefs')->delete_many(array_map('intval', $userids));
+        }
     }
 
     /**
@@ -99,5 +119,6 @@ class preferences_manager {
                 'timemodified' => $now,
             ]);
         }
+        \cache::make('local_unifiedgrader', 'userprefs')->set($userid, $prefs);
     }
 }

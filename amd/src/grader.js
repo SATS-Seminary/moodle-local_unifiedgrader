@@ -79,6 +79,10 @@ export const init = (containerId) => {
     const allowmanualgradeoverride = container.dataset.allowmanualgradeoverride === '1';
     const gradesPosted = container.dataset.gradesposted === '1';
     const gradesHidden = parseInt(container.dataset.gradeshidden, 10) || 0;
+    const gradesPartial = container.dataset.gradespartial === '1';
+    const postedCount = parseInt(container.dataset.postedcount, 10) || 0;
+    const postedTotal = parseInt(container.dataset.postedtotal, 10) || 0;
+    const canPostClass = container.dataset.canpostclass !== '0';
     const canloginas = container.dataset.canloginas === '1';
     const hassatsmail = container.dataset.hassatsmail === '1';
     const enableReportForm = container.dataset.enablereportform === '1';
@@ -212,6 +216,10 @@ export const init = (containerId) => {
             posting: false,
             gradesPosted: gradesPosted,
             gradesHidden: gradesHidden,
+            gradesPartial: gradesPartial,
+            postedCount: postedCount,
+            postedTotal: postedTotal,
+            canPostClass: canPostClass,
             draftitemid: draftitemid,
             questionCommentEditor: questionCommentEditor,
             feedbackfilesdraftid: feedbackfilesdraftid,

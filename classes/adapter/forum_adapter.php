@@ -249,6 +249,9 @@ class forum_adapter extends base_adapter {
         global $DB, $PAGE;
 
         $groupids = $this->get_group_ids($filters);
+        if ($groupids === null) {
+            return [];
+        }
         $forumid = $this->forum->get_id();
 
         // Get enrolled users who can view discussions (active enrolments only).
@@ -317,6 +320,8 @@ class forum_adapter extends base_adapter {
                 }
             }
         }
+
+        $this->attach_user_contextids($enrolledusers);
 
         $result = [];
         foreach ($enrolledusers as $user) {
@@ -404,7 +409,7 @@ class forum_adapter extends base_adapter {
             return $sortdir === 'desc' ? -$cmp : $cmp;
         });
 
-        return $result;
+        return $this->attach_grade_hidden($result);
     }
 
     /**
@@ -938,18 +943,11 @@ class forum_adapter extends base_adapter {
         }
 
         // Get attachment files for these posts.
-        $fs = get_file_storage();
+        $filesbypost = $this->get_area_files_by_item('mod_forum', 'attachment', $postids);
         $converter = new \core_files\converter();
         $result = [];
         foreach ($postids as $postid) {
-            $files = $fs->get_area_files(
-                $this->context->id,
-                'mod_forum',
-                'attachment',
-                $postid,
-                'filename',
-                false,
-            );
+            $files = $filesbypost[(int) $postid] ?? [];
             foreach ($files as $file) {
                 $downloadurl = \moodle_url::make_pluginfile_url(
                     $file->get_contextid(),
@@ -1058,7 +1056,7 @@ class forum_adapter extends base_adapter {
         }
 
         $results = [];
-        $fs = get_file_storage();
+        $filesbypost = $this->get_area_files_by_item('mod_forum', 'attachment', array_keys($posts));
 
         // Post-body plagiarism is already surfaced inline in the preview
         // panel via per-post plagiarism shields rendered alongside the
@@ -1066,14 +1064,7 @@ class forum_adapter extends base_adapter {
         // listing in the marking panel. Attachments don't have an
         // equivalent inline affordance, so they get listed here.
         foreach ($posts as $post) {
-            $files = $fs->get_area_files(
-                $this->context->id,
-                'mod_forum',
-                'attachment',
-                $post->id,
-                'filename',
-                false,
-            );
+            $files = $filesbypost[(int) $post->id] ?? [];
             foreach ($files as $file) {
                 // A recording / image / archive can never produce a plagiarism
                 // result — show a neutral note rather than the vendor's red
@@ -1161,13 +1152,9 @@ class forum_adapter extends base_adapter {
             }
         }
 
-        // Check the gradebook item is not hidden.
-        $gradeitem = $this->fetch_grade_item();
-        if ($gradeitem && $gradeitem->is_hidden()) {
-            return false;
-        }
-
-        return true;
+        // The gradebook cell (and the item behind it) must be visible.
+        // A pending feedback walk hides the cell and still opens this page.
+        return !$this->withheld_blocks_release($userid);
     }
 
     /**

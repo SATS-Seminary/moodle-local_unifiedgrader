@@ -59,22 +59,35 @@ class observer {
     public static function handle_user_graded(\core\event\user_graded $event): void {
         global $CFG;
 
-        if (!penalty\compat::unified() || penalty\service::is_syncing() || empty($event->relateduserid)) {
+        if (empty($event->relateduserid) || grades\release::is_sealing()) {
             return;
         }
-        require_once($CFG->libdir . '/gradelib.php');
+        // Decided before the penalty resync. That resync writes another grade
+        // history row and fires this event again, and a new cell only looks new
+        // until then. The seal itself runs on Moodle 5.0 as well, where the
+        // penalty resync below does not.
+        $seal = grades\release::should_seal($event);
 
-        $grade = $event->get_grade();
-        $gradeitem = \grade_item::fetch(['id' => $grade->itemid]);
-        if (!$gradeitem || $gradeitem->itemtype !== 'mod' || !penalty\activity_settings::supports($gradeitem->itemmodule)) {
-            return;
+        if (penalty\compat::unified() && !penalty\service::is_syncing()) {
+            require_once($CFG->libdir . '/gradelib.php');
+
+            $grade = $event->get_grade();
+            $gradeitem = \grade_item::fetch(['id' => $grade->itemid]);
+            if ($gradeitem && $gradeitem->itemtype === 'mod' && penalty\activity_settings::supports($gradeitem->itemmodule)) {
+                $cm = get_coursemodule_from_instance(
+                    $gradeitem->itemmodule,
+                    $gradeitem->iteminstance,
+                    $gradeitem->courseid,
+                );
+                if ($cm) {
+                    penalty\service::resync((int) $cm->id, (int) $event->relateduserid, false);
+                }
+            }
         }
 
-        $cm = get_coursemodule_from_instance($gradeitem->itemmodule, $gradeitem->iteminstance, $gradeitem->courseid);
-        if (!$cm) {
-            return;
+        if ($seal) {
+            grades\release::seal($event->get_grade());
         }
-        penalty\service::resync((int) $cm->id, (int) $event->relateduserid, false);
     }
 
     /**
@@ -131,11 +144,17 @@ class observer {
      * Resync an activity's students in the background after its settings changed.
      *
      * A changed due date or penalty switch can change every student's penalty.
-     * Moodle 5.3+ only.
+     * The resync is for Moodle 5.3+ only; the caches are cleared on any version.
      *
      * @param \core\event\course_module_updated $event
      */
     public static function handle_course_module_updated(\core\event\course_module_updated $event): void {
+        // What is cached about an activity is read from its settings.
+        penalty\activity_settings::invalidate((int) $event->objectid);
+        if (($event->other['modulename'] ?? '') === 'forum') {
+            forum_helper::invalidate((int) $event->objectid);
+        }
+
         if (!penalty\compat::unified() || !penalty\activity_settings::supports($event->other['modulename'] ?? '')) {
             return;
         }
@@ -204,5 +223,34 @@ class observer {
             return;
         }
         $DB->delete_records('local_unifiedgrader_segcomment', ['cmid' => $cmid]);
+    }
+
+    /**
+     * Keep a quiz grade item visible once a feedback walk has revealed it.
+     *
+     * The quiz writes the item's hidden flag from its review options on every
+     * grade sync. That flag covers every cell, so the gradebook would hide a
+     * mark the student has already read. Review options are left alone. A
+     * class hide closes the cells first, and this does not open them again.
+     *
+     * @param \core\event\grade_item_updated $event
+     */
+    public static function handle_grade_item_updated(\core\event\grade_item_updated $event): void {
+        if (grades\release::is_sealing()) {
+            return;
+        }
+        $item = $event->get_grade_item();
+        if (!$item || $item->itemtype !== 'mod' || $item->itemmodule !== 'quiz' || !$item->is_hidden()) {
+            return;
+        }
+        $released = friction\service::released_userids((int) $item->id);
+        if (!$released) {
+            return;
+        }
+        $cm = get_coursemodule_from_instance('quiz', $item->iteminstance, $item->courseid, false, IGNORE_MISSING);
+        if (!$cm || !adapter\adapter_factory::is_supported('quiz')) {
+            return;
+        }
+        grades\release::reveal_students(adapter\adapter_factory::create((int) $cm->id), $released);
     }
 }

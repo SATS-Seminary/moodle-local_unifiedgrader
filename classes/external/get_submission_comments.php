@@ -74,6 +74,10 @@ class get_submission_comments extends external_api {
         if (!$hasgrade && (int) $params['userid'] !== (int) $USER->id) {
             throw new \moodle_exception('nopermission', 'local_unifiedgrader');
         }
+        // A teacher may only work with students they can see in this activity.
+        if ($hasgrade) {
+            \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
+        }
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler
@@ -89,9 +93,27 @@ class get_submission_comments extends external_api {
             $PAGE->set_context($context);
         }
 
+        // A thread has many comments and few authors: load each author once,
+        // with the context ID their picture URL needs.
+        $authors = [];
+        $authorids = array_values(array_unique(array_map(fn($c) => (int) $c->authorid, $comments)));
+        if ($authorids) {
+            global $DB;
+            $userfields = \core_user\fields::for_name()->with_userpic()->get_sql('u', false, '', '', false)->selects;
+            [$insql, $inparams] = $DB->get_in_or_equal($authorids, SQL_PARAMS_NAMED);
+            $inparams['contextlevel'] = CONTEXT_USER;
+            $authors = $DB->get_records_sql(
+                "SELECT {$userfields}, ctx.id AS contextid
+                   FROM {user} u
+              LEFT JOIN {context} ctx ON ctx.instanceid = u.id AND ctx.contextlevel = :contextlevel
+                  WHERE u.id {$insql}",
+                $inparams,
+            );
+        }
+
         $result = [];
         foreach ($comments as $c) {
-            $author = \core_user::get_user($c->authorid);
+            $author = $authors[(int) $c->authorid] ?? null;
             $avatar = '';
             if ($author) {
                 $avatar = $OUTPUT->user_picture($author, ['size' => 30, 'link' => false]);

@@ -371,6 +371,245 @@ class behat_local_unifiedgrader extends behat_base {
     }
 
     /**
+     * Hide the activity's grades through the adapter, as an administrator.
+     *
+     * The grader then opens on a class whose grades are not yet posted, without
+     * the scenario having to drive the menu for that setup.
+     *
+     * @Given /^grades are hidden for activity "(?P<activity>(?:[^"]|\\")*)"$/
+     * @param string $activity Activity name.
+     */
+    public function grades_are_hidden_for_activity(string $activity): void {
+        $cmid = $this->get_supported_cmid_by_name($this->unescape_argument($activity));
+        \core\session\manager::set_user(get_admin());
+        $adapter = \local_unifiedgrader\adapter\adapter_factory::create($cmid);
+        $adapter->set_grades_posted(1);
+    }
+
+    /**
+     * Choose one group in the grader's group filter.
+     *
+     * The filter is a checkbox menu. Checking the named group fires the same
+     * change handler a click does, and the participant list reloads.
+     *
+     * @When /^I select group "(?P<groupname>(?:[^"]|\\")*)" in the navigator$/
+     * @param string $groupname
+     */
+    public function i_select_group_in_the_navigator(string $groupname): void {
+        $groupname = $this->unescape_argument($groupname);
+        $this->execute('behat_general::wait_until_exists', [
+            '[data-region="group-dropdown-menu"] input[data-group-value]',
+            'css_element',
+        ]);
+        $encoded = json_encode($groupname);
+        $this->spin(function () use ($encoded) {
+            $ok = $this->evaluate_script(
+                "(function(){"
+                . "var name = {$encoded};"
+                . "var labels = Array.prototype.slice.call("
+                . "document.querySelectorAll('[data-region=\"group-dropdown-menu\"] label'));"
+                . "var label = labels.find(function(item){ return item.textContent.trim() === name; });"
+                . "if (!label) { return false; }"
+                . "var menu = label.closest('[data-region=\"group-dropdown-menu\"]');"
+                . "menu.querySelectorAll('input[type=\"checkbox\"]').forEach(function(box){ box.checked = false; });"
+                . "var input = label.querySelector('input');"
+                . "input.checked = true;"
+                . "input.dispatchEvent(new Event('change', {bubbles: true}));"
+                . "return true;"
+                . "})()"
+            );
+            if (!$ok) {
+                throw new \Exception("Group '{$encoded}' is not in the navigator yet.");
+            }
+            return true;
+        });
+        $this->wait_for_pending_js();
+    }
+
+    /**
+     * Accept the post-grades confirmation and click a menu action.
+     *
+     * Moodle's Behat runner does not answer window.confirm, so the step stubs
+     * it before the click. The click itself waits until the action is in the menu.
+     *
+     * @param string $action data-action value.
+     */
+    private function click_post_grades_action(string $action): void {
+        $this->evaluate_script('window.confirm = function() { return true; };');
+        $this->execute('behat_general::i_click_on', [
+            '[data-action="post-grades-status"]',
+            'css_element',
+        ]);
+        $this->spin(function () use ($action) {
+            $ready = $this->evaluate_script(
+                "(function(){"
+                . "var button = document.querySelector('[data-action=\"{$action}\"]');"
+                . "if (!button) { return false; }"
+                . "var item = button.closest('li');"
+                . "return !item || !item.classList.contains('d-none');"
+                . "})()"
+            );
+            if (!$ready) {
+                throw new \Exception("Post-grades action '{$action}' is not available yet.");
+            }
+            return true;
+        });
+        $this->execute('behat_general::i_click_on', [
+            '[data-action="' . $action . '"]',
+            'css_element',
+        ]);
+        $this->wait_for_pending_js();
+    }
+
+    /**
+     * Post grades for the student the grader currently has open.
+     *
+     * @When /^I post grades for the open student$/
+     */
+    public function i_post_grades_for_the_open_student(): void {
+        $this->click_post_grades_action('post-grades-student');
+    }
+
+    /**
+     * Hide grades for the student the grader currently has open.
+     *
+     * @When /^I hide grades for the open student$/
+     */
+    public function i_hide_grades_for_the_open_student(): void {
+        $this->click_post_grades_action('hide-grades-student');
+    }
+
+    /**
+     * Post grades for the groups named by the current filter.
+     *
+     * @When /^I post grades for the groups in view$/
+     */
+    public function i_post_grades_for_the_groups_in_view(): void {
+        $this->click_post_grades_action('post-grades-groups');
+    }
+
+    /**
+     * Post grades for the whole class.
+     *
+     * @When /^I post grades for the whole class$/
+     */
+    public function i_post_grades_for_the_whole_class(): void {
+        $this->click_post_grades_action('post-grades-now');
+    }
+
+    /**
+     * The status button reads the given text.
+     *
+     * @Then /^the grade status shows "(?P<text>(?:[^"]|\\")*)"$/
+     * @param string $text
+     */
+    public function the_grade_status_shows(string $text): void {
+        $text = $this->unescape_argument($text);
+        $this->spin(function () use ($text) {
+            $actual = trim((string) $this->evaluate_script(
+                "(document.querySelector('[data-action=\"post-grades-status\"] span') || {}).textContent || ''"
+            ));
+            if ($actual !== $text) {
+                throw new \Exception("Grade status is '{$actual}', expected '{$text}'.");
+            }
+            return true;
+        });
+    }
+
+    /**
+     * A named participant's eye, whether or not that student is the open one.
+     *
+     * Filtering does not change who is open, and the filtered row may sit in a
+     * panel the browser will not click. The flag is read from the row itself.
+     *
+     * @Then /^the participant "(?P<name>(?:[^"]|\\")*)" grade is (?P<state>posted|hidden)$/
+     * @param string $name
+     * @param string $state posted or hidden.
+     */
+    public function the_participant_grade_is(string $name, string $state): void {
+        $name = $this->unescape_argument($name);
+        $wanted = $state === 'posted' ? '1' : '0';
+        $encoded = json_encode($name);
+        $this->spin(function () use ($encoded, $wanted) {
+            $actual = (string) $this->evaluate_script(
+                "(function(){"
+                . "var name = {$encoded};"
+                . "var rows = document.querySelectorAll('[data-region=\"participant-list\"] button');"
+                . "var row = Array.prototype.find.call(rows, function(item) {"
+                . "return item.textContent.trim().indexOf(name) === 0;"
+                . "});"
+                . "return row ? row.dataset.gradeposted : 'missing';"
+                . "})()"
+            );
+            if ($actual !== $wanted) {
+                throw new \Exception("Participant grade posted flag is '{$actual}', expected '{$wanted}'.");
+            }
+            return true;
+        });
+    }
+
+    /**
+     * The open participant's eye is open.
+     *
+     * @Then /^the open student's grade is posted$/
+     */
+    public function the_open_students_grade_is_posted(): void {
+        $this->assert_open_student_posted('1');
+    }
+
+    /**
+     * The open participant's eye is shut.
+     *
+     * @Then /^the open student's grade is hidden$/
+     */
+    public function the_open_students_grade_is_hidden(): void {
+        $this->assert_open_student_posted('0');
+    }
+
+    /**
+     * Count participant rows whose eye is open or shut.
+     *
+     * The list sort decides which row is which, so a count does not depend on
+     * a user id or on who the grader opened first.
+     *
+     * @Then /^"(?P<count>\d+)" participant grades are (?P<state>posted|hidden)$/
+     * @param string $count
+     * @param string $state posted or hidden.
+     */
+    public function participant_grades_are_in_state(string $count, string $state): void {
+        $wanted = $state === 'posted' ? '1' : '0';
+        $this->spin(function () use ($count, $wanted) {
+            $actual = (string) $this->evaluate_script(
+                "document.querySelectorAll('[data-region=\"participant-list\"] [data-gradeposted=\"{$wanted}\"]').length"
+            );
+            if ($actual !== (string) (int) $count) {
+                throw new \Exception("Expected {$count} grades with posted={$wanted}, found {$actual}.");
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Assert the open row's data-gradeposted value.
+     *
+     * @param string $posted '1' or '0'.
+     */
+    private function assert_open_student_posted(string $posted): void {
+        $this->spin(function () use ($posted) {
+            $actual = (string) $this->evaluate_script(
+                "(function(){"
+                . "var row = document.querySelector('[data-region=\"participant-list\"] .active');"
+                . "return row ? row.dataset.gradeposted : '';"
+                . "})()"
+            );
+            if ($actual !== $posted) {
+                throw new \Exception("The open student's grade posted flag is '{$actual}', expected '{$posted}'.");
+            }
+            return true;
+        });
+    }
+
+    /**
      * Resolve the cmid of an assignment, forum, quiz or BigBlueButton activity
      * by its name.
      *

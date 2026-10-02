@@ -21,7 +21,7 @@ use core_external\external_api;
 /**
  * Tests for annotation-related web service external functions.
  *
- * Covers get_annotations, save_annotations, delete_annotations, and get_student_annotations.
+ * Covers get_annotations, save_annotations, and get_student_annotations.
  *
  * @package    local_unifiedgrader
  * @category   test
@@ -29,7 +29,6 @@ use core_external\external_api;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers \local_unifiedgrader\external\get_annotations
  * @covers \local_unifiedgrader\external\save_annotations
- * @covers \local_unifiedgrader\external\delete_annotations
  * @covers \local_unifiedgrader\external\get_student_annotations
  */
 final class annotation_webservices_test extends \advanced_testcase {
@@ -248,91 +247,6 @@ final class annotation_webservices_test extends \advanced_testcase {
         $page1 = array_filter($annotations, fn($a) => $a['pagenum'] == 1);
         $this->assertCount(1, $page1);
         $this->assertStringContainsString('circle', reset($page1)['annotationdata']);
-    }
-
-    // Delete_annotations tests.
-
-    /**
-     * Test delete_annotations removes all annotations for a file.
-     */
-    public function test_delete_annotations_happy_path(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario();
-        $studentid = $scenario->students[0]->id;
-
-        // Save annotations.
-        save_annotations::execute(
-            $scenario->cm->id,
-            $studentid,
-            self::FAKE_FILEID,
-            [
-                ['pagenum' => 1, 'annotationdata' => '{"objects":[{"type":"rect"}]}'],
-                ['pagenum' => 2, 'annotationdata' => '{"objects":[{"type":"circle"}]}'],
-            ],
-        );
-
-        // Delete all annotations for the file.
-        $result = delete_annotations::execute($scenario->cm->id, $studentid, self::FAKE_FILEID);
-        $this->assertTrue($result['success']);
-
-        // Verify they are gone.
-        $annotations = get_annotations::execute($scenario->cm->id, $studentid, self::FAKE_FILEID);
-        $this->assertEmpty($annotations);
-    }
-
-    /**
-     * Test delete_annotations throws when user lacks the grade capability.
-     */
-    public function test_delete_annotations_no_capability(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario();
-        $this->setUser($scenario->students[0]);
-
-        $this->expectException(\required_capability_exception::class);
-        delete_annotations::execute($scenario->cm->id, $scenario->students[0]->id, self::FAKE_FILEID);
-    }
-
-    /**
-     * Test delete_annotations return value passes clean_returnvalue validation.
-     */
-    public function test_delete_annotations_return_validation(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario();
-
-        $result = delete_annotations::execute(
-            $scenario->cm->id,
-            $scenario->students[0]->id,
-            self::FAKE_FILEID,
-        );
-
-        $cleaned = external_api::clean_returnvalue(
-            delete_annotations::execute_returns(),
-            $result,
-        );
-
-        $this->assertIsBool($cleaned['success']);
-        $this->assertTrue($cleaned['success']);
-    }
-
-    /**
-     * Test delete_annotations succeeds even when no annotations exist.
-     */
-    public function test_delete_annotations_no_data(): void {
-        $this->resetAfterTest();
-
-        $scenario = $this->create_scenario();
-
-        // Delete when nothing exists should succeed gracefully.
-        $result = delete_annotations::execute(
-            $scenario->cm->id,
-            $scenario->students[0]->id,
-            self::FAKE_FILEID,
-        );
-
-        $this->assertTrue($result['success']);
     }
 
     // Get_student_annotations tests.

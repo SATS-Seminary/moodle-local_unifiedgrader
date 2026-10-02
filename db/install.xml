@@ -313,5 +313,40 @@
         <INDEX NAME="ix_cmid_userid_attempt" UNIQUE="false" FIELDS="cmid, userid, attemptnumber"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_unifiedgrader_friction" COMMENT="Friction Feedback walk for one posted mark. A pending row holds the gradebook cell until the student finishes or the fail-safe opens it.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Course module the mark belongs to"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Student walking the feedback"/>
+        <FIELD NAME="itemid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="grade_items.id of the activity grade"/>
+        <FIELD NAME="gradetimemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="grade_grades.timemodified of the mark this walk belongs to"/>
+        <FIELD NAME="state" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="pending" SEQUENCE="false" COMMENT="pending, complete, or waived"/>
+        <FIELD NAME="step" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Zero-based step the student resumes on"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecompleted" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the walk finished or the fail-safe opened the cell"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="uix_item_user_time" UNIQUE="true" FIELDS="itemid, userid, gradetimemodified"/>
+        <INDEX NAME="ix_cmid_userid" UNIQUE="false" FIELDS="cmid, userid"/>
+        <INDEX NAME="ix_state" UNIQUE="false" FIELDS="state"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_unifiedgrader_frictioncfg" COMMENT="Per-activity Friction Feedback switch. No row means the activity follows the site default.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="mode" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="on" SEQUENCE="false" COMMENT="on or off. Inherit deletes the row."/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="uix_cmid" UNIQUE="true" FIELDS="cmid"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

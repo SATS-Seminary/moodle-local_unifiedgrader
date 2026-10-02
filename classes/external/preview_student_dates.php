@@ -64,6 +64,7 @@ class preview_student_dates extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:grade', $context);
+        \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
         \core\session\manager::write_close();
 
         return (new student_dates($params['cmid'], $params['userid']))->preview(trim($params['extension']));

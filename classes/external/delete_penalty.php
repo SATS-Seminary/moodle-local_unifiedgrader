@@ -71,7 +71,16 @@ class delete_penalty extends external_api {
         // Prevent deletion of auto-managed late penalties.
         global $DB;
         $record = $DB->get_record('local_unifiedgrader_penalty', ['id' => $params['penaltyid']]);
-        if ($record && $record->category === 'late') {
+        // The penalty must belong to this activity: the capability was checked here, not elsewhere.
+        if (!$record) {
+            // Already gone: nothing to do.
+            return ['success' => true];
+        }
+        if ((int) $record->cmid !== (int) $params['cmid']) {
+            throw new \invalid_parameter_exception('Penalty does not belong to the given activity');
+        }
+        \local_unifiedgrader\access::require_student_access($context, (int) $record->userid);
+        if ($record->category === 'late') {
             throw new \moodle_exception('cannotdeleteautopenalty', 'local_unifiedgrader');
         }
 

@@ -60,21 +60,6 @@ export async function saveAnnotations(cmid, userid, fileid, pages) {
 }
 
 /**
- * Delete all annotations for a file.
- *
- * @param {number} cmid Course module ID.
- * @param {number} userid Student user ID.
- * @param {number} fileid File ID.
- * @returns {Promise<object>} {success: boolean}
- */
-export async function deleteAnnotations(cmid, userid, fileid) {
-    return Ajax.call([{
-        methodname: 'local_unifiedgrader_delete_annotations',
-        args: {cmid, userid, fileid},
-    }])[0];
-}
-
-/**
  * Load annotations for the current student's own file (read-only student view).
  *
  * Uses the student-safe web service which forces userid to $USER->id server-side,

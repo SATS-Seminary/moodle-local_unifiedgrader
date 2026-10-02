@@ -116,6 +116,10 @@ $participants = $adapter->get_participants([
     'sortdir' => 'asc',
     'groups' => $initialgroupids,
 ]);
+// A student named in the URL must be one this teacher may work with.
+if ($userid && !\local_unifiedgrader\access::can_access_student($context, $userid)) {
+    $userid = 0;
+}
 $initialuserid = $userid ?: ($participants[0]['id'] ?? 0);
 
 // Capability flags for the template.
@@ -131,9 +135,12 @@ $canloginas = has_capability('moodle/user:loginas', $coursecontext);
 // silently fail in environments where satsmail isn't deployed.
 $hassatsmail = file_exists($CFG->dirroot . '/local/satsmail/create.php');
 
-// Grade posting status.
-$gradesposted = $adapter->are_grades_posted();
-$gradeshidden = $adapter->get_grades_hidden_value();
+// Grade posting status. Counts follow the cells, so a partly posted class
+// is neither "posted" nor simply "hidden".
+$postingstatus = $adapter->posting_status();
+$gradesposted = $postingstatus['posted'];
+$gradeshidden = $postingstatus['hidden'];
+$canpostclass = $groupmode != SEPARATEGROUPS || has_capability('moodle/site:accessallgroups', $context);
 
 // Quizzes: post grades toggle is hidden by default (quiz review options control visibility).
 // When enabled via setting, the schedule option is still hidden (review options are state-based, not date-based).
@@ -143,6 +150,8 @@ if ($cm->modname === 'quiz') {
     $showpostgrades = !empty(get_config('local_unifiedgrader', 'enable_quiz_post_grades'));
     $showschedulepost = false;
 }
+
+$frictionmode = \local_unifiedgrader\friction\service::mode($cmid);
 
 // Prepare template context.
 $templatedata = [
@@ -185,8 +194,15 @@ $templatedata = [
     'allowmanualgradeoverride' => !empty(get_config('local_unifiedgrader', 'allow_manual_grade_override')),
     'gradesposted' => $gradesposted,
     'gradeshidden' => $gradeshidden,
+    'gradespartial' => !empty($postingstatus['partial']),
+    'postedcount' => (int) $postingstatus['postedcount'],
+    'postedtotal' => (int) $postingstatus['total'],
+    'canpostclass' => $canpostclass,
     'showpostgrades' => $showpostgrades,
     'showschedulepost' => $showschedulepost,
+    'frictioninherit' => $frictionmode === 'inherit',
+    'frictionon' => $frictionmode === 'on',
+    'frictionoff' => $frictionmode === 'off',
     'coursecode' => \local_unifiedgrader\course_code_helper::extract_code($course->shortname),
     'coursefullname' => format_string($course->fullname, true, ['escape' => false]),
     'enablereportform' => !empty(get_config('local_unifiedgrader', 'enable_report_form')),
@@ -343,6 +359,7 @@ if ($cm->modname === 'assign' && class_exists('\local_nida\local\enabled_courses
 $templatedata['langoptionsjson'] = json_encode($langoptions);
 
 // Output.
+$PAGE->requires->js_call_amd('local_unifiedgrader/friction_mode', 'init');
 echo $OUTPUT->header();
 echo $OUTPUT->render_from_template('local_unifiedgrader/grading_interface', $templatedata);
 echo $OUTPUT->footer();

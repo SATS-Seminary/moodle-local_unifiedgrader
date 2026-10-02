@@ -518,24 +518,6 @@ export default class AnnotationLayer {
     }
 
     /**
-     * Get the current canvas display width.
-     *
-     * @returns {number}
-     */
-    getCanvasWidth() {
-        return this._canvasWidth;
-    }
-
-    /**
-     * Get the current canvas display height.
-     *
-     * @returns {number}
-     */
-    getCanvasHeight() {
-        return this._canvasHeight;
-    }
-
-    /**
      * Whether an object is currently selected on the canvas.
      *
      * @returns {boolean}

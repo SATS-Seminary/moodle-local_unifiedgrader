@@ -60,7 +60,12 @@ if (!get_config('local_unifiedgrader', 'enable_' . $cm->modname)) {
 $adapter = adapter_factory::create($cmid);
 $userid = $USER->id;
 
-if (!$adapter->is_grade_released($userid)) {
+// A pending walk opens the feedback page and still withholds the mark. The PDF
+// carries the mark, so it stays closed until the walk or the fail-safe finishes.
+if (
+    !$adapter->is_grade_released($userid)
+    || \local_unifiedgrader\friction\service::is_pending_user($adapter, $userid)
+) {
     throw new moodle_exception('feedback_not_available', 'local_unifiedgrader');
 }
 

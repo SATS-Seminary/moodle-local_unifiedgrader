@@ -386,15 +386,6 @@ abstract class base_adapter {
     }
 
     /**
-     * Get the course module info.
-     *
-     * @return \cm_info
-     */
-    public function get_cm(): \cm_info {
-        return $this->cm;
-    }
-
-    /**
      * Get the module context.
      *
      * @return \context_module
@@ -404,37 +395,165 @@ abstract class base_adapter {
     }
 
     /**
+     * The course module id.
+     *
+     * @return int
+     */
+    public function get_cmid(): int {
+        return (int) $this->cm->id;
+    }
+
+    /**
      * Check whether grades are currently posted (visible to students).
      *
-     * @return bool True if grades are posted (grade item is not hidden).
+     * Posted means every student this user can see has a released cell. A hidden
+     * grade item, or a hidden cell while other cells are released, is not posted.
+     *
+     * @return bool True if grades are posted.
      */
     public function are_grades_posted(): bool {
-        $gradeitem = $this->fetch_grade_item();
-        return $gradeitem ? !$gradeitem->is_hidden() : true;
+        return $this->posting_status()['posted'];
     }
 
     /**
      * Get the raw hidden value for the grade item.
      *
      * Returns 0 (visible), 1 (always hidden), or a Unix timestamp (hidden until).
+     * Per-student release lives on the cells; this remains the item's own value.
      *
      * @return int The hidden value.
      */
     public function get_grades_hidden_value(): int {
-        $gradeitem = $this->fetch_grade_item();
-        return $gradeitem ? (int) $gradeitem->get_hidden() : 0;
+        return $this->posting_status()['hidden'];
     }
 
     /**
-     * Set grade posting status for this activity.
+     * Post, hide, or schedule grades for the class or for the given students.
+     *
+     * An empty user list is the whole class. The returned status includes
+     * `lifted`, which is true when a partial post had to reveal the grade item.
      *
      * @param int $hidden 0 = post (visible), 1 = hide permanently, or Unix timestamp = hide until.
+     * @param int[] $userids Students to change. Empty for the whole class.
+     * @return array{posted:bool,partial:bool,hidden:int,postedcount:int,total:int,lifted:bool}
      */
-    public function set_grades_posted(int $hidden): void {
-        $gradeitem = $this->fetch_grade_item();
-        if ($gradeitem) {
-            $gradeitem->set_hidden($hidden);
+    public function set_grades_posted(int $hidden, array $userids = []): array {
+        $status = \local_unifiedgrader\grades\release::apply($this, $hidden, $userids, true);
+        \local_unifiedgrader\friction\service::settle($this, $hidden, $userids);
+        $fresh = $this->posting_status();
+        $fresh['lifted'] = !empty($status['lifted']);
+        return $fresh;
+    }
+
+    /**
+     * The current posting status: posted, partial, the item's hidden value, and the counts.
+     *
+     * @return array{posted:bool,partial:bool,hidden:int,postedcount:int,total:int,lifted:bool}
+     */
+    public function posting_status(): array {
+        return \local_unifiedgrader\grades\release::summarise($this);
+    }
+
+    /**
+     * The grade item this activity posts against.
+     *
+     * @return \grade_item|null
+     */
+    public function get_grade_item(): ?\grade_item {
+        return $this->fetch_grade_item();
+    }
+
+    /**
+     * Add each participant's effective grade-hidden value, in one query.
+     *
+     * @param array $participants Participant rows. Each has an `id`.
+     * @return array The same rows, each with `gradehidden`.
+     */
+    public function attach_grade_hidden(array $participants): array {
+        global $DB;
+
+        if (!$participants) {
+            return $participants;
         }
+        $item = $this->fetch_grade_item();
+        $itemhidden = $item ? (int) $item->get_hidden() : 0;
+        $selective = $item && \local_unifiedgrader\grades\release::is_selective($item);
+        $cells = $item
+            ? $DB->get_records_menu('grade_grades', ['itemid' => $item->id], '', 'userid, hidden')
+            : [];
+        $pending = $item
+            ? array_flip(\local_unifiedgrader\friction\service::pending_userids((int) $item->id))
+            : [];
+        $released = ($item && $itemhidden === 1 && $this->release_outlives_hidden_item())
+            ? array_flip(\local_unifiedgrader\friction\service::released_userids((int) $item->id))
+            : [];
+        foreach ($participants as &$participant) {
+            $userid = (int) ($participant['id'] ?? 0);
+            // The cell is hidden while the student reads the feedback. The teacher
+            // still sees that grade as posted. A finished quiz walk stays posted
+            // while the review options keep the grade item hidden.
+            if (isset($pending[$userid]) || isset($released[$userid])) {
+                $participant['gradehidden'] = 0;
+                continue;
+            }
+            $cell = array_key_exists($userid, $cells) ? (int) $cells[$userid] : null;
+            $participant['gradehidden'] = \local_unifiedgrader\grades\release::effective_hidden(
+                $itemhidden,
+                $cell,
+                $selective,
+            );
+        }
+        unset($participant);
+        return $participants;
+    }
+
+    /**
+     * Whether this student's gradebook cell is withheld.
+     *
+     * A missing cell is withheld when the item is hidden, and also when release
+     * is selective: other students have been held back, so this one has not been posted.
+     *
+     * @param int $userid
+     * @return bool
+     */
+    protected function grade_is_withheld(int $userid): bool {
+        $item = $this->fetch_grade_item();
+        if (!$item) {
+            return false;
+        }
+        $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $userid]);
+        if ($grade) {
+            return $grade->is_hidden();
+        }
+        return $item->is_hidden() || \local_unifiedgrader\grades\release::is_selective($item);
+    }
+
+    /**
+     * Whether a finished walk still counts as posted while the grade item is hidden.
+     *
+     * Quizzes leave the item hidden until the class review options show marks.
+     * A student post cannot lift it, so the finished walk is the release.
+     *
+     * @return bool
+     */
+    public function release_outlives_hidden_item(): bool {
+        return false;
+    }
+
+    /**
+     * Whether a withheld cell should keep the feedback page closed.
+     *
+     * A pending Friction Feedback walk hides the cell and still opens the page,
+     * so the student can read the feedback. The mark itself stays off that page.
+     *
+     * @param int $userid
+     * @return bool
+     */
+    protected function withheld_blocks_release(int $userid): bool {
+        if (\local_unifiedgrader\friction\service::is_pending_user($this, $userid)) {
+            return false;
+        }
+        return $this->grade_is_withheld($userid);
     }
 
     /**
@@ -548,16 +667,22 @@ abstract class base_adapter {
      * Supports the new 'groups' key (array of group IDs) with fallback
      * to the legacy 'group' key (single int).
      *
+     * In separate groups mode, a teacher who cannot access all groups is
+     * confined to their own groups, whatever the filter asks for.
+     *
      * @param array $filters Filter array from get_participants().
-     * @return int[] Array of group IDs. Empty array means no group filter (all groups).
+     * @return int[]|null Array of group IDs. Empty array means no group filter
+     *         (all groups); null means the viewer may see nobody.
      */
-    protected function get_group_ids(array $filters): array {
+    protected function get_group_ids(array $filters): ?array {
         if (isset($filters['groups']) && is_array($filters['groups'])) {
-            return $filters['groups'];
+            $groupids = $filters['groups'];
+        } else {
+            // Legacy: single group ID.
+            $groupid = (int) ($filters['group'] ?? 0);
+            $groupids = $groupid > 0 ? [$groupid] : [];
         }
-        // Legacy: single group ID.
-        $groupid = (int) ($filters['group'] ?? 0);
-        return $groupid > 0 ? [$groupid] : [];
+        return \local_unifiedgrader\access::visible_group_ids($this->cm, $this->context, $groupids);
     }
 
     /**
@@ -594,6 +719,96 @@ abstract class base_adapter {
             $merged += $users; // Preserves first occurrence per key.
         }
         return $merged;
+    }
+
+    /**
+     * The files of several items of one of this activity's file areas, in one query.
+     *
+     * file_storage::get_area_files() takes one item at a time, which costs a
+     * query for each forum post or attempt. Directories are left out.
+     *
+     * @param string $component Component owning the file area.
+     * @param string $filearea File area.
+     * @param int[] $itemids Item IDs.
+     * @return \stored_file[][] Files in filename order, keyed by item ID. An
+     *         item without files has no entry.
+     */
+    protected function get_area_files_by_item(string $component, string $filearea, array $itemids): array {
+        global $DB;
+
+        $fs = get_file_storage();
+        $result = [];
+        foreach (array_chunk(array_values(array_unique(array_map('intval', $itemids))), 1000) as $chunk) {
+            [$insql, $params] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED);
+            $params += [
+                'contextid' => $this->context->id,
+                'component' => $component,
+                'filearea' => $filearea,
+                'dot' => '.',
+            ];
+            $records = $DB->get_records_select(
+                'files',
+                "contextid = :contextid AND component = :component AND filearea = :filearea
+                 AND filename <> :dot AND itemid {$insql}",
+                $params,
+                'itemid, filename',
+            );
+            foreach ($records as $record) {
+                if (!empty($record->referencefileid)) {
+                    // A file held in a repository needs its reference details as well.
+                    $file = $fs->get_file_by_id($record->id);
+                } else {
+                    $record->repositoryid = null;
+                    $record->reference = null;
+                    $record->referencelastsync = null;
+                    $file = $fs->get_file_instance($record);
+                }
+                if ($file) {
+                    $result[(int) $record->itemid][] = $file;
+                }
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Look up the user context of every listed user in one query.
+     *
+     * A profile picture URL needs the user's context ID, and user_picture
+     * fetches it one user at a time unless the record already carries it.
+     * Call this before building picture URLs for a list of users.
+     *
+     * @param \stdClass[] $users User records with id and picture. Each one with
+     *        a picture gains a contextid property.
+     */
+    protected function attach_user_contextids(array $users): void {
+        global $DB;
+
+        $userids = [];
+        foreach ($users as $user) {
+            if (!empty($user->picture) && empty($user->contextid)) {
+                $userids[] = (int) $user->id;
+            }
+        }
+
+        $contextids = [];
+        foreach (array_chunk($userids, 1000) as $chunk) {
+            [$insql, $params] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED);
+            $params['contextlevel'] = CONTEXT_USER;
+            $contextids += $DB->get_records_select_menu(
+                'context',
+                "contextlevel = :contextlevel AND instanceid {$insql}",
+                $params,
+                '',
+                'instanceid, id',
+            );
+        }
+
+        foreach ($users as $user) {
+            if (isset($contextids[$user->id])) {
+                $user->contextid = (int) $contextids[$user->id];
+            }
+        }
     }
 
     /**

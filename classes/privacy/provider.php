@@ -116,6 +116,16 @@ class provider implements
             'commenttext' => 'privacy:metadata:segcomment:commenttext',
         ], 'privacy:metadata:segcomment');
 
+        $collection->add_database_table('local_unifiedgrader_friction', [
+            'userid' => 'privacy:metadata:friction:userid',
+            'state' => 'privacy:metadata:friction:state',
+            'step' => 'privacy:metadata:friction:step',
+            'timecreated' => 'privacy:metadata:friction:timecreated',
+            'timecompleted' => 'privacy:metadata:friction:timecompleted',
+        ], 'privacy:metadata:friction');
+
+        $collection->add_database_table('local_unifiedgrader_frictioncfg', [], 'privacy:metadata:frictioncfg');
+
         return $collection;
     }
 
@@ -217,6 +227,17 @@ class provider implements
             'contextlevel' => CONTEXT_MODULE,
             'userid1' => $userid,
             'userid2' => $userid,
+        ]);
+
+        // Feedback walks belong to the student.
+        $sql = "SELECT DISTINCT ctx.id
+                  FROM {local_unifiedgrader_friction} f
+                  JOIN {course_modules} cm ON cm.id = f.cmid
+                  JOIN {context} ctx ON ctx.instanceid = cm.id AND ctx.contextlevel = :contextlevel
+                 WHERE f.userid = :userid";
+        $contextlist->add_from_sql($sql, [
+            'contextlevel' => CONTEXT_MODULE,
+            'userid' => $userid,
         ]);
 
         return $contextlist;
@@ -323,6 +344,12 @@ class provider implements
                   JOIN {course_modules} cm ON cm.id = sg.cmid
                  WHERE cm.id = :cmid";
         $userlist->add_from_sql('authorid', $sql, ['cmid' => $context->instanceid]);
+
+        $sql = "SELECT DISTINCT f.userid
+                  FROM {local_unifiedgrader_friction} f
+                  JOIN {course_modules} cm ON cm.id = f.cmid
+                 WHERE cm.id = :cmid";
+        $userlist->add_from_sql('userid', $sql, ['cmid' => $context->instanceid]);
     }
 
     /**
@@ -558,6 +585,27 @@ class provider implements
                     (object) ['authored_segment_comments' => array_values($exportdata)],
                 );
             }
+
+            $walks = $DB->get_records('local_unifiedgrader_friction', [
+                'cmid' => $cm->id,
+                'userid' => $userid,
+            ]);
+            if ($walks) {
+                $exportdata = array_map(function ($walk) {
+                    return [
+                        'state' => $walk->state,
+                        'step' => (int) $walk->step,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($walk->timecreated),
+                        'timecompleted' => $walk->timecompleted
+                            ? \core_privacy\local\request\transform::datetime($walk->timecompleted)
+                            : '',
+                    ];
+                }, $walks);
+                writer::with_context($context)->export_data(
+                    [get_string('friction_mode', 'local_unifiedgrader')],
+                    (object) ['friction' => array_values($exportdata)],
+                );
+            }
         }
 
         // Export comment library (user-level, not context-specific).
@@ -639,6 +687,8 @@ class provider implements
         $DB->delete_records('local_unifiedgrader_qfb', ['cmid' => $context->instanceid]);
         $DB->delete_records('local_unifiedgrader_scomm', ['cmid' => $context->instanceid]);
         $DB->delete_records('local_unifiedgrader_segcomment', ['cmid' => $context->instanceid]);
+        $DB->delete_records('local_unifiedgrader_friction', ['cmid' => $context->instanceid]);
+        $DB->delete_records('local_unifiedgrader_frictioncfg', ['cmid' => $context->instanceid]);
     }
 
     /**
@@ -704,11 +754,16 @@ class provider implements
                 'cmid' => $context->instanceid,
                 'authorid' => $userid,
             ]);
+            $DB->delete_records('local_unifiedgrader_friction', [
+                'cmid' => $context->instanceid,
+                'userid' => $userid,
+            ]);
         }
 
         // Delete user-level data.
         $DB->delete_records('local_unifiedgrader_comments', ['userid' => $userid]);
         $DB->delete_records('local_unifiedgrader_prefs', ['userid' => $userid]);
+        \local_unifiedgrader\preferences_manager::invalidate([$userid]);
 
         // Delete comment library v2 data.
         $clibids = $DB->get_fieldset_select('local_unifiedgrader_clib', 'id', 'userid = ?', [$userid]);
@@ -793,9 +848,17 @@ class provider implements
             array_merge(['cmid7' => $context->instanceid], $inparams11, $inparams12),
         );
 
+        [$insql13, $inparams13] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'uid13');
+        $DB->delete_records_select(
+            'local_unifiedgrader_friction',
+            "cmid = :cmid8 AND userid {$insql13}",
+            array_merge(['cmid8' => $context->instanceid], $inparams13),
+        );
+
         // Delete user-level data.
         $DB->delete_records_list('local_unifiedgrader_comments', 'userid', $userids);
         $DB->delete_records_list('local_unifiedgrader_prefs', 'userid', $userids);
+        \local_unifiedgrader\preferences_manager::invalidate($userids);
 
         // Delete comment library v2 data.
         [$cinsql, $cinparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'clib');

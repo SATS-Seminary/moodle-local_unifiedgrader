@@ -69,11 +69,21 @@ class save_note extends external_api {
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
         require_capability('local/unifiedgrader:managenotes', $context);
+        \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler
         // does not write to $SESSION.
         \core\session\manager::write_close();
+
+        // An existing note must be this student's, in this activity.
+        if ($params['noteid'] > 0) {
+            global $DB;
+            $note = $DB->get_record('local_unifiedgrader_notes', ['id' => $params['noteid']], 'id, cmid, userid');
+            if (!$note || (int) $note->cmid !== (int) $params['cmid'] || (int) $note->userid !== (int) $params['userid']) {
+                throw new \invalid_parameter_exception('Note does not belong to the given activity and student');
+            }
+        }
 
         $id = notes_manager::save_note(
             $params['cmid'],

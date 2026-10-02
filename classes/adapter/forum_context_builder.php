@@ -173,7 +173,9 @@ class forum_context_builder {
      * Batch-load the user records needed to render post authors.
      *
      * @param array $posts Post records.
-     * @return array User records keyed by id, carrying user-picture fields.
+     * @return array User records keyed by id, carrying user-picture fields and
+     *         the user's context ID, which a picture URL otherwise looks up
+     *         one author at a time.
      */
     private function fetch_authors(array $posts): array {
         global $DB;
@@ -184,9 +186,16 @@ class forum_context_builder {
         }
 
         [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'au');
-        $fields = \core_user\fields::for_userpic()->get_sql('', false, '', '', false)->selects;
+        $fields = \core_user\fields::for_userpic()->get_sql('u', false, '', '', false)->selects;
+        $params['contextlevel'] = CONTEXT_USER;
 
-        return $DB->get_records_select('user', "id {$insql}", $params, '', $fields);
+        return $DB->get_records_sql(
+            "SELECT {$fields}, ctx.id AS contextid
+               FROM {user} u
+          LEFT JOIN {context} ctx ON ctx.instanceid = u.id AND ctx.contextlevel = :contextlevel
+              WHERE u.id {$insql}",
+            $params,
+        );
     }
 
     /**

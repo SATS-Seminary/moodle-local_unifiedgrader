@@ -133,45 +133,4 @@ class submission_comment_manager {
         global $DB;
         return $DB->get_record(self::TABLE, ['id' => $commentid]);
     }
-
-    /**
-     * Delete all comments for a given activity (cleanup).
-     *
-     * @param int $cmid Course module ID.
-     */
-    public static function delete_all_for_context(int $cmid): void {
-        global $DB;
-        $DB->delete_records(self::TABLE, ['cmid' => $cmid]);
-    }
-
-    /**
-     * Get all comments authored by a specific user (for privacy provider).
-     *
-     * @param int $authorid Author user ID.
-     * @return array List of comment records.
-     */
-    public static function get_comments_by_author(int $authorid): array {
-        global $DB;
-        return array_values($DB->get_records(self::TABLE, ['authorid' => $authorid], 'timecreated ASC'));
-    }
-
-    /**
-     * Delete all comments authored by a specific user (for privacy provider).
-     *
-     * @param int $authorid Author user ID.
-     */
-    public static function delete_comments_by_author(int $authorid): void {
-        global $DB;
-        $DB->delete_records(self::TABLE, ['authorid' => $authorid]);
-    }
-
-    /**
-     * Delete all comments about a specific user (for privacy provider).
-     *
-     * @param int $userid Student user ID.
-     */
-    public static function delete_comments_about_user(int $userid): void {
-        global $DB;
-        $DB->delete_records(self::TABLE, ['userid' => $userid]);
-    }
 }

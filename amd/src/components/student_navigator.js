@@ -102,10 +102,9 @@ export default class extends BaseComponent {
         this._setupProfilePopout();
         this._initGroupSelector(state);
 
-        // Prefetch action strings for assign, quiz, and forum activities.
-        if (state.activity.type === 'assign' || state.activity.type === 'quiz' || state.activity.type === 'forum') {
-            await this._prefetchStrings();
-        }
+        // Eye titles are used for every activity. The action labels are only
+        // drawn for assign, quiz, and forum, and are cheap to load alongside.
+        await this._prefetchStrings();
 
         this._renderParticipants({state});
         this._updateCurrentStudent({state});
@@ -149,6 +148,8 @@ export default class extends BaseComponent {
             'override_active',
             'extension_granted',
             'submitted_prefix',
+            'grades_posted_student',
+            'grades_hidden_student',
         ];
         try {
             const values = await getStrings(keys.map(key => ({key, component: 'local_unifiedgrader'})));
@@ -553,6 +554,9 @@ export default class extends BaseComponent {
                 item.classList.add('active');
             }
             item.dataset.userid = p.id;
+            const gradeHidden = Number(p.gradehidden) || 0;
+            const gradePosted = gradeHidden === 0 || (gradeHidden > 1 && gradeHidden * 1000 <= Date.now());
+            item.dataset.gradeposted = gradePosted ? '1' : '0';
 
             const nameSpan = document.createElement('span');
             nameSpan.className = 'small';
@@ -601,6 +605,14 @@ export default class extends BaseComponent {
                 extIcon.title = this._strings?.extension_granted || 'Extension granted';
                 statusWrapper.appendChild(extIcon);
             }
+
+            const postedIcon = document.createElement('i');
+            postedIcon.className = 'fa ' + (gradePosted ? 'fa-eye text-success' : 'fa-eye-slash text-warning');
+            postedIcon.dataset.region = 'grade-posted-icon';
+            postedIcon.title = gradePosted
+                ? (this._strings?.grades_posted_student || '')
+                : (this._strings?.grades_hidden_student || '');
+            statusWrapper.appendChild(postedIcon);
 
             statusWrapper.appendChild(statusBadge);
             item.appendChild(statusWrapper);

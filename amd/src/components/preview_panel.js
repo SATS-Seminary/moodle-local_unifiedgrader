@@ -473,14 +473,6 @@ export default class extends BaseComponent {
     }
 
     /**
-     * Whether the dual-file view is currently showing.
-     * @return {boolean}
-     */
-    isMultiview() {
-        return this._multiview;
-    }
-
-    /**
      * Turn the dual-file view on or off.
      *
      * On: the single-viewer regions are hidden and the two stacked panes take over.

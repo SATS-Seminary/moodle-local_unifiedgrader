@@ -697,14 +697,21 @@ class comment_library_manager {
               ORDER BY p.timecreated ASC";
         $records = $DB->get_records_sql($sql, ['status' => 'pending']);
 
+        // The tags of every proposed comment, in one query.
+        $tagidsbycomment = [];
+        $commentids = array_values(array_unique(array_map(fn($r) => (int) $r->commentid, $records)));
+        if ($commentids) {
+            [$insql, $inparams] = $DB->get_in_or_equal($commentids);
+            $maps = $DB->get_recordset_select('local_unifiedgrader_clmap', "commentid {$insql}", $inparams, 'id');
+            foreach ($maps as $map) {
+                $tagidsbycomment[(int) $map->commentid][] = (int) $map->tagid;
+            }
+            $maps->close();
+        }
+
         $out = [];
         foreach ($records as $r) {
-            $tagids = $DB->get_fieldset_select(
-                'local_unifiedgrader_clmap',
-                'tagid',
-                'commentid = ?',
-                [$r->commentid],
-            );
+            $tagids = $tagidsbycomment[(int) $r->commentid] ?? [];
             $out[] = [
                 'id' => (int) $r->id,
                 'commentid' => (int) $r->commentid,

@@ -1,0 +1,80 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_unifiedgrader/friction_walk
+
+    One feedback step at a time. The mark is not in this template.
+
+    Context variables required:
+    - cmid
+    - frictionseconds
+    - frictionstep
+    - frictioninvitation
+    - frictionstepsjson: JSON array of steps, already escaped for a script tag
+
+    Example context (json):
+    {
+        "cmid": 1,
+        "frictionseconds": 20,
+        "frictionstep": 0,
+        "frictioninvitation": "Read the feedback on this step. Your mark follows once you have seen each part.",
+        "frictionstepsjson": "[]"
+    }
+}}
+<div class="local-unifiedgrader-friction" data-region="friction-walk"
+     data-cmid="{{cmid}}"
+     data-seconds="{{frictionseconds}}"
+     data-step="{{frictionstep}}"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="ug-friction-title">
+    <div class="local-unifiedgrader-friction-card card border-0 shadow">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                    <div class="text-primary small fw-semibold text-uppercase mb-1">
+                        <i class="fa fa-book me-1" aria-hidden="true"></i>
+                        {{#str}} friction_mode, local_unifiedgrader {{/str}}
+                    </div>
+                    <p class="mb-0 text-muted">{{frictioninvitation}}</p>
+                </div>
+                <div class="ug-friction-ring flex-shrink-0" data-region="friction-ring">
+                    <svg viewBox="0 0 72 72" class="ug-friction-ring-svg" aria-hidden="true">
+                        <circle class="ug-friction-ring-track" cx="36" cy="36" r="28"></circle>
+                        <circle data-region="friction-ring-progress" cx="36" cy="36" r="28"></circle>
+                    </svg>
+                    <svg viewBox="0 0 72 72" class="ug-friction-ring-done d-none" data-region="friction-done" aria-hidden="true">
+                        <circle class="ug-friction-ring-fill" cx="36" cy="36" r="32"></circle>
+                        <path class="ug-friction-ring-check" d="M16 36 L32 52 L56 20"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="small text-muted mb-2" data-region="friction-kicker"></div>
+            <h2 class="h4 mb-3" id="ug-friction-title" data-region="friction-title"></h2>
+            <div class="ug-friction-body mb-3" data-region="friction-body"></div>
+            <ul class="list-group mb-3 d-none" data-region="friction-levels"></ul>
+            <div class="ug-friction-remark d-none" data-region="friction-remark"></div>
+            <div class="d-flex justify-content-end align-items-center gap-2 mt-4">
+                <button type="button" class="btn btn-primary d-none" data-action="friction-tick">
+                    <i class="fa fa-check me-1" aria-hidden="true"></i>
+                    {{#str}} friction_seen, local_unifiedgrader {{/str}}
+                </button>
+            </div>
+        </div>
+    </div>
+    <script type="application/json" data-region="friction-steps">{{{frictionstepsjson}}}</script>
+</div>

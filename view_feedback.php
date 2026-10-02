@@ -29,6 +29,7 @@ require_once(__DIR__ . '/../../config.php');
 
 use local_unifiedgrader\adapter\adapter_factory;
 use local_unifiedgrader\feedback_data_helper;
+use local_unifiedgrader\friction\service;
 
 $cmid = required_param('cmid', PARAM_INT);
 $fileid = optional_param('fileid', 0, PARAM_INT);
@@ -50,6 +51,12 @@ if (!in_array($cm->modname, $supported)) {
 // Verify the plugin is enabled for this activity type.
 if (!get_config('local_unifiedgrader', 'enable_' . $cm->modname)) {
     throw new moodle_exception('invalidactivitytype', 'local_unifiedgrader');
+}
+
+// Moodle 5.3 adds a "Previous / Next activity" footer to activity pages.
+// It is not relevant on the student feedback page, released or not.
+if (method_exists($PAGE, 'set_show_navigation_footer')) {
+    $PAGE->set_show_navigation_footer(false);
 }
 
 // Create the adapter and check grade release.
@@ -93,8 +100,6 @@ if ($cm->modname === 'forum') {
 
     $selectedfile = null;
     $selectedpdfurl = '';
-    $hasannotatedpdf = false;
-    $annotatedpdfmap = [];
 
     if ($haspdffiles) {
         $selectedfile = $pdffiles[0];
@@ -107,31 +112,7 @@ if ($cm->modname === 'forum') {
             }
         }
 
-        // Check for flattened annotated PDFs in file storage.
-        $fs = get_file_storage();
-        foreach ($pdffiles as $pdf) {
-            $apdf = $fs->get_file(
-                $context->id,
-                'local_unifiedgrader',
-                'annotatedpdf',
-                $pdf['fileid'],
-                '/' . $userid . '/',
-                'annotated.pdf',
-            );
-            if ($apdf && !$apdf->is_directory()) {
-                $annotatedpdfmap[$pdf['fileid']] = moodle_url::make_pluginfile_url(
-                    $context->id,
-                    'local_unifiedgrader',
-                    'annotatedpdf',
-                    $pdf['fileid'],
-                    '/' . $userid . '/',
-                    'annotated.pdf',
-                )->out(false);
-            }
-        }
-
         $selectedpdfurl = $selectedfile['previewurl'];
-        $hasannotatedpdf = isset($annotatedpdfmap[$selectedfile['fileid']]);
     }
 
     // Set up the page.
@@ -185,10 +166,7 @@ if ($cm->modname === 'forum') {
         'pdffiles' => $pdffiles,
         'hasmultiplefiles' => count($pdffiles) > 1,
         'pdffilesjson' => json_encode($pdffiles),
-        'hasannotatedpdf' => $hasannotatedpdf,
-        'annotatedpdfurl' => $hasannotatedpdf ? $annotatedpdfmap[$selectedfile['fileid']] : '',
         'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
-        'annotatedpdfmapjson' => json_encode($annotatedpdfmap),
         'feedbackdownloadurl' => $feedbackdownloadurl,
         'userid' => $userid,
         'showrightcolumn' => $showrightcolumn,
@@ -196,6 +174,10 @@ if ($cm->modname === 'forum') {
         'penalties' => $penaltyinfo['penalties'],
     ];
     $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+    $templatedata = service::present($adapter, (int) $userid, $templatedata);
+    if (!empty($templatedata['frictionactive'])) {
+        $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');
+    }
 
     echo $OUTPUT->header();
     echo $OUTPUT->render_from_template('local_unifiedgrader/feedback_view_forum', $templatedata);
@@ -307,6 +289,10 @@ if ($cm->modname === 'quiz') {
         'commentcount' => $commentcount,
     ];
     $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+    $templatedata = service::present($adapter, (int) $userid, $templatedata);
+    if (!empty($templatedata['frictionactive'])) {
+        $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');
+    }
 
     echo $OUTPUT->header();
     echo $OUTPUT->render_from_template('local_unifiedgrader/feedback_view_quiz', $templatedata);
@@ -378,6 +364,10 @@ if ($cm->modname === 'bigbluebuttonbn') {
         'commentcount' => $commentcount,
     ];
     $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+    $templatedata = service::present($adapter, (int) $userid, $templatedata);
+    if (!empty($templatedata['frictionactive'])) {
+        $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');
+    }
 
     echo $OUTPUT->header();
     echo $OUTPUT->render_from_template('local_unifiedgrader/feedback_view_quiz', $templatedata);
@@ -424,8 +414,6 @@ $haspdffiles = !empty($pdffiles);
 // Determine which file to show (for PDF submissions).
 $selectedfile = null;
 $selectedpdfurl = '';
-$hasannotatedpdf = false;
-$annotatedpdfmap = [];
 
 if ($haspdffiles) {
     $selectedfile = $pdffiles[0];
@@ -438,34 +426,10 @@ if ($haspdffiles) {
         }
     }
 
-    // Check for flattened annotated PDFs in file storage.
-    $fs = get_file_storage();
-    foreach ($pdffiles as $pdf) {
-        $apdf = $fs->get_file(
-            $context->id,
-            'local_unifiedgrader',
-            'annotatedpdf',
-            $pdf['fileid'],
-            '/' . $userid . '/',
-            'annotated.pdf',
-        );
-        if ($apdf && !$apdf->is_directory()) {
-            $annotatedpdfmap[$pdf['fileid']] = moodle_url::make_pluginfile_url(
-                $context->id,
-                'local_unifiedgrader',
-                'annotatedpdf',
-                $pdf['fileid'],
-                '/' . $userid . '/',
-                'annotated.pdf',
-            )->out(false);
-        }
-    }
-
     // Always use the original PDF in the interactive viewer (annotations are
     // rendered as a Fabric.js overlay with hover tooltips for comments).
     // The flattened annotated PDF is only used for the download button.
     $selectedpdfurl = $selectedfile['previewurl'];
-    $hasannotatedpdf = isset($annotatedpdfmap[$selectedfile['fileid']]);
 }
 
 // For non-PDF submissions, build an iframe URL to preview_submission.php
@@ -653,10 +617,7 @@ $templatedata = [
     'pdffiles' => $pdffiles,
     'hasmultiplefiles' => count($pdffiles) > 1,
     'pdffilesjson' => json_encode($pdffiles),
-    'hasannotatedpdf' => $hasannotatedpdf,
-    'annotatedpdfurl' => $hasannotatedpdf ? $annotatedpdfmap[$selectedfile['fileid']] : '',
     'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
-    'annotatedpdfmapjson' => json_encode($annotatedpdfmap),
     'feedbackdownloadurl' => $feedbackdownloadurl,
     'submissionpreviewurl' => $submissionpreviewurl,
     'userid' => $userid,
@@ -681,6 +642,10 @@ $templatedata = [
     'translationpendingtext' => $translationpendingtext,
 ];
 $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+$templatedata = service::present($adapter, (int) $userid, $templatedata);
+if (!empty($templatedata['frictionactive'])) {
+    $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');
+}
 
 // Output.
 echo $OUTPUT->header();

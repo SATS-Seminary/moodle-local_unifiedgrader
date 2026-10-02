@@ -77,6 +77,10 @@ class add_submission_comment extends external_api {
         if (!$hasgrade && (int) $params['userid'] !== (int) $USER->id) {
             throw new \moodle_exception('nopermission', 'local_unifiedgrader');
         }
+        // A teacher may only work with students they can see in this activity.
+        if ($hasgrade) {
+            \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
+        }
 
         // Release the PHP session lock so concurrent AJAX from the same
         // teacher does not serialize behind this request. This handler

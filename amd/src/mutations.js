@@ -744,13 +744,16 @@ export default class {
     }
 
     /**
-     * Set grade visibility for the current activity.
+     * Set grade visibility for the class, the open student, or the groups in view.
      *
      * @param {object} stateManager The reactive state manager.
      * @param {number} cmid Course module ID.
      * @param {number} hidden 0 = post (visible), 1 = hide permanently, >1 = hide-until timestamp.
+     * @param {string} scope class, user, or groups.
+     * @param {number} userid Student id when scope is user.
+     * @param {number[]} groupids Group ids when scope is groups.
      */
-    async setGradesPosted(stateManager, cmid, hidden) {
+    async setGradesPosted(stateManager, cmid, hidden, scope = 'class', userid = 0, groupids = []) {
         stateManager.setReadOnly(false);
         stateManager.state.ui.posting = true;
         stateManager.setReadOnly(true);
@@ -758,13 +761,29 @@ export default class {
         try {
             const result = await Ajax.call([{
                 methodname: 'local_unifiedgrader_set_grades_posted',
-                args: {cmid, hidden},
+                args: {cmid, hidden, scope, userid, groupids},
+            }])[0];
+
+            const participants = await Ajax.call([{
+                methodname: 'local_unifiedgrader_get_participants',
+                args: {
+                    cmid,
+                    status: stateManager.state.filters.status,
+                    group: String(stateManager.state.filters.group),
+                    search: stateManager.state.filters.search,
+                    sort: stateManager.state.filters.sort,
+                    sortdir: stateManager.state.filters.sortdir,
+                },
             }])[0];
 
             stateManager.setReadOnly(false);
             stateManager.state.ui.gradesPosted = result.posted;
             stateManager.state.ui.gradesHidden = result.hidden;
+            stateManager.state.ui.gradesPartial = result.partial;
+            stateManager.state.ui.postedCount = result.postedcount;
+            stateManager.state.ui.postedTotal = result.total;
             stateManager.state.ui.posting = false;
+            stateManager.state.participants = participants;
             stateManager.setReadOnly(true);
         } catch (error) {
             _handleError(error);
@@ -847,110 +866,6 @@ export default class {
             stateManager.setReadOnly(true);
 
             this._refreshFileManager(stateManager);
-        } catch (error) {
-            _handleError(error);
-            stateManager.setReadOnly(false);
-            stateManager.state.ui.loading = false;
-            stateManager.setReadOnly(true);
-        }
-    }
-
-    /**
-     * Delete a user-level override and refresh submission data.
-     *
-     * @param {object} stateManager The reactive state manager.
-     * @param {number} cmid Course module ID.
-     * @param {number} userid Student user ID.
-     */
-    async deleteUserOverride(stateManager, cmid, userid) {
-        stateManager.setReadOnly(false);
-        stateManager.state.ui.loading = true;
-        stateManager.setReadOnly(true);
-
-        try {
-            await Ajax.call([{
-                methodname: 'local_unifiedgrader_delete_user_override',
-                args: {cmid, userid},
-            }])[0];
-
-            // Refresh submission data and participant list.
-            const refreshCalls = [
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_submission_data',
-                    args: {cmid, userid},
-                }])[0],
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_participants',
-                    args: {
-                        cmid,
-                        status: stateManager.state.filters.status,
-                        group: String(stateManager.state.filters.group),
-                        search: stateManager.state.filters.search,
-                        sort: stateManager.state.filters.sort,
-                        sortdir: stateManager.state.filters.sortdir,
-                    },
-                }])[0],
-            ];
-
-            const [submissionData, participants] = await Promise.all(refreshCalls);
-
-            stateManager.setReadOnly(false);
-            Object.assign(stateManager.state.submission, submissionData);
-            stateManager.state.participants = participants;
-            stateManager.state.ui.loading = false;
-            stateManager.setReadOnly(true);
-        } catch (error) {
-            _handleError(error);
-            stateManager.setReadOnly(false);
-            stateManager.state.ui.loading = false;
-            stateManager.setReadOnly(true);
-        }
-    }
-
-    /**
-     * Delete a quiz duedate extension for a user.
-     *
-     * @param {object} stateManager The reactive state manager.
-     * @param {number} cmid Course module ID.
-     * @param {number} userid Student user ID.
-     */
-    async deleteDuedateExtension(stateManager, cmid, userid) {
-        stateManager.setReadOnly(false);
-        stateManager.state.ui.loading = true;
-        stateManager.setReadOnly(true);
-
-        try {
-            await Ajax.call([{
-                methodname: 'local_unifiedgrader_delete_duedate_extension',
-                args: {cmid, userid},
-            }])[0];
-
-            // Refresh submission data and participant list.
-            const refreshCalls = [
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_submission_data',
-                    args: {cmid, userid},
-                }])[0],
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_participants',
-                    args: {
-                        cmid,
-                        status: stateManager.state.filters.status,
-                        group: String(stateManager.state.filters.group),
-                        search: stateManager.state.filters.search,
-                        sort: stateManager.state.filters.sort,
-                        sortdir: stateManager.state.filters.sortdir,
-                    },
-                }])[0],
-            ];
-
-            const [submissionData, participants] = await Promise.all(refreshCalls);
-
-            stateManager.setReadOnly(false);
-            Object.assign(stateManager.state.submission, submissionData);
-            stateManager.state.participants = participants;
-            stateManager.state.ui.loading = false;
-            stateManager.setReadOnly(true);
         } catch (error) {
             _handleError(error);
             stateManager.setReadOnly(false);
@@ -1079,69 +994,6 @@ export default class {
             methodname: 'local_unifiedgrader_save_preference',
             args: {key: `forumview_${cmid}`, value: mode},
         }])[0].catch(() => {});
-    }
-
-    /**
-     * Delete a forum due date extension for a user.
-     *
-     * @param {object} stateManager The reactive state manager.
-     * @param {number} cmid Course module ID.
-     * @param {number} userid Student user ID.
-     */
-    async deleteForumExtension(stateManager, cmid, userid) {
-        stateManager.setReadOnly(false);
-        stateManager.state.ui.loading = true;
-        stateManager.setReadOnly(true);
-
-        try {
-            // Delete the extension (also re-syncs late penalty and gradebook on the server).
-            await Ajax.call([{
-                methodname: 'local_unifiedgrader_delete_forum_extension',
-                args: {cmid, userid},
-            }])[0];
-
-            // Refresh submission data, grade data, penalties, and participant list.
-            const refreshCalls = [
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_submission_data',
-                    args: {cmid, userid},
-                }])[0],
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_grade_data',
-                    args: {cmid, userid},
-                }])[0],
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_penalties',
-                    args: {cmid, userid},
-                }])[0].catch(() => []),
-                Ajax.call([{
-                    methodname: 'local_unifiedgrader_get_participants',
-                    args: {
-                        cmid,
-                        status: stateManager.state.filters.status,
-                        group: String(stateManager.state.filters.group),
-                        search: stateManager.state.filters.search,
-                        sort: stateManager.state.filters.sort,
-                        sortdir: stateManager.state.filters.sortdir,
-                    },
-                }])[0],
-            ];
-
-            const [submissionData, gradeData, penalties, participants] = await Promise.all(refreshCalls);
-
-            stateManager.setReadOnly(false);
-            Object.assign(stateManager.state.submission, submissionData);
-            Object.assign(stateManager.state.grade, gradeData);
-            stateManager.state.penalties = penalties;
-            stateManager.state.participants = participants;
-            stateManager.state.ui.loading = false;
-            stateManager.setReadOnly(true);
-        } catch (error) {
-            _handleError(error);
-            stateManager.setReadOnly(false);
-            stateManager.state.ui.loading = false;
-            stateManager.setReadOnly(true);
-        }
     }
 
     /**

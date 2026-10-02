@@ -89,6 +89,9 @@ class get_segment_comments extends external_api {
             if (!adapter_factory::create($params['cmid'])->is_grade_released((int) $USER->id)) {
                 throw new \moodle_exception('feedback_not_available', 'local_unifiedgrader');
             }
+        } else {
+            // A teacher may only work with students they can see in this activity.
+            \local_unifiedgrader\access::require_student_access($context, (int) $params['userid']);
         }
 
         // Release the PHP session lock so concurrent grader AJAX does not serialize

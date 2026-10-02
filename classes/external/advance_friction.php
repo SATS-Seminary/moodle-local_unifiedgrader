@@ -15,11 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * External function: delete a quiz duedate extension.
- *
- * Removes the user's due date extension (from Moodle 5.3 the due date on their
- * core quiz override; before that, the quizaccess_duedate plugin's override),
- * recalculates grades, and cleans up calendar events.
+ * External function: the student has seen the current feedback step.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
@@ -32,20 +28,20 @@ use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use local_unifiedgrader\adapter\adapter_factory;
+use local_unifiedgrader\friction\service;
 
 /**
- * Deletes a quiz duedate extension for a user.
+ * Advances the current user's walk. The last step opens their gradebook cell.
  */
-class delete_duedate_extension extends external_api {
+class advance_friction extends external_api {
     /**
      * Parameter definition.
+     *
      * @return external_function_parameters
      */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Course module ID'),
-            'userid' => new external_value(PARAM_INT, 'Student user ID'),
         ]);
     }
 
@@ -53,42 +49,31 @@ class delete_duedate_extension extends external_api {
      * Execute the function.
      *
      * @param int $cmid
-     * @param int $userid
-     * @return array
+     * @return array{finished:bool,step:int}
      */
-    public static function execute(int $cmid, int $userid): array {
+    public static function execute(int $cmid): array {
+        global $USER;
+
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
-            'userid' => $userid,
         ]);
 
         $context = \context_module::instance($params['cmid']);
         self::validate_context($context);
-        require_capability('local/unifiedgrader:grade', $context);
-        // From Moodle 5.3 a quiz extension is a core override due date.
-        require_capability(
-            \local_unifiedgrader\penalty\compat::unified() ? 'mod/quiz:manageoverrides' : 'quizaccess/duedate:manageoverrides',
-            $context,
-        );
+        require_capability('local/unifiedgrader:viewfeedback', $context);
 
-        // Release the PHP session lock so concurrent AJAX from the same
-        // teacher does not serialize behind this request. This handler
-        // does not write to $SESSION.
-        \core\session\manager::write_close();
-
-        $adapter = adapter_factory::create($params['cmid']);
-        $adapter->delete_duedate_extension($params['userid']);
-
-        return ['success' => true];
+        return service::advance($params['cmid'], (int) $USER->id);
     }
 
     /**
      * Return definition.
+     *
      * @return external_single_structure
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'success' => new external_value(PARAM_BOOL, 'Whether the delete succeeded'),
+            'finished' => new external_value(PARAM_BOOL, 'Whether the walk is finished and the mark is visible'),
+            'step' => new external_value(PARAM_INT, 'The step to show next, when the walk continues'),
         ]);
     }
 }

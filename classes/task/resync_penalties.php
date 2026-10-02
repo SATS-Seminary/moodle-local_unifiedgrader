@@ -50,8 +50,10 @@ class resync_penalties extends \core\task\adhoc_task {
             $userids = self::users_to_resync($cm);
         }
 
+        // One adapter for the whole activity, not one per student.
+        $adapter = $userids ? \local_unifiedgrader\adapter\adapter_factory::create($cmid) : null;
         foreach ($userids as $userid) {
-            service::resync($cmid, $userid);
+            service::resync($cmid, $userid, true, $adapter);
         }
     }
 

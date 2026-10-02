@@ -59,13 +59,20 @@ class service {
      * @param int $userid Student user ID.
      * @param bool $pushraw True to push the activity's raw mark first. The
      *        observer passes false: the activity has just pushed it.
+     * @param \local_unifiedgrader\adapter\base_adapter|null $adapter The activity's
+     *        adapter, when the caller resyncs many students and already has one.
      */
-    public static function resync(int $cmid, int $userid, bool $pushraw = true): void {
+    public static function resync(
+        int $cmid,
+        int $userid,
+        bool $pushraw = true,
+        ?\local_unifiedgrader\adapter\base_adapter $adapter = null,
+    ): void {
         if (!compat::unified() || self::$syncing) {
             return;
         }
 
-        $adapter = adapter_factory::create($cmid);
+        $adapter ??= adapter_factory::create($cmid);
         if (!activity_settings::supports($adapter->get_type())) {
             return;
         }
