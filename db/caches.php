@@ -64,4 +64,12 @@ $definitions = [
         'staticacceleration' => true,
         'staticaccelerationsize' => 10,
     ],
+    // A proctoring service's answer for a quiz (proctoring\provider). Keyed by
+    // provider and course module ID. Fifteen minutes old at most; the grader's
+    // refresh button asks the service again.
+    'proctoring' => [
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
+        'ttl' => 900,
+    ],
 ];

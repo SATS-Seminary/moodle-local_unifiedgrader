@@ -2,6 +2,42 @@
 
 ## v3.0.0 (2026100100)
 
+### Proctoring review priority on quizzes
+
+On a proctored quiz, each student in the list carries a red, yellow or green marker for their review priority, and the marking panel has a Proctoring card with the findings behind it and a link to the evidence. Four services are supported, each behind a provider class (`proctoring\provider\*`), so the marker, the card, the web service and the capability are the same for all.
+
+Every service is off by default. An administrator ticks the ones the institution uses under "Proctoring services to show"; a service that is not ticked is never contacted and nothing about it is shown. Only users with the new `local/unifiedgrader:viewproctoring` capability (editing teachers and managers by default) see any of it.
+
+| Service | Read from | The colour is |
+|---|---|---|
+| Quilgo (`quizaccess_quilgo`) | The plugin's report table; reports it has not stored yet are fetched through its own API client | Quilgo's own confidence level: high is green, moderate yellow, low red |
+| ProctorLink (`quizaccess_quizproctoring`) | The plugin's tables | Ours, from the kind of warning |
+| AutoProctor (`quizaccess_autoproctor`) | AutoProctor's REST API, with the credentials its plugin holds | Ours, from its trust score against two site thresholds (80% and 50% by default) |
+| SMOWL (`block_smowl`) | SMOWL's Results API, with the entity name and key saved in the SMOWL block | Ours, from the kind of alarm |
+
+- **Which service proctors a quiz is detected.** The three access rule plugins each record that they are on for a quiz, so there is nothing to set per quiz. For SMOWL two things must hold: the course has the SMOWL block (`block_smowl`), and the quiz is switched on in the SMOWL panel, which SMOWL's API is asked about. A course without the block is never asked about. In a course with it, a quiz that is not switched on shows "SMOWL is not active on this quiz", since a teacher cannot otherwise tell without opening the panel.
+- **"Ours, from the kind"** (`proctoring\rule`): any finding in a high-priority category is red, any other is yellow, none is green. It follows the kind of finding, not the number. The categories are site settings per service, and the colours can differ from what the service's own report suggests.
+- **Per attempt where the service is.** Quilgo, ProctorLink and AutoProctor keep a result per attempt: the card follows the attempt selector, and the student's marker is their worst attempt. SMOWL keeps one result per student per quiz.
+- **Still under review.** Green is only ever a finished verdict. While any evidence is waiting on the service (SMOWL camera validation, a Quilgo or AutoProctor report not ready), a student with nothing against them shows as "Awaiting review", never as low priority. An alarm already reported counts at once: the marker is red or yellow straight away, hollow to show that more may follow.
+- **Links.** The marker and the card open the service's own report in a new tab: the student's attempts in ProctorLink, the attempt in AutoProctor, the quiz's report list in Quilgo, the SMOWL block's panel for the course. A link shows only to a user who holds that plugin's own report capability.
+- **Cost.** Answers from SMOWL, AutoProctor and Quilgo's API are kept for fifteen minutes (`proctoring` cache); the card's refresh button asks again. ProctorLink is read from its tables each time. The grader draws first and asks afterwards, so an unreachable service does not hold up marking.
+- **Other plugins' data is only read.** A provider checks that the plugin and its tables exist before reading, and never writes to them.
+
+Covered by `tests/proctoring/`. The access rule plugins are not installed on a test site, so their tables are stood in for and their APIs faked: none of the four has yet been checked against the live service. Checked against the live services so far: SMOWL's authentication, request format and "quiz not switched on" answer, and AutoProctor's authentication, request format and "unknown attempt" answer. Also seen with real data: Quilgo reports and its top-up call, an AutoProctor trust score, ProctorLink warnings, and a SMOWL result filed under the quiz ID and the Moodle user ID. Still to see: a SMOWL result after SmowlTech has finished validating it.
+
+### Settings grouped into pages
+
+The single settings page had grown long. "Unified Grader" under Local plugins now opens an index of tiles, one per group of settings: General (which activities open in the grader), Grading (display and marking options, posting quiz grades, late penalties), Comment library (its settings, with buttons to the two library tools), Friction feedback, and Academic integrity (plagiarism scanning, the impropriety report form, proctoring).
+
+- Each page keeps its own address, and General keeps the one the single page had. No setting was renamed, so saved values carry over.
+- The pages sit in a hidden admin category, so Moodle no longer renders them all on one category page. Every page links back to the index.
+- Academic integrity opens with a note on plagiarism scanning: whether plagiarism plugins are enabled on the site, and where Moodle configures them. The Unified Grader has no plagiarism settings of its own.
+- A proctoring service's own settings appear only once it is ticked and saved.
+
+### Translations
+
+All twelve language packs (Afrikaans, German, Greek, Spanish, French, Hebrew, Italian, Portuguese, Russian, Swahili, Xhosa and Zulu) are back at parity with English: 218 strings added to each, covering everything new in 3.0.0. Placeholders and embedded links were checked against English in every pack. Product names (Quilgo, ProctorLink, AutoProctor, SMOWL, Friction Feedback, Unified Grader) are left in English.
+
 ### Post grades for one student, a group, or the class
 
 Grade posting is no longer only a switch for the whole class. The post-grades menu now posts or hides the open student, the groups in the current filter, or the whole class. A partly posted class shows how many students are posted, and each row carries an eye for that student's grade.
@@ -84,196 +120,58 @@ The participant list, which the grader fetches on opening and again after every 
 `tests/query_count_test.php` fails if a per-student query returns to any participant list, and checks each batched lookup against the single one it replaced.
 
 ## v2.13.0 (2026093000)
-
-### Rich-text comments on manually marked quiz questions
-
-The comment on each manually marked quiz question was a plain textarea, so a teacher could not format it or add images or recorded audio, which Moodle's own manual grading page allows. It is now the same TinyMCE editor, with the options that page uses and the same file handling. Each question's editor works on its own draft area, which holds the files already attached to the comment. On save, those files are stored with the grading step in `question/response_bf_comment`, where the quiz serves them to students. A save that changes neither the text nor the files still adds no grading step.
-
-- `grade.php` ships one TinyMCE configuration for these editors (built by the new `tiny_editor_config`, since `use_editor()` can only set up a textarea already in the page). The marking panel clones it for each question and points the file picker at that question's draft area.
-- `prepare_feedback_draft` takes a new `questioncomments` flag. When a student or attempt loads, it also prepares a draft area for each question comment (`quiz_adapter::prepare_question_comment_drafts()`). Autosaves leave the flag off, so they create no draft areas.
-- A comment saved from the old textarea was plain text stored as HTML, so its line breaks were never shown. When the editor loads such a comment, its line breaks become `<br>`.
-- The attempt preview now resolves `@@PLUGINFILE@@` links in comments, so their images and audio display there.
-- A teacher whose preferred editor is not TinyMCE keeps the plain textarea.
-
-Covered by `tests/adapter/quiz_comment_files_test.php`.
+- Replace the plain textarea for comments on manually marked quiz questions with the TinyMCE editor, including images and recorded audio
+- Show images and audio from question comments in the attempt preview
+- Convert line breaks in comments saved from the old textarea so they display
+- Keep the plain textarea for teachers whose preferred editor is not TinyMCE
 
 ## v2.12.5 (2026092802)
-
-### Re-edited feedback sometimes stayed open after saving
-
-Clicking Edit on saved overall feedback focuses the editor 100 ms later. After a save, the editor collapses back to the saved card only if it does not have focus, so a Save clicked within those 100 ms was followed by the delayed focus, and the editor stayed open as if the save had failed. The delayed focus is now skipped once a save has started.
-
-The timer was also invisible to Behat's wait for pending JavaScript, which is how `feedback_card_reedit.feature` raced it: the scenario failed three times in a row on one loaded CI runner in v2.12.4 (and before, in the `deploy.sh` run of 23 September) while passing everywhere else. The earlier fix of a longer wait could not help, since the save had landed and the editor was simply focused. The timer is now tracked with `core/pending`.
+- Fix re-edited overall feedback sometimes staying open after a save
 
 ## v2.12.4 (2026092801)
-
-### Forum feedback banner missing inside a discussion
-
-The "Your teacher has graded your forum participation" banner only appeared on the forum's list of discussions (`mod/forum/view.php`). A student who opened a discussion from elsewhere never passed through the list and could miss their feedback entirely. format_simple 1.1.3 makes this common: it opens a Q&A forum's only discussion straight from the course page.
-
-The output hook now also acts on `mod/forum/discuss.php`, so the banner sits at the top of every discussion as well. The other scripts it loads there (the "View grades" override, the comments bubble, the teacher's grade button) find nothing to attach to on that page and do nothing. Other forum pages, such as the reply form, are still left alone. Covered by `tests/hook_callbacks_test.php` and `tests/behat/forum_feedback_banner.feature`, both of which fail on v2.12.3.
+- Show the forum feedback banner inside a discussion as well as on the forum's list of discussions
 
 ## v2.12.3 (2026092800)
-
-### Quiz feedback page crashed for every student
-
-The quiz branch of `view_feedback.php` merged `$gradinginfo` into its template without ever assigning it. v2.12.0 added the nine grading keys to that branch by mistake (they were meant for BigBlueButton), where the undefined variable only raised warnings. v2.12.1 moved them into the typed `feedback_data_helper::grading_template_data()`, which throws on the null: "Argument #1 ($gradinginfo) must be of type array, null given".
-
-The quiz branch now calls `parse_grading_data()` like the others. Quizzes have no rubric or marking guide, so the page renders as it did before v2.12.0. The wiring test in `tests/feedback_data_helper_test.php` now also checks that every feedback view parses its own grading data, and fails on the v2.12.2 code.
+- Fix the quiz feedback page crashing for every student
 
 ## v2.12.2 (2026092301)
-
-### Quiz extensions vanishing from the student's calendar
-
-Saving or deleting a core quiz override rewrites the student's calendar events on that quiz, and the due date extension's event went with them. The combined overrides and extensions form does exactly that whenever an extension runs past the close date, since it pushes the close date out to match. The student's calendar and timeline then showed the class due date, not their extension.
-
-After a core override is saved or deleted (the combined form, the override page, and `quiz_adapter::delete_user_override()`, which the delete and clear-all web services use), `quiz_adapter::refresh_duedate_calendar_events()` has quizaccess_duedate rebuild the quiz's due-date events. It needs quizaccess_duedate v2.0 and does nothing on older versions.
-
-### Deleting a quiz override threw an error
-
-`quiz_adapter::delete_user_override()` called core's `delete_overrides()` with a named argument, `overrideids`, that it does not have, so removing a student's quiz override from the grader, or clearing all their overrides, failed with "Unknown named parameter". It now calls `delete_overrides_by_id()`. The existing web service tests only covered assignments, so `test_core_override_changes_keep_duedate_event` now exercises the quiz path.
+- Fix a quiz due date extension vanishing from the student's calendar when a core override is saved or deleted (needs `quizaccess_duedate` v2.0)
+- Fix an error when removing a student's quiz override, or clearing all their overrides
 
 ## v2.12.1 (2026092300)
-
-### Marking guide missing from the student's BBB feedback view
-
-v2.12.0 parsed the grading data in the BigBlueButton branch of `view_feedback.php` but never passed it to the template, so the rubric and marking guide reached the downloadable PDF and not the screen. The four branches end in identical lines, and the edit landed on the quiz one.
-
-The nine template keys are now produced by `feedback_data_helper::grading_template_data()` and merged by every branch, so a branch that omits them is visible at a glance. `tests/feedback_data_helper_test.php` asserts each `render_from_template()` call site has its merge — reintroducing the defect fails that test.
+- Fix the marking guide missing from the student's BigBlueButton feedback view
 
 ## v2.12.0 (2026092200)
-
-BigBlueButton graders were offered every session on the activity, students could not see the marking guide behind their grade, the feedback PDF is redesigned, and an ampersand in a course name reached the screen as `&amp;`.
-
-### Sessions a student was never in
-
-Attendance *is* the submission on BBB, so a session the student did not attend is not theirs to be marked on. The existing filter compares BBB recording ids against attendance ids; where a site's analytics callback reports a `recordid` matching no recording, nothing reconciles and every session stays visible.
-
-- Group membership is now checked first. Under separate groups each recording carries the group it ran for, so a student outside that group could not have joined — decided from enrolment data rather than a roster BBB may never have sent.
-- Ungrouped sessions, and any recording carrying the student's own feedback, are always kept.
-- Under visible groups or no groups the pass stands down: a student may then join another group's meeting, so membership proves nothing.
-- A student in no group keeps every session and is told why.
-- The "ids do not reconcile" notice now fires whenever nothing matches, not only when the filter empties the list.
-
-### Double-escaped course and activity names
-
-`format_string()` escaped these values and the output layer escaped them again, so "Grief & Loss" reached the screen as "Grief &amp; Loss". They all flow into sinks that escape on their own — Mustache, `textContent`, `encodeURIComponent`, TCPDF's literal `Cell()` — so `format_string()` now runs with `'escape' => false` at each source.
-
-Affects course short and full names, activity names across all four adapters, BBB session labels, forum subjects and discussion names, quiz criterion shortnames, and group names in the filter. Two cases where the entity reached data rather than a screen are also fixed: the impropriety report form's URL parameters, and the PDF header. Calls feeding raw HTML are unchanged.
-
-### Marking guide in the student's feedback view
-
-The BBB branch of `view_feedback.php` never parsed its grading data and rendered through a template with no rubric or guide markup, so students saw the overall feedback alone — the per-criterion scores and remarks reached them only in the PDF. The right-hand column now opens for a marking guide even with no written feedback.
-
-A student reading their own BBB feedback also sees every session's figures at once, totals then one block per session, rather than the grader's one-at-a-time switcher.
-
-### Feedback summary PDF
-
-Shared by every adapter, so assignments, forums, quizzes and BBB sessions all open the same way.
-
-- Score and overall feedback side by side: the grade as a donut on the left, the teacher's comments on the right.
-- Site logo is drawn into the header band, taken from Moodle's own settings. SVG logos are skipped — TCPDF cannot read them.
-- Engagement figures as dashboard tiles: an emphasised totals row, then one row per attended session, each carrying all six metrics.
-- Font Awesome icons on each tile and section heading, converted from the TrueType original Moodle ships.
-- Recording annotations listed as timestamped text. Previously the PDF dumped the grading pane's Bootstrap markup into TCPDF, which ignores the class hiding unselected sessions, so every session rendered at once under a player a PDF cannot play.
-- Footer on every page, with a page number. It was painted once, before the annotation pages existed.
-- "Graded on [[strftimedatefull]]" fixed — not a core string.
-
-### Deployment
-
-`deploy.sh` takes a list of Moodle installs rather than one. AMD is built on the first and shipped to the rest, so every install runs identical JavaScript.
-
-### Coverage
-
-`tests/adapter/bbb_adapter_test.php` gains twelve tests covering the group filter, the reconciliation notice, the feedback report and the student's stacked session tiles; `assign_adapter_test.php` adds two for the unescaped activity name. Two new files: `tests/pdf/feedback_summary_pdf_test.php` (grade bands, engagement, annotations, logo, page breaks) and `tests/feedback_data_helper_logo_test.php` (logo lookup order, SVG skip, unconfigured site).
+- Stop offering BigBlueButton sessions a student could not have attended, using group membership under separate groups
+- Fix course, activity, forum and group names showing `&amp;` where the name contains an ampersand
+- Show the rubric or marking guide in the student's BigBlueButton feedback view, with every session's engagement figures at once
+- Redesign the feedback summary PDF: grade donut beside the feedback, site logo, engagement tiles, icons, and a footer with page numbers on every page
+- List recording annotations in the PDF as timestamped text
+- Let `deploy.sh` deploy to several Moodle installs, building the JavaScript once
+- Add test coverage for the BigBlueButton group filter, the feedback PDF and logo lookup
 
 ## v2.11.1 (2026091000)
-
-Overall feedback could be typed into an assignment that has nowhere to store it, and two attempt-handling slips could overwrite feedback on multi-attempt assignments.
-
-### Assignments with "Feedback comments" disabled
-
-The Overall Feedback editor was shown on every assignment, including ones whose **Feedback types** settings leave **Feedback comments** unticked. `mod_assign` discards feedback text for a disabled feedback type without complaint, so a teacher could write feedback, click save, see success, and lose it. On those assignments the editor is now replaced with a warning label: *Feedback comments are not enabled for this assessment*. Forums and quizzes are unaffected; they always store feedback.
-
-The save itself is guarded as well. A grader page opened before the setting was changed still has the editor, so a save that carries feedback text to a comments-disabled assignment is now refused with an explanatory error before anything is written, and the text stays in the teacher's editor. A blank editor saves the grade as normal.
-
-### Feedback on previous attempts
-
-- **Viewing a previous attempt loaded the latest attempt's feedback into the editor.** `prepare_feedback_draft()` accepted an attempt number but never used it. Saving from that screen then wrote the latest attempt's text over the previous attempt's own feedback. The editor now loads the attempt on screen.
-- **Re-saving a previous attempt overwrote the latest attempt's feedback.** After `mod_assign` stored the graded attempt, the follow-up step that moves embedded files out of the editor's draft area rewrote the comment of the *latest* attempt's grade instead. The manual-grade-override step on rubric and marking-guide saves had the same slip and could put the typed mark on the latest attempt. Both now target the attempt being graded.
-
-### Coverage
-
-`tests/adapter/assign_adapter_test.php` gains four tests: a feedback-carrying save is refused on a comments-disabled assignment (text and media-only feedback) with no grade written; blank feedback still saves the grade there without creating a comment row; re-saving a previous attempt leaves the latest attempt's feedback and grade intact; and the feedback draft loads the requested attempt's feedback. A new Behat feature, `feedback_comments_disabled.feature`, checks that the notice replaces the editor only when comments are disabled. `marking_keyboard_navigation.feature` now enables feedback comments on its assignment explicitly: core's assignment generator leaves them off unless asked, and that scenario types into the feedback editor. For the same reason, `tests/penalty_roundtrip_test.php` now enables feedback comments on its assignment: its web-service test sends feedback text, which was previously discarded silently and is now refused.
+- Replace the Overall Feedback editor with a notice on assignments whose "Feedback comments" feedback type is disabled, and refuse a save that carries feedback there
+- Fix a previous attempt loading the latest attempt's feedback into the editor
+- Fix re-saving a previous attempt overwriting the latest attempt's feedback or mark
+- Add test coverage for both
 
 ## v2.11.0 (2026082601)
-
-Export, import, and clean up the comment library — as CSV, from either the admin moderation tool or a teacher's own library.
-
-### CSV export and import
-
-Every library view — a teacher's own library, one admin-inspected bucket, or the moderation page's full filtered list across every teacher — now has an **Export (CSV)** link, and a matching **Import** upload alongside it. The two shapes are deliberately minimal: `coursecode,shared,tags,content` for a single owner, with `ownerid,ownername` added at the front when the export spans more than one teacher. Tags are one cell, pipe-separated (`Grammar|Needs revision`).
-
-Import is additive and idempotent, in the same spirit as the legacy importer added in v2.10.0: a row whose owner, course code and content already match an existing comment is skipped rather than duplicated, so re-running an import — after fixing a couple of bad rows, say — never doubles up what already succeeded. `content` is the only required column; a missing `tags` cell resolves against the owner's existing tags by name (case-insensitively) before creating a new one, and a missing `coursecode` cell falls back to whatever the import context implies — the current bucket when importing into one, or universal otherwise.
-
-Two safety rules are enforced beneath the UI, not just by it: a teacher's own import always writes to their own library regardless of what an `ownerid` column in the file claims, and an admin importing without a chosen owner filter is required to either filter to one teacher first or supply that column — otherwise every unattributed row would default to `userid = 0`, the system-defaults bucket, which is almost never what "restore this backup" means.
-
-### Bulk delete and duplicate cleanup
-
-The bucket view (both admin and teacher) gains a **Delete selected** action beside the existing re-scope and reassign forms, reusing the same checkboxes — tick comments, then move, hand off, or remove them in one visit rather than three.
-
-A new **Possible duplicate comments** section — on the moderation page (site-wide or filtered to one teacher) and on the teacher's own library — groups exact repeats: same owner, same course code, same content, most often left behind by a double-submit or a re-run import. Each group gets a one-click **Delete extra copies, keep oldest** button. Comments that happen to share wording across two different courses, or across two different teachers, are not flagged — that's normal reuse, not a duplicate.
-
-### Coverage
-
-`tests/manager/library_csv_test.php` (14 tests) covers both export shapes, the required-content-column and empty-file error paths, the skip-on-duplicate behaviour, tag reuse and creation, the owner-column override and its teacher-side lockout, an invalid ownerid being reported rather than silently defaulting, and forced-coursecode bucket imports. `tests/manager/library_audit_test.php` gains coverage for `delete_comments()` (including its owner scope) and `find_duplicate_comments()` (grouping, and that it does *not* group across course codes or across owners). Full suite: 605 tests, 1685 assertions, all passing.
+- Add CSV export and import for comment libraries, for a teacher's own library and for the admin moderation tool; imports skip comments that already exist
+- Add "Delete selected" to the library bucket view
+- Add a "Possible duplicate comments" section with one-click removal of extra copies
+- Add test coverage for CSV export, import and duplicate detection
 
 ## v2.10.0 (2026082500)
-
-Comment libraries you can audit, and three defects that were quietly misfiling them.
-
-### Comment libraries can now be moderated
-
-A comment library entry is scoped by a free-text `coursecode` string, not a link to a course. Nothing at the database level keeps that string pointing anywhere real, and nothing in the interface showed an admin what had been stored — so an entry filed under the wrong code was indistinguishable from an entry that had never been saved. A teacher reporting "my library from last term is gone" could not be answered.
-
-**Site administration → Plugins → Local plugins → Unified Grader → Moderate comment libraries** lists every library on the site, one row per owner per course code, and flags seven ways an entry can drift out of its owner's reach:
-
-- **Owner missing** / **Owner deleted** — the `userid` points at no user row, or at a deleted one.
-- **System default with a course code** — a `userid = 0` row is always written with an empty code, so a code here means a scoped comment was written into the system bucket.
-- **Sentinel stored as code** — the modal's sidebar buckets (`__system__`, `__universal__`) stored verbatim as a course code.
-- **Padded code** — leading or trailing whitespace, which splits one bucket into two and is invisible in the interface. Codes are shown in `[brackets]` throughout so this is legible at a glance.
-- **Code matches no course** — no course on the site currently produces this code.
-- **Competing spellings of one code** — two codes that differ only by case or padding. Detected site-wide, so filtering to one teacher still reports a clash with another teacher's spelling.
-
-The **Matching courses** column shows which courses each stored code resolves to today, which is also how an over-truncating extraction regex becomes visible: two different courses collapsing onto one code is a merged library, not a coincidence.
-
-From a bucket you can re-scope comments to another code (blank makes them universal), or reassign them to another owner — for rescuing a library after a duplicate account is merged. Both are logged as a `library_repaired` event. Orphaned tag mappings can be purged, and rows still stranded in the pre-v2 `local_unifiedgrader_comments` table are listed with the code they would be filed under, and can be imported. That import is additive and idempotent: it skips inserting anything the owner already has, unlike the upgrade-time migration, which opens by deleting the entire v2 table. Each row's legacy source is removed only once its copy is confirmed present in the current library — whether newly inserted or already there — so a successful import clears the backlog instead of reporting the same rows on every subsequent visit.
-
-Gated on a new `local/unifiedgrader:moderatelibraries` capability, granted to managers.
-
-### Teachers can re-file their own comments
-
-**Organise library**, linked from the comment library sidebar, shows a teacher their own comments grouped by course code and lets them move a selection to another code without involving an admin. Only codes for courses they are enrolled in are offered — moving comments into a course they do not teach would only lose them again. Every operation is scoped to the teacher's own rows at the manager level.
-
-### Three defects that misfiled comments
-
-- **An extraction regex with an empty capture group silently made comments universal.** `course_code_helper::extract_code()` returned `$matches[1] ?? $matches[0]`, and `??` only falls back on null — not on a group that participated in the match without capturing anything. Such a group yields `''`, and an empty course code is precisely what `get_comments()` treats as "visible in all my courses". Every comment a teacher saved while grading an affected course went into their universal bucket, where they used it all term without noticing, and where it does not appear under the course next term. Extraction now tests for emptiness rather than null, and never returns an empty code for a shortname that has one.
-- **The library sidebar's `__system__` bucket leaked into saved comments.** `__universal__` was handled explicitly when computing a new comment's course code; `__system__` fell through and was stored verbatim, producing a phantom course bucket only that teacher could see. Both sentinels are now filtered.
-- **A delete attempted by a non-owner stripped a comment's tags.** `delete_comment()` scoped the comment delete by `userid` but deleted the tag mappings unconditionally, and `delete_records()` reports success whether or not it matched a row. The comment survived, untagged and much harder to find. Both `delete_comment()` and `delete_system_comment()` now confirm the scoped row exists before touching the mappings.
-
-### Every language pack brought up to date
-
-All twelve translations — Afrikaans, German, Greek, Spanish, French, Hebrew, Italian, Portuguese, Russian, Swahili, Xhosa and Zulu — were last touched for content in v2.6.6 (2 July). Seven releases of English strings had landed since, so each pack was short **350 strings** and still carried **29 keys that no longer exist** in English: leftovers from the marking-panel and comment-library rewrites (`clib_edit_comment`, `markingpanel`, `status_needsgrading`, `download_annotated_pdf` and the like).
-
-Every pack is now at full parity with English — 682 strings each, obsolete keys removed, files re-sorted by key. The newly translated material covers the BigBlueButton engagement and attendance work, forum post-rating and post views, submission translation and segment-anchored marking, the dual file view, integrity referrals, ranged rubrics, the comment-library approval queue, and this release's own moderation pages.
-
-Checked mechanically across all twelve, not just spot-read: key parity against English in both directions, no duplicate keys, sort order, `php -l` on every file, and — the check that matters most for a translation pass — **placeholder parity**, so no `{$a}`, `{$a->count}`, `{parsed}` or `{recordings}` token was dropped, renamed or mistranslated in any of the 4,200 new strings. Every one of those checks passes on every language.
-
-Terms that are product names or configuration values are deliberately left in English: BigBlueButton, Moodle, `local_nida`, `unoconv`, and the literal setting name "Register live sessions" that admins have to find in the BigBlueButton plugin's own settings page.
-
-### Coverage
-
-`tests/manager/library_audit_test.php` covers each anomaly flag, site-wide variant detection surviving a user filter, owner-scoped re-scoping, reassignment refusing an invalid owner, orphan purging leaving live mappings alone, and legacy import being idempotent. `tests/helper/course_code_helper_test.php` gains regressions for the empty capture group and for a regex that can match zero characters. `tests/manager/comment_library_manager_test.php` strengthens the existing wrong-owner delete test to assert the comment's *tags* survive as well — the original only checked the comment itself, which is why the mapping bug went unnoticed. Full suite: 583 tests, 1620 assertions, all passing.
+- Add "Moderate comment libraries" for administrators: lists every library by owner and course code, flags entries that have drifted out of their owner's reach, and can re-scope or reassign them
+- Add capability `local/unifiedgrader:moderatelibraries`
+- Add "Organise library" so teachers can move their own comments between course codes
+- Add an import for comments still stranded in the pre-v2 table
+- Fix a course code pattern with an empty capture group silently making comments universal
+- Fix the library sidebar's system bucket being saved as a course code
+- Fix a delete attempted by a non-owner stripping a comment's tags
+- Bring all twelve translations up to date with English
+- Add test coverage for library moderation and course code extraction
 
 ## v2.9.5 (2026082400)
 - Fix ranged rubrics (`gradingform_rubric_ranges`) showing an empty criteria modal and an empty marking pane on assignments, forums and BigBlueButton

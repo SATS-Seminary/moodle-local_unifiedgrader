@@ -259,6 +259,12 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
     ],
+    'local_unifiedgrader_get_proctoring' => [
+        'classname' => 'local_unifiedgrader\external\get_proctoring',
+        'description' => 'Get proctoring review priorities for the students of a quiz, from the service that proctors it.',
+        'type' => 'read',
+        'ajax' => true,
+    ],
     'local_unifiedgrader_get_referrals' => [
         'classname' => 'local_unifiedgrader\external\get_referrals',
         'description' => 'Get academic-integrity referrals for a student in an activity.',

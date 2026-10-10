@@ -231,6 +231,11 @@ if ($cm->modname === 'forum') {
 $feedbackcommentsenabled = $cm->modname !== 'assign' || $adapter->has_feedback_plugin('comments');
 $templatedata['feedbackcommentsenabled'] = $feedbackcommentsenabled;
 
+// Proctoring: a card in the marking panel and a marker on each student,
+// both filled in after the page has drawn (see amd/src/proctoring.js).
+$showproctoring = \local_unifiedgrader\proctoring\service::applies($cm, $context);
+$templatedata['showproctoring'] = $showproctoring;
+
 // TinyMCE editor setup for the feedback textarea.
 // The textarea is rendered in the static Mustache template, so use_editor() can find it.
 // Skipped when the template renders no textarea (feedback comments disabled).
@@ -360,6 +365,9 @@ $templatedata['langoptionsjson'] = json_encode($langoptions);
 
 // Output.
 $PAGE->requires->js_call_amd('local_unifiedgrader/friction_mode', 'init');
+if ($showproctoring) {
+    $PAGE->requires->js_call_amd('local_unifiedgrader/proctoring', 'init', [$cmid]);
+}
 echo $OUTPUT->header();
 echo $OUTPUT->render_from_template('local_unifiedgrader/grading_interface', $templatedata);
 echo $OUTPUT->footer();

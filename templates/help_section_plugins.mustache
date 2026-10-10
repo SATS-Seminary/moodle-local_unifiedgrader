@@ -268,6 +268,30 @@ and are subtracted at gradebook-push time.</p>
 <p>For UX details see <a href="#feature-penalties">Penalties</a>.</p>
 </section>
 
+{{! ----- Proctoring services ----- }}
+<section id="plugin-smowl">
+<h3>Proctoring (Quilgo, ProctorLink, AutoProctor, SMOWL)</h3>
+
+<p>On a proctored quiz, the Unified Grader shows each student's
+<strong>review priority</strong>: a red, yellow or green marker in the student
+list, and a <em>Proctoring</em> card in the marking panel with the findings
+behind it. Both open the service's own report in a new tab, which is where the
+evidence is reviewed.</p>
+
+<ul>
+    <li><strong>Setup:</strong> everything is off by default. Under the plugin's <em>Proctoring</em> settings, tick the services your institution uses. Each is read through its own Moodle plugin, which must be installed and set up: the quiz access rule plugins for Quilgo, ProctorLink and AutoProctor, and the SMOWL block for SMOWL. Nothing about the connection is entered twice.</li>
+    <li><strong>Per quiz:</strong> nothing to set. A quiz shows results when the service's plugin is switched on for it (for SMOWL, when SMOWL holds results for it).</li>
+    <li><strong>Who sees it:</strong> users with <code>local/unifiedgrader:viewproctoring</code> (editing teachers and managers by default). The link to a service's report also needs that plugin's own report capability.</li>
+    <li><strong>Where the colour comes from:</strong> Quilgo's is its own confidence level. For ProctorLink and SMOWL it is worked out here from the <em>kind</em> of warning (any ticked as high priority is red, any other yellow, none green). For AutoProctor it is the trust score against two thresholds. All of these are site settings, and the colour can differ from what the service's own report suggests.</li>
+    <li><strong>Attempts:</strong> Quilgo, ProctorLink and AutoProctor keep a result per attempt, so the card follows the attempt selector and the student's marker shows their worst attempt. SMOWL keeps one result per student per quiz.</li>
+    <li><strong>Grey marker, "Awaiting review":</strong> the service has not finished reviewing the evidence and nothing has been reported against the student so far. Green is only shown once the review is complete.</li>
+    <li><strong>Hollow red or yellow marker:</strong> an alarm has already been reported, and the review is still going, so more may follow.</li>
+    <li><strong>Freshness:</strong> answers fetched from a service are kept for fifteen minutes; the refresh button on the card asks again.</li>
+    <li><strong>SMOWL:</strong> a quiz is proctored when its course has the SMOWL block <em>and</em> the quiz is switched on in the SMOWL panel. The link opens the block's SMOWL panel for the course.</li>
+    <li><strong>"SMOWL is not active on this quiz":</strong> the course has the SMOWL block, but this quiz has not been switched on in the SMOWL panel, so attempts at it are not monitored.</li>
+</ul>
+</section>
+
 {{! ----- Plagiarism plugins ----- }}
 <section id="plugin-plagiarism">
 <h3>Plagiarism plugins (Copyleaks, Turnitin, etc.)</h3>

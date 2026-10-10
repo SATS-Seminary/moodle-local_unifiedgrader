@@ -106,4 +106,13 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+    'local/unifiedgrader:viewproctoring' => [
+        'riskbitmask' => RISK_PERSONAL,
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => [
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        ],
+    ],
 ];

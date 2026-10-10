@@ -2006,3 +2006,66 @@ span.local-unifiedgrader-mark-highlight {
     font-size: 0.875rem;
     text-align: right;
 }
+
+/* SMOWL proctoring: the review-priority marker and its card. */
+.ug-proctor-dot {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border: 2px solid currentcolor;
+    border-radius: 50%;
+    background: currentcolor;
+}
+.ug-proctor-dot[data-level="red"] {
+    color: #b3261e;
+}
+.ug-proctor-dot[data-level="yellow"] {
+    color: #e0a100;
+}
+.ug-proctor-dot[data-level="green"] {
+    color: #2e7d32;
+}
+.ug-proctor-dot[data-level="pending"] {
+    color: #8a9099;
+}
+/* Hollow while SMOWL is still reviewing: the colour may yet change. */
+.ug-proctor-dot[data-level="pending"],
+.ug-proctor-dot[data-provisional="1"] {
+    background: transparent;
+}
+.ug-proctor-dot[data-link="1"] {
+    cursor: pointer;
+}
+.ug-proctor-level {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+}
+.ug-proctor-tools {
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+}
+.ug-proctor-tools ul {
+    margin: 0;
+    padding-left: 0.25rem;
+    list-style: none;
+}
+.ug-proctor-tools ul li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Settings index: the tiles. */
+.ug-settings-tile {
+    transition: box-shadow 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+.ug-settings-tile:hover,
+.ug-settings-tile:focus-within {
+    border-color: var(--bs-primary, #0f6cbf);
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
+}
