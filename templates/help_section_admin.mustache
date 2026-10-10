@@ -1,103 +1,286 @@
 {{!
     @template local_unifiedgrader/help_section_admin
 
-    Documentation partial: admin settings reference.
+    Help page partial: set-up, the settings reference and capabilities.
+    Every setting key, default and capability here mirrors settings.php and
+    db/access.php; change them together.
+
+    Context variables:
+    * img - object - Screenshot URLs keyed by file name in pix/help.
 
     Example context (json):
-    {}
+    {
+        "img": {
+            "settings_index": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/settings_index"
+        }
+    }
 }}
+
+{{! ----- Set up ----- }}
+<section id="admin-setup">
+<h3>Set up</h3>
+
+<div class="local-unifiedgrader-help-note local-unifiedgrader-help-note-req">
+    <p><strong>Requirements.</strong> This page describes the plugin on <strong>Moodle 5.3</strong>.
+    The plugin still installs on Moodle 5.0, where late penalties and quiz due dates behave as they
+    did in release 2.13. Nothing else is required: every integration below is optional.</p>
+</div>
+
+<ol class="local-unifiedgrader-help-steps">
+    <li><strong>Choose the activities.</strong> Assignments open in the grader by default. Switch
+        on forums, quizzes and BigBlueButton under <a href="#settings-general">General</a>.</li>
+    <li><strong>Decide who marks.</strong> Editing teachers and managers can grade. Non-editing
+        teachers cannot until you give their role <code>local/unifiedgrader:grade</code>
+        (see <a href="#admin-capabilities">Capabilities</a>).</li>
+    <li><strong>Enable a document converter</strong> in Moodle if teachers should annotate Word
+        files and online text (see <a href="#plugin-converter">Document conversion</a>).</li>
+    <li><strong>Set late penalty rules</strong> in Moodle's grade penalty settings, and take
+        <em>Assignment</em> out of Moodle's own supported modules there
+        (see <a href="#plugin-gradepenalty-duedate">Late penalty rules</a>).</li>
+    <li><strong>Optional:</strong> <a href="#settings-friction">Friction Feedback</a>, the
+        <a href="#settings-integrity">report form and proctoring</a>, and a
+        <a href="#settings-library">course code pattern</a> for the comment library.</li>
+</ol>
+
+<h4 id="feature-i18n">Languages</h4>
+<p>The interface is translated into Afrikaans, German, Greek, Spanish, French, Hebrew, Italian,
+Portuguese, Russian, Swahili, Xhosa and Zulu, as well as English. It follows each user's Moodle
+language. This help page is in English.</p>
+</section>
+
+{{! ----- Settings ----- }}
 <section id="admin-settings">
-<h2>Admin settings reference</h2>
+<h3>Settings</h3>
 
-<p>Settings live under <em>Site administration → Plugins → Local plugins
-→ Unified Grader</em>.</p>
+<p>Go to <strong>Site administration &gt; Plugins &gt; Local plugins &gt; Unified Grader</strong>.
+It opens an index with a tile for each group of settings. Each page links back to the index, and
+the individual pages still turn up in the admin search.</p>
 
-<table class="table table-sm table-bordered">
-    <thead>
-        <tr><th>Setting</th><th>Default</th><th>Effect</th></tr>
-    </thead>
+<figure class="local-unifiedgrader-help-shot">
+    <a href="{{img.settings_index}}" data-action="help-zoom">
+        <img src="{{img.settings_index}}" width="1300" height="555" loading="lazy"
+             alt="The Unified Grader settings index with five tiles: General, Grading, Comment library, Friction feedback and Academic integrity, each with a one-line description.">
+    </a>
+    <figcaption>The settings index: General, Grading, Comment library, Friction feedback, Academic integrity.</figcaption>
+</figure>
+
+<p>All settings are stored under the <code>local_unifiedgrader</code> plugin. The name in
+<code>code</code> below each label is the setting's key.</p>
+
+{{! General }}
+<h4 id="settings-general">General</h4>
+<div class="local-unifiedgrader-help-table local-unifiedgrader-help-table-stack">
+<table class="table-reboot">
+    <thead><tr><th scope="col">Setting</th><th scope="col">Default</th><th scope="col">What it does</th></tr></thead>
     <tbody>
-        <tr>
-            <td><code>enable_assign</code></td>
-            <td>On</td>
-            <td>Routes assignment activities through the Unified Grader.</td>
-        </tr>
-        <tr>
-            <td><code>enable_forum</code></td>
-            <td>Off</td>
-            <td>Routes forum activities (whole-forum grading) through the Unified Grader.</td>
-        </tr>
-        <tr>
-            <td><code>enable_quiz</code></td>
-            <td>Off</td>
-            <td>Routes quiz activities through the Unified Grader.</td>
-        </tr>
-        <tr>
-            <td><code>enable_quiz_post_grades</code></td>
-            <td>Off</td>
-            <td>Surfaces a <em>Post grades</em> toggle for quizzes — programmatically updates the quiz's review-marks bitmask. Off by default because most quiz workflows manage mark visibility through review options directly.</td>
-        </tr>
-        <tr>
-            <td><code>enable_bigbluebuttonbn</code></td>
-            <td>Off</td>
-            <td>Routes BigBlueButton activities through the Unified Grader. See the BBB integration section above for prerequisites.</td>
-        </tr>
-        <tr>
-            <td><code>enable_submission_comments</code></td>
-            <td>On</td>
-            <td>Replaces / adds a chat-style messenger between teacher and student on the activity view page.</td>
-        </tr>
-        <tr>
-            <td><code>onlinetext_as_pdf</code></td>
-            <td>Off</td>
-            <td>Converts assignment online-text submissions to PDF on the fly so they can be annotated. Requires a configured document converter (unoconv or Google Drive).</td>
-        </tr>
-        <tr>
-            <td><code>allow_manual_grade_override</code></td>
-            <td>On</td>
-            <td>Lets teachers type a numeric grade even when a marking guide / rubric is configured. When off, the grade is computed exclusively from criteria.</td>
-        </tr>
-        <tr>
-            <td><code>coursecode_regex</code></td>
-            <td>(empty)</td>
-            <td>Regular expression applied to <code>course.shortname</code> to extract a course code; used by the comment library for course-scoped comments.</td>
-        </tr>
-        <tr>
-            <td><code>require_systemdefault_approval</code></td>
-            <td>On</td>
-            <td>When on, a teacher's suggestion to promote one of their comment-library entries to a system default queues for manager approval on the <em>Manage comment library</em> page. When off, suggestions are promoted immediately (still recorded for audit). See <a href="#feature-comment-library">Comment library</a>.</td>
-        </tr>
-        <tr>
-            <td><code>enable_report_form</code></td>
-            <td>Off</td>
-            <td>When set together with <code>report_form_url</code>, the single academic-integrity button (<em>Report academic impropriety</em>) opens the report form in addition to flagging the submission. See <a href="#feature-referral">Academic-integrity referral</a>.</td>
-        </tr>
-        <tr>
-            <td><code>report_form_url</code></td>
-            <td>(empty)</td>
-            <td>Target URL for the impropriety report form (e.g. a Microsoft / Google Form or an LMS-internal workflow). Supports placeholders: <code>{studentname}</code>, <code>{studentid}</code>, <code>{coursecode}</code>, <code>{coursename}</code>, <code>{activityname}</code>, <code>{activitytype}</code>, <code>{gradername}</code>, <code>{graderurl}</code>.</td>
-        </tr>
+        <tr><th scope="row">Enable for Assignments <code>enable_assign</code></th><td data-label="Default">On</td><td>Assignments open in the Unified Grader.</td></tr>
+        <tr><th scope="row">Replace submission comments <code>enable_submission_comments</code></th><td data-label="Default">On</td><td>Replaces Moodle's submission comments on the student's assignment page with the Unified Grader message thread, with notifications.</td></tr>
+        <tr><th scope="row">Enable for Forums <code>enable_forum</code></th><td data-label="Default">Off</td><td>Forums open in the Unified Grader.</td></tr>
+        <tr><th scope="row">Enable for Quizzes <code>enable_quiz</code></th><td data-label="Default">Off</td><td>Quizzes open in the Unified Grader.</td></tr>
+        <tr><th scope="row">Enable for BigBlueButton <code>enable_bigbluebuttonbn</code></th><td data-label="Default">Off</td><td>BigBlueButton activities open in the Unified Grader, with recordings and Activity Points.</td></tr>
     </tbody>
 </table>
+</div>
 
+<details class="local-unifiedgrader-help-details">
+    <summary>See the General page</summary>
+    <div>
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.settings_general}}" data-action="help-zoom">
+            <img src="{{img.settings_general}}" width="1500" height="835" loading="lazy"
+                 alt="The General settings page: a link back to all Unified Grader settings, then five tick boxes under Activities.">
+        </a>
+        <figcaption>The General page.</figcaption>
+    </figure>
+    </div>
+</details>
+
+{{! Grading }}
+<h4 id="settings-grading">Grading</h4>
+<div class="local-unifiedgrader-help-table local-unifiedgrader-help-table-stack">
+<table class="table-reboot">
+    <thead><tr><th scope="col">Setting</th><th scope="col">Default</th><th scope="col">What it does</th></tr></thead>
+    <tbody>
+        <tr><th scope="row">Render online text as PDF <code>onlinetext_as_pdf</code></th><td data-label="Default">Off</td><td>Converts online text to a PDF so teachers can annotate it. Needs a document converter enabled in Moodle. When off, online text shows inline.</td></tr>
+        <tr><th scope="row">Allow manual grade override <code>allow_manual_grade_override</code></th><td data-label="Default">On</td><td>Teachers may type over the grade a rubric or marking guide calculated. When off, the grade always comes from the criteria.</td></tr>
+        <tr><th scope="row">Enable post grades for quizzes <code>enable_quiz_post_grades</code></th><td data-label="Default">Off</td><td>Shows the post-grades control on quizzes. Posting the class switches <em>Marks</em>, <em>Maximum mark</em> and <em>Overall feedback</em> on in the quiz review options for the two <em>after the attempt</em> periods, and nothing else. Leave off if teachers manage visibility through review options.</td></tr>
+        <tr><th scope="row">Extension presets <code>extensionpresets</code></th><td data-label="Default">1, 2, 3, 7</td><td>The quick buttons in Dates &amp; extensions, as days after the due date, separated by commas. Multiples of 7 show as weeks.</td></tr>
+        <tr><th scope="row">Quiz attempt must answer (%) <code>quizgenuineattemptpct</code></th><td data-label="Default">50</td><td>The share of a quiz's questions a student must answer for an attempt to count when deciding whether the quiz was late. An attempt submitted nearly empty is ignored. 0 counts every submitted attempt. Moodle 5.3 only.</td></tr>
+    </tbody>
+</table>
+</div>
+<p>The <em>Late penalties</em> part of this page also warns you while Moodle's own grade penalties
+are still switched on for assignments.</p>
+
+<figure class="local-unifiedgrader-help-shot">
+    <a href="{{img.settings_grading}}" data-action="help-zoom">
+        <img src="{{img.settings_grading}}" width="1500" height="430" loading="lazy"
+             alt="The lower part of the Grading settings page: Enable post grades for quizzes, Extension presets set to 1, 2, 3, 7, and under Late penalties, Quiz attempt must answer set to 50.">
+    </a>
+    <figcaption>Part of the Grading page: quiz grade posting, extension presets and the late penalty setting.</figcaption>
+</figure>
+
+{{! Comment library }}
+<h4 id="settings-library">Comment library</h4>
+<div class="local-unifiedgrader-help-table local-unifiedgrader-help-table-stack">
+<table class="table-reboot">
+    <thead><tr><th scope="col">Setting</th><th scope="col">Default</th><th scope="col">What it does</th></tr></thead>
+    <tbody>
+        <tr><th scope="row">Require approval for system-default suggestions <code>require_systemdefault_approval</code></th><td data-label="Default">On</td><td>A teacher's suggestion for a system-default comment waits for approval. When off, suggestions become system defaults at once and are still recorded.</td></tr>
+        <tr><th scope="row">Course code regex <code>coursecode_regex</code></th><td data-label="Default">Empty</td><td>A regular expression that picks the course code out of a course short name, so comments follow a course from one offering to the next. <code>/[A-Z]{3}\d{4}/</code> reads <em>THE2201</em> from <em>THE2201-2026-S1</em>. Empty uses the whole short name.</td></tr>
+    </tbody>
+</table>
+</div>
+<p>The page also has two tools, each shown only to users who may use it:</p>
+<ul>
+    <li><strong>Manage comment library</strong>: the tags and comments every teacher starts with, and the queue of teachers' suggestions to approve or reject.</li>
+    <li><strong>Moderate comment libraries</strong>: review teachers' libraries, move comments to another course code or another owner, delete comments, and export libraries as CSV.</li>
+</ul>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>See the Comment library page</summary>
+    <div>
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.settings_comment_library}}" data-action="help-zoom">
+            <img src="{{img.settings_comment_library}}" width="1500" height="793" loading="lazy"
+                 alt="The Comment library settings page: a Tools section with Manage comment library and Moderate comment libraries buttons, then the approval tick box and the course code regex.">
+        </a>
+        <figcaption>The Comment library page, with its two tools.</figcaption>
+    </figure>
+    </div>
+</details>
+
+{{! Friction feedback }}
+<h4 id="settings-friction">Friction feedback</h4>
+<div class="local-unifiedgrader-help-table local-unifiedgrader-help-table-stack">
+<table class="table-reboot">
+    <thead><tr><th scope="col">Setting</th><th scope="col">Default</th><th scope="col">What it does</th></tr></thead>
+    <tbody>
+        <tr><th scope="row">Friction feedback <code>friction_enable</code></th><td data-label="Default">Off</td><td>The site default. When on, a posted mark stays hidden from the student until they have read each part of the feedback. A teacher can force it on or off for an activity.</td></tr>
+        <tr><th scope="row">Seconds on each step <code>friction_seconds</code></th><td data-label="Default">20</td><td>How long a student waits on each part before they can confirm it. The timer pauses while the tab is in the background. 0 shows the confirmation at once.</td></tr>
+        <tr><th scope="row">Open held marks this many days before the course ends <code>friction_daysbeforeend</code></th><td data-label="Default">14</td><td>In a course with an end date, held marks are released once the course is this close to ending. 0 waits for the end date.</td></tr>
+        <tr><th scope="row">Open a held mark this many days after it was posted <code>friction_daysafterpost</code></th><td data-label="Default">21</td><td>A mark the student never opened is released this many days after posting. With a course end date as well, the earlier of the two wins. 0 releases on the next daily run.</td></tr>
+        <tr><th scope="row">Invitation <code>friction_invitation</code></th><td data-label="Default">Empty</td><td>One sentence shown at the start of the walk. Empty uses the built-in sentence: <em>Read the feedback on this step. Your mark follows once you have seen each part.</em></td></tr>
+    </tbody>
+</table>
+</div>
+<p>The two day settings are a fail-safe. A held grade is in the stored course total, but Moodle
+leaves hidden items out of the total a student sees, so a daily scheduled task opens held marks
+when either limit is reached. A mark a teacher has hidden is left hidden.</p>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>See the Friction feedback page</summary>
+    <div>
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.settings_friction}}" data-action="help-zoom">
+            <img src="{{img.settings_friction}}" width="1500" height="1057" loading="lazy"
+                 alt="The Friction feedback settings page: the enable tick box, Seconds on each step, the two day settings and the Invitation text box.">
+        </a>
+        <figcaption>The Friction feedback page. This site has changed the seconds from the default of 20.</figcaption>
+    </figure>
+    </div>
+</details>
+
+{{! Academic integrity }}
+<h4 id="settings-integrity">Academic integrity</h4>
+<p>The page opens with a note on plagiarism scanning: whether plagiarism plugins are enabled on
+the site and where Moodle configures them. The Unified Grader has no plagiarism settings of its own.</p>
+
+<div class="local-unifiedgrader-help-table local-unifiedgrader-help-table-stack">
+<table class="table-reboot">
+    <thead><tr><th scope="col">Setting</th><th scope="col">Default</th><th scope="col">What it does</th></tr></thead>
+    <tbody>
+        <tr><th scope="row">Enable academic impropriety report form <code>enable_report_form</code></th><td data-label="Default">Off</td><td>With a URL below, the integrity button in the plagiarism card reads <em>Report academic impropriety</em> and opens the form as well as flagging the submission.</td></tr>
+        <tr><th scope="row">Report form URL template <code>report_form_url</code></th><td data-label="Default">Empty</td><td>The address of your form. These placeholders are replaced with URL-encoded values: <code>{studentname}</code>, <code>{studentid}</code>, <code>{coursecode}</code>, <code>{coursename}</code>, <code>{activityname}</code>, <code>{activitytype}</code>, <code>{gradername}</code>, <code>{graderurl}</code>.</td></tr>
+        <tr><th scope="row">Proctoring services to show <code>proctoring_services</code></th><td data-label="Default">None</td><td>Tick Quilgo, ProctorLink, AutoProctor or SMOWL. A service that is not ticked is never contacted. Save, and the settings for each ticked service appear below.</td></tr>
+        <tr><th scope="row">SMOWL: High priority alarms <code>smowl_red</code></th><td data-label="Default">Eight kinds</td><td>A student with any of these alarms is red. The defaults are: monitoring tool not launched, wrong person, more than one person, banned elements, suspicious behaviour, opened or used a program that is not allowed, and virtual machine.</td></tr>
+        <tr><th scope="row">SMOWL: Alarms to leave out <code>smowl_ignore</code></th><td data-label="Default">None</td><td>These alarms do not affect the colour and are not listed. An alarm ticked in both lists counts as high priority.</td></tr>
+        <tr><th scope="row">ProctorLink: High priority warnings <code>proctorlink_red</code></th><td data-label="Default">Three kinds</td><td>An attempt with any of these warnings is red. The defaults are: face does not match, more than one face, object detected.</td></tr>
+        <tr><th scope="row">ProctorLink: Warnings to leave out <code>proctorlink_ignore</code></th><td data-label="Default">None</td><td>These warnings do not affect the colour and are not listed.</td></tr>
+        <tr><th scope="row">AutoProctor: Low priority from this trust score <code>autoproctor_green</code></th><td data-label="Default">80</td><td>An attempt with at least this trust score (%) is green.</td></tr>
+        <tr><th scope="row">AutoProctor: Medium priority from this trust score <code>autoproctor_yellow</code></th><td data-label="Default">50</td><td>An attempt with at least this score, and under the one above, is yellow. Anything lower is red.</td></tr>
+    </tbody>
+</table>
+</div>
+<p>Quilgo has no settings of its own here. See <a href="#admin-proctoring">Proctoring setup</a> for
+what each service needs.</p>
+
+<div class="local-unifiedgrader-help-shots">
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.settings_integrity_report}}" data-action="help-zoom">
+            <img src="{{img.settings_integrity_report}}" width="1300" height="355" loading="lazy"
+                 alt="The top of the Academic integrity page: a note that plagiarism plugins are enabled, then the Impropriety report form settings with a URL template that uses placeholders.">
+        </a>
+        <figcaption>The plagiarism note and the report form.</figcaption>
+    </figure>
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.settings_integrity_proctoring}}" data-action="help-zoom">
+            <img src="{{img.settings_integrity_proctoring}}" width="1300" height="321" loading="lazy"
+                 alt="The Proctoring section: four tick boxes for Quilgo, ProctorLink, AutoProctor and SMOWL, with SMOWL ticked.">
+        </a>
+        <figcaption>Proctoring services to show. Here SMOWL is ticked.</figcaption>
+    </figure>
+</div>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>See the SMOWL alarm settings</summary>
+    <div>
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.settings_integrity_smowl}}" data-action="help-zoom">
+            <img src="{{img.settings_integrity_smowl}}" width="1300" height="867" loading="lazy"
+                 alt="The Proctoring: SMOWL section, with a long list of alarm kinds under High priority alarms, some of them ticked.">
+        </a>
+        <figcaption>SMOWL's settings appear once SMOWL is ticked and saved. Other services show
+        their own settings in the same place.</figcaption>
+    </figure>
+    </div>
+</details>
+
+{{! Per activity }}
+<h4 id="settings-activity">Settings teachers have on each activity</h4>
+<ul>
+    <li><strong>Apply late penalties</strong>: a tick box in the <em>Late penalties</em> section of
+        assignment, forum and quiz settings on Moodle 5.3. New activities start with it off. An
+        activity that existed before the upgrade keeps the behaviour it had until its settings are saved.</li>
+    <li><strong>Friction feedback</strong>: the menu in the grader header (Site default, On for this activity, Off for this activity).</li>
+</ul>
+</section>
+
+{{! ----- Capabilities ----- }}
+<section id="admin-capabilities">
 <h3>Capabilities</h3>
 
-<table class="table table-sm table-bordered">
-    <thead><tr><th>Capability</th><th>Risk</th><th>Default roles</th><th>Purpose</th></tr></thead>
+<div class="local-unifiedgrader-help-note local-unifiedgrader-help-note-warn">
+    <p><strong>Only <code>grade</code> opens the grader.</strong> The Unified Grader item and the
+    grader page are shown to users who hold <code>local/unifiedgrader:grade</code> in the activity.
+    A non-editing teacher has <code>viewall</code> and <code>viewnotes</code> by default but not
+    <code>grade</code>, so they see no Unified Grader item and cannot open the grader. Give their
+    role <code>grade</code> if they mark.</p>
+</div>
+
+<div class="local-unifiedgrader-help-table local-unifiedgrader-help-table-stack">
+<table class="table-reboot">
+    <thead><tr><th scope="col">Capability</th><th scope="col">Allowed by default</th><th scope="col">What it allows</th></tr></thead>
     <tbody>
-        <tr><td><code>local/unifiedgrader:grade</code></td><td>Write, XSS, personal</td><td>editingteacher, manager</td><td>Save grades, feedback, annotations, manage extensions/overrides</td></tr>
-        <tr><td><code>local/unifiedgrader:viewall</code></td><td>Read, personal</td><td>teacher, editingteacher, manager</td><td>Open the grader and see the participant list</td></tr>
-        <tr><td><code>local/unifiedgrader:viewfeedback</code></td><td>Read, personal</td><td>student (active enrolment)</td><td>View feedback page for the student themselves</td></tr>
-        <tr><td><code>local/unifiedgrader:viewnotes</code></td><td>Read, personal</td><td>teacher, editingteacher, manager</td><td>See private teacher notes (any author)</td></tr>
-        <tr><td><code>local/unifiedgrader:managenotes</code></td><td>Write, personal</td><td>editingteacher, manager</td><td>Create / edit / delete own notes</td></tr>
-        <tr><td><code>local/unifiedgrader:sharecomments</code></td><td>Write</td><td>editingteacher, manager</td><td>Share comment library entries with other markers</td></tr>
-        <tr><td><code>local/unifiedgrader:refer</code></td><td>Write, personal</td><td>editingteacher, manager</td><td>Flag a submission for academic-integrity review and resolve referrals (see <a href="#feature-referral">Academic-integrity referral</a>)</td></tr>
-        <tr><td><code>local/unifiedgrader:managesystemdefaults</code></td><td>Write, XSS</td><td>manager</td><td>Curate site-wide system-default comment-library tags / comments and approve or reject teacher proposals</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:grade</code></th><td data-label="Allowed by default">Editing teacher, manager</td><td>Open the grader. Save grades, feedback, annotations and penalties, post grades, and change a student's dates.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:viewall</code></th><td data-label="Allowed by default">Teacher, editing teacher, manager</td><td>Reserved. The grader reads it, but nothing depends on it at present. It does not open the grader.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:viewnotes</code></th><td data-label="Allowed by default">Teacher, editing teacher, manager</td><td>Read teacher notes.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:managenotes</code></th><td data-label="Allowed by default">Editing teacher, manager</td><td>Add teacher notes, and delete notes in the activity.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:viewfeedback</code></th><td data-label="Allowed by default">Student, teacher, editing teacher, manager</td><td>Open the feedback page, download the feedback PDF, use submission comments, and complete the Friction Feedback walk.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:refer</code></th><td data-label="Allowed by default">Editing teacher, manager</td><td>Flag a submission for an academic integrity review, and mark a referral resolved.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:viewproctoring</code></th><td data-label="Allowed by default">Editing teacher, manager</td><td>See proctoring markers and the Proctoring card.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:sharecomments</code> <span class="local-unifiedgrader-help-scope">site</span></th><td data-label="Allowed by default">Editing teacher, manager</td><td>Copy a comment another teacher has shared into your own library.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:managesystemdefaults</code> <span class="local-unifiedgrader-help-scope">site</span></th><td data-label="Allowed by default">Manager</td><td>Maintain system-default tags and comments, and approve or reject teachers' suggestions.</td></tr>
+        <tr><th scope="row"><code>local/unifiedgrader:moderatelibraries</code> <span class="local-unifiedgrader-help-scope">site</span></th><td data-label="Allowed by default">Manager</td><td>Open <em>Moderate comment libraries</em>, and export other people's libraries.</td></tr>
     </tbody>
 </table>
+</div>
 
-<p>Most capabilities are scoped at <code>CONTEXT_MODULE</code> level so they
-can be tuned per-activity if needed. The exception is
-<code>local/unifiedgrader:managesystemdefaults</code>, which governs a
-site-wide library and is checked at <code>CONTEXT_SYSTEM</code>.</p>
+<p>Capabilities marked <span class="local-unifiedgrader-help-scope">site</span> are checked for
+the whole site. The others are checked in the activity, so they can be changed for one course or
+one activity. The grader also respects Moodle's own rules: a teacher without <em>Access all
+groups</em> in a separate-groups activity sees and posts only their own groups.</p>
+
+<p>A marker who can open the report form but cannot <code>refer</code> gets a plain
+<em>Report academic impropriety</em> link in the plagiarism card: the form, without the flag.</p>
 </section>

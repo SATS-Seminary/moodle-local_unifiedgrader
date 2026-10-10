@@ -17,10 +17,10 @@
 /**
  * Unified Grader help / documentation page.
  *
- * Linked from the "?" icon in the grading interface toolbar. Renders a
- * single self-contained reference covering every adapter integration and
- * cross-cutting feature. Available to anyone logged in — there is no
- * tenant-specific data on the page.
+ * Linked from the "?" icon in the grading interface toolbar, which opens the
+ * section for the activity type being graded (#integration-{modname}). One
+ * page, in four parts: teachers, students, administrators and developers.
+ * Available to anyone logged in: there is no site data on the page.
  *
  * @package    local_unifiedgrader
  * @copyright  2026 South African Theological Seminary (mathieu@sats.ac.za)
@@ -52,11 +52,28 @@ if (empty($plugininfo->release)) {
     }
 }
 
+// Screenshots live in pix/help and are served through the theme, so a theme
+// can override any of them. The template reads them as {{img.<filename>}}.
+$images = [];
+foreach (glob(__DIR__ . '/pix/help/*.png') ?: [] as $imagepath) {
+    $imagename = basename($imagepath, '.png');
+    $images[$imagename] = $OUTPUT->image_url('help/' . $imagename, 'local_unifiedgrader')->out(false);
+}
+
 $templatedata = [
     'wwwroot' => $CFG->wwwroot,
     'pluginrelease' => $plugininfo->release,
     'pluginversion' => $plugininfo->version,
+    'img' => $images,
+    // Only shown to users who can open the settings.
+    'settingsurl' => has_capability('moodle/site:config', context_system::instance())
+        ? (new moodle_url('/local/unifiedgrader/settings_index.php'))->out(false)
+        : '',
 ];
+
+// Marks the current section in the navigation and opens screenshots at full
+// size. The page reads the same without it.
+$PAGE->requires->js_call_amd('local_unifiedgrader/help', 'init');
 
 echo $OUTPUT->header();
 echo $OUTPUT->render_from_template('local_unifiedgrader/help', $templatedata);

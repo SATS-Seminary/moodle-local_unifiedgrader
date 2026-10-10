@@ -1,116 +1,90 @@
 {{!
     @template local_unifiedgrader/help_section_quiz
 
-    Documentation partial for the Quiz activity adapter.
+    Help page partial: marking a quiz. The grader's help button links to
+    #integration-quiz, so that id must stay.
+
+    Context variables:
+    * img - object - Screenshot URLs keyed by file name in pix/help.
 
     Example context (json):
-    {}
+    {
+        "img": {
+            "quiz": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/quiz"
+        }
+    }
 }}
-<section id="integration-quiz">
-<h3>Quiz <span class="badge bg-secondary">mod_quiz</span></h3>
+<section id="integration-quiz" class="local-unifiedgrader-help-activity">
+<h4 class="local-unifiedgrader-help-activity-title"><i class="fa fa-check-square-o" aria-hidden="true"></i> Quizzes</h4>
 
-<p>Quiz support focuses on <strong>manual grading</strong> of essay,
-audio-response, and file-upload questions, plus a unified surface for
-quiz feedback that complements the auto-grading already performed by
-Moodle's question engine.</p>
+<p>Use the grader to mark the questions Moodle cannot mark for you, such as essays, and to give
+feedback on the attempt as a whole.</p>
 
-<h4>Preview</h4>
+<h5>What you see</h5>
 <ul>
-    <li>The full <strong>rendered attempt</strong> with question text, student responses, and (where applicable) auto-grading correctness indicators.</li>
-    <li><strong>Native question renderers</strong> are used, so audio responses, file uploads, and drag-and-drop questions all display correctly.</li>
-    <li><strong>Question display order</strong> respects the attempt's layout (which honours per-attempt shuffle), not the quiz definition order.</li>
-    <li><strong>Description / label items</strong> are skipped when numbering manual-graded questions, so question 1 is question 1 regardless of intervening descriptions.</li>
+    <li><strong>Left:</strong> the student's attempt, question by question, in the order they saw
+        it. Automatically marked questions show their result. Moodle's own
+        <em>Make comment or override mark</em> link appears under each question.</li>
+    <li><strong>Right:</strong> a <strong>Manually marked questions</strong> list with one row per
+        question that needs you: a score box and a comment editor. The badge shows how many are done (<em>0 / 1</em>).</li>
+    <li>Below that, <strong>Overall Feedback</strong> for the attempt and the usual notes.</li>
+    <li>When a student has more than one finished attempt, an attempt selector appears. Feedback is kept per attempt.</li>
 </ul>
 
-<h4>Marking</h4>
+<figure class="local-unifiedgrader-help-shot">
+    <a href="{{img.quiz}}" data-action="help-zoom">
+        <img src="{{img.quiz}}" width="1600" height="909" loading="lazy"
+             alt="A quiz attempt. On the left, an essay question with the student's answer and a true/false question marked correct. On the right, a Manually marked questions list with a score box and comment editor for question 1.">
+    </a>
+    <figcaption>A quiz with an essay question. The essay gets a score and a comment on the right.</figcaption>
+</figure>
+
+<h5>Mark a question</h5>
+<ol>
+    <li>Read the answer in the preview.</li>
+    <li>Type the score in the question's score box. A score above the question's maximum, or below zero, is refused.</li>
+    <li>Write a comment if you wish. It can hold formatting, images and recorded audio.</li>
+    <li>Press <strong>Save feedback</strong>. Moodle recalculates the quiz grade.</li>
+</ol>
+<p>The score box of a question worth zero marks is disabled; the question can still take a comment. The overall grade box
+is filled by Moodle from the question marks.</p>
+
+<h5>Due date, late attempts and extensions</h5>
+<p>In Moodle 5.3 a quiz has its own <strong>Due date</strong> in its <em>Timing</em> settings,
+separate from the date it closes. A quiz without a due date is never late.</p>
+
+<figure class="local-unifiedgrader-help-shot">
+    <a href="{{img.quiz_due_date}}" data-action="help-zoom">
+        <img src="{{img.quiz_due_date}}" width="1300" height="323" loading="lazy"
+             alt="The Timing section of the quiz settings: Open the quiz, Due date (enabled), Close the quiz, Time limit and When time expires.">
+    </a>
+    <figcaption>The quiz <strong>Due date</strong> is a standard Moodle 5.3 quiz setting.</figcaption>
+</figure>
+
+<p>With <em>Apply late penalties</em> ticked for the quiz, the student's <strong>first real
+attempt</strong> decides whether the quiz is late. A real attempt is one where they answered at
+least half of the questions (your administrator can change that share).</p>
 <ul>
-    <li><strong>Per-question manual grade and comment</strong> with the same UI as a marking guide. Each manually-gradable question becomes a row, and each mark is validated against the question's maximum — an out-of-range value blocks the save, just like marking-guide criteria.</li>
-    <li><strong>Zero-mark questions</strong> (e.g. information-only essay items) have their score input disabled to avoid the question engine's division-by-zero — comments are still allowed.</li>
-    <li><strong>Per-attempt feedback</strong> is stored in <code>local_unifiedgrader_qfb</code> keyed on <code>(cmid, userid, attemptnumber)</code>. Each attempt can carry its own feedback narrative.</li>
-    <li><strong>Attempt switcher</strong> appears in the marking panel header when a student has more than one finished attempt.</li>
+    <li>First real attempt on time: no penalty, even if later attempts come after the due date.</li>
+    <li>First real attempt late: the penalty for that lateness comes off the quiz grade, whatever later attempts score.</li>
 </ul>
+<p>The grader shows the lateness and the penalty as it does for an assignment
+(see <a href="#feature-penalties">Penalties</a>). To excuse a student, extend their due date in
+<a href="#feature-overrides">Dates &amp; extensions</a>.</p>
 
-<h4>Post grades</h4>
-<p>Quiz grade visibility isn't controlled by the gradebook's hidden flag — it
-follows the quiz's <em>review options</em> matrix. Unified Grader's
-<em>Post grades</em> toggle deliberately flips a <strong>narrow, well-defined
-slice</strong> of that matrix and leaves everything else alone.</p>
+<figure class="local-unifiedgrader-help-shot local-unifiedgrader-help-shot-narrow">
+    <a href="{{img.quiz_late_penalty}}" data-action="help-zoom">
+        <img src="{{img.quiz_late_penalty}}" width="1200" height="750" loading="lazy"
+             alt="The marking panel on a late quiz attempt: a banner reading Late: 1 day 23 hours, and a red badge reading minus 10 percent, 2 days late, under the grade box.">
+    </a>
+    <figcaption>A late quiz attempt: the exact lateness in the banner, the penalty in the badge.</figcaption>
+</figure>
 
-<p><strong>What posting changes:</strong></p>
-<ul>
-    <li><code>reviewmarks</code> — Marks shown on the quiz view page.</li>
-    <li><code>reviewmaxmarks</code> — Maximum mark shown alongside.</li>
-    <li><code>reviewoverallfeedback</code> — Per-grade-range overall feedback.</li>
-</ul>
-<p>...for the <em>Later, while the quiz is still open</em> and <em>After the quiz
-is closed</em> timeframes only. Unposting clears the same three.</p>
+<h5>Posting quiz grades</h5>
+<p>A quiz normally shows marks according to its <em>Review options</em>. If your administrator has
+switched on <em>Enable post grades for quizzes</em>, the
+<a href="#feature-post-grades">post-grades control</a> also works on quizzes, with some
+differences explained there.</p>
 
-<p><strong>What posting does <em>not</em> change:</strong></p>
-<ul>
-    <li><code>reviewattempt</code> — Whether the student can open the attempt
-    at all. If this is off in the quiz Review options, posting grades will
-    expose the score but the <em>Review</em> link won't render — students
-    can't click through to inspect their questions, answers, or any
-    per-question feedback.</li>
-    <li><code>reviewcorrectness</code>, <code>reviewspecificfeedback</code>,
-    <code>reviewrightanswer</code>, <code>reviewgeneralfeedback</code> — all
-    governed by <code>reviewattempt</code> anyway (they only appear inside
-    the attempt review page).</li>
-    <li>The <em>During the attempt</em> and <em>Immediately after the
-    attempt</em> timeframes are never touched.</li>
-</ul>
-
-<p>This means a teacher who wants <em>marks only, no question review</em>
-just leaves <code>reviewattempt</code> off in the quiz Review options page
-and uses Unified Grader's Post grades toggle to flip marks/maxmarks/overall
-feedback on or off. The two layers compose cleanly.</p>
-
-<p>Gated by the admin setting <code>enable_quiz_post_grades</code> (off by
-default; enable it only when your workflow explicitly relies on the toggle
-to control mark visibility). Scheduling a future post date is not supported
-for the whole quiz — review options are state-based, not date-based.</p>
-
-<p>Posting one student or one group writes that gradebook cell and the
-Unified Grader feedback only. The attempt review page stays on the quiz
-review options. While those options still hide marks, the gradebook hides
-the mark as well. Friction Feedback is the exception: when that student
-finishes the walk, their mark is shown in the gradebook and the review
-options are left as they are. The gradebook eye cannot show the quiz item
-itself, because the quiz owns that flag.</p>
-
-<h4>Quiz extensions</h4>
-<p><strong>Moodle 5.3 and later:</strong> quizzes have their own due date, and an
-extension is the due date on the student's quiz override. Extensions show
-inline and can be granted or cleared from the grader. The effective due date is
-Moodle's own: user override &gt; group override &gt; quiz due date. A quiz
-without a due date is never late; its close time only ends access.</p>
-
-<p><strong>Earlier versions:</strong> if the <code>quizaccess_duedate</code> plugin
-is installed, the Unified Grader integrates with its override system. Extensions
-show inline, overrides can be cleared, and the effective due date for
-late-penalty calculation comes from the plugin's resolver (user override &gt;
-group override &gt; quiz default).</p>
-
-<h4>Quiz late penalties (Moodle 5.3 and later)</h4>
-<p>With <em>Apply late penalties</em> ticked in the quiz settings, the student's
-<strong>first genuine attempt</strong> decides the penalty: the first submitted
-attempt in which they answered at least the share of questions set in
-<code>quizgenuineattemptpct</code> (50% by default). An attempt submitted empty
-does not count, so it cannot secure an on-time attempt.</p>
-<ul>
-    <li>Submitted by the due date: no penalty, and later attempts can reach full marks even if they are late.</li>
-    <li>Submitted after it: the grade penalty rules set the penalty from how late it was, and it comes off the quiz grade whatever later attempts score. A first genuine attempt two days late under a 10% rule caps the quiz at 90%.</li>
-</ul>
-
-<div class="local-unifiedgrader-help-screenshot">
-    <i class="fa fa-image" aria-hidden="true"></i>
-    <span>Screenshot: quiz grading with the rendered attempt in the preview pane
-    and a per-question marking guide on the right, attempt selector visible.</span>
-</div>
-
-<h4>Notes</h4>
-<ul>
-    <li>Quiz grades are computed by the question engine — manual marks are added to the underlying question attempt, then the engine recalculates the overall grade.</li>
-    <li>If a question's max mark is changed mid-quiz, existing graded attempts will re-score against the new max when next viewed (standard Moodle behaviour).</li>
-</ul>
+<p>On a proctored quiz, see <a href="#feature-proctoring">Proctoring results</a>.</p>
 </section>

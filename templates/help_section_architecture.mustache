@@ -1,27 +1,27 @@
 {{!
     @template local_unifiedgrader/help_section_architecture
 
-    Documentation partial: architecture / developer notes with inline SVG diagrams.
+    Help page partial: notes for developers and integrators, with inline SVG
+    diagrams. Collapsed by default so it stays out of a teacher's way.
 
     Example context (json):
     {}
 }}
-<section id="architecture">
-<h2>Architecture</h2>
+<section id="architecture" class="local-unifiedgrader-help-part">
+<header class="local-unifiedgrader-help-part-head">
+    <p class="local-unifiedgrader-help-kicker"><i class="fa fa-code" aria-hidden="true"></i> For developers</p>
+    <h2>How it is built</h2>
+    <p>Notes for developers and integrators. You do not need any of this to mark or to run the plugin. Each topic opens when you click it.</p>
+</header>
 
-<p>This section is for developers, integrators, and advanced admins.
-Skip it if you only need to grade.</p>
-
-<h3>Adapter pattern</h3>
-
-<p>The single grading UI works against any number of activity types
-because each type is wrapped by an adapter that normalises its data to
-a shared shape. New activity types can be supported by adding a new
-adapter and registering it in <code>adapter_factory</code>.</p>
-
-<figure class="local-unifiedgrader-help-figure my-4">
-<svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Adapter pattern diagram"
-     class="img-fluid" style="max-width: 720px;">
+<details class="local-unifiedgrader-help-details" id="dev-adapters">
+    <summary>Adapters: one screen, four activity types</summary>
+    <div>
+        <p>The interface never talks to an activity directly. Each activity type is wrapped by an
+        adapter that presents its data in one shape. Supporting another activity type means adding
+        an adapter and registering it in <code>adapter_factory</code>.</p>
+        <figure class="local-unifiedgrader-help-figure">
+<svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Adapter pattern diagram">
     <style>
         .ug-svg-box { fill: #fff; stroke: #495057; stroke-width: 1.5; }
         .ug-svg-box-mod { fill: #e7f1ff; stroke: #0d6efd; }
@@ -63,11 +63,11 @@ adapter and registering it in <code>adapter_factory</code>.</p>
 
     <rect x="360" y="280" width="150" height="60" rx="6" class="ug-svg-box-mod"/>
     <text x="380" y="304" class="ug-svg-text ug-svg-text-bold">quiz_adapter</text>
-    <text x="380" y="324" class="ug-svg-label">+ quizaccess_duedate</text>
+    <text x="380" y="324" class="ug-svg-label">core due dates (5.3)</text>
 
     <rect x="530" y="280" width="170" height="60" rx="6" class="ug-svg-box-mod"/>
     <text x="550" y="304" class="ug-svg-text ug-svg-text-bold">bbb_adapter</text>
-    <text x="550" y="324" class="ug-svg-label">+ bbbext_advgrd · scraper</text>
+    <text x="550" y="324" class="ug-svg-label">+ bbbext_advgrd</text>
 
     <!-- Arrows -->
     <path d="M360 100 L360 130" class="ug-svg-arrow" marker-end="url(#ug-arrowhead)"/>
@@ -77,121 +77,246 @@ adapter and registering it in <code>adapter_factory</code>.</p>
     <path d="M380 248 L425 280" class="ug-svg-arrow" marker-end="url(#ug-arrowhead)"/>
     <path d="M395 248 L600 280" class="ug-svg-arrow" marker-end="url(#ug-arrowhead)"/>
 </svg>
-<figcaption class="text-muted small">UI components hit a thin web-service layer; the layer dispatches through
-<code>adapter_factory</code> to the adapter for the active activity type.</figcaption>
-</figure>
+            <figcaption>The interface calls a thin web service layer, which goes through
+            <code>adapter_factory</code> to the adapter for the activity being marked.</figcaption>
+        </figure>
+        <p><code>\local_unifiedgrader\adapter\base_adapter</code> defines, among others:</p>
+        <ul>
+            <li><code>get_activity_info()</code>: name, type, dates, maximum grade, grading method, feature flags.</li>
+            <li><code>get_participants(array $filters)</code>: the student list with status, submission time, grade, late and override flags.</li>
+            <li><code>get_submission_data(int $userid)</code> and <code>get_submission_files(int $userid)</code>: what the preview shows.</li>
+            <li><code>get_grade_data(int $userid)</code> and <code>save_grade(...)</code>: grade, feedback and advanced grading.</li>
+            <li><code>supports_feature(string $feature)</code>: rubric, marking guide, online text, file submission, blind marking, annotations, plagiarism.</li>
+            <li><code>is_grade_released(int $userid)</code>, <code>get_late_reference_time()</code> and <code>calculate_late_penalty()</code>.</li>
+        </ul>
+    </div>
+</details>
 
-<h4>The adapter contract</h4>
-<p><code>\local_unifiedgrader\adapter\base_adapter</code> is abstract and
-defines (among others):</p>
-
-<ul>
-    <li><code>get_activity_info(): array</code> — name, type, due dates, max grade, grading method, feature flags.</li>
-    <li><code>get_participants(array $filters): array</code> — filtered list with status, submission time, grade, late flag, override flag.</li>
-    <li><code>get_submission_data(int $userid): array</code> — content / files / portfolio URL / hascontent flag / attempts.</li>
-    <li><code>get_grade_data(int $userid): array</code> — current grade, feedback, rubric fill data.</li>
-    <li><code>save_grade(...)</code> — write grade, feedback, advanced grading data.</li>
-    <li><code>get_submission_files(int $userid): array</code> — files for the right-rail file selector.</li>
-    <li><code>supports_feature(string $feature): bool</code> — feature gates: rubric, markingguide, onlinetext, filesubmission, blindmarking, annotations, plagiarism.</li>
-    <li><code>is_grade_released(int $userid): bool</code> — whether students should see their grade.</li>
-</ul>
-
-<p>Optional methods cover attempts, plagiarism links, rubric/marking
-guide integration, draft-area handling, submission-action handlers, and
-override / extension management.</p>
-
-<h3>BBB engagement data flow</h3>
-
-<p>BBB is the only adapter with a non-trivial data-source story. There are
-three independent paths into the Activity Points card; the adapter merges
-their results with this priority:</p>
-
-<figure class="local-unifiedgrader-help-figure my-4">
-<svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BBB engagement data flow"
-     class="img-fluid" style="max-width: 760px;">
+<details class="local-unifiedgrader-help-details" id="dev-integrations">
+    <summary>Optional plugins and how they are detected</summary>
+    <div>
+        <p>Every integration is found at run time, with <code>class_exists()</code>,
+        <code>function_exists()</code> or a check that the other plugin's tables exist. A missing
+        plugin switches its part of the interface off. Other plugins' data is read, never written.</p>
+        <figure class="local-unifiedgrader-help-figure">
+<svg viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Companion plugin landscape">
     <style>
-        .bbf-box { fill: #fff; stroke: #495057; stroke-width: 1.5; }
-        .bbf-box-bbb { fill: #fde2cf; stroke: #c54d00; }
-        .bbf-box-moodle { fill: #e7f1ff; stroke: #0d6efd; }
-        .bbf-box-ours { fill: #d1e7dd; stroke: #198754; }
-        .bbf-text { font-family: -apple-system, sans-serif; font-size: 12px; fill: #212529; }
-        .bbf-text-bold { font-weight: bold; font-size: 13px; }
-        .bbf-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
-        .bbf-arrow { stroke: #6c757d; stroke-width: 1.5; fill: none; }
-        .bbf-arrow-dashed { stroke: #6c757d; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+        .cp-core { fill: #d1e7dd; stroke: #198754; stroke-width: 1.5; }
+        .cp-mod { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; }
+        .cp-opt { fill: #fff3cd; stroke: #b08800; stroke-width: 1.5; }
+        .cp-3p { fill: #fde2cf; stroke: #c54d00; stroke-width: 1.5; }
+        .cp-text { font-family: -apple-system, sans-serif; font-size: 12px; fill: #212529; }
+        .cp-text-bold { font-weight: bold; font-size: 13px; }
+        .cp-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
+        .cp-arrow { stroke: #6c757d; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
     </style>
     <defs>
-        <marker id="bbf-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <marker id="cp-arrowhead" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 9 3, 0 6" fill="#6c757d"/>
+        </marker>
+    </defs>
+
+    <!-- Core in the middle -->
+    <rect x="280" y="160" width="240" height="60" rx="6" class="cp-core"/>
+    <text x="300" y="186" class="cp-text cp-text-bold">local_unifiedgrader (core)</text>
+    <text x="300" y="204" class="cp-label">adapter pattern · web services · UI</text>
+
+    <!-- Activity adapters: top -->
+    <rect x="40" y="40" width="160" height="40" rx="6" class="cp-mod"/>
+    <text x="60" y="64" class="cp-text cp-text-bold">mod_assign · forum · quiz · bigbluebuttonbn</text>
+
+    <!-- Optional plugins: bottom row -->
+    <rect x="20" y="280" width="170" height="50" rx="6" class="cp-opt"/>
+    <text x="34" y="304" class="cp-text cp-text-bold">bbbext_advgrd</text>
+    <text x="34" y="322" class="cp-label">BBB rubric / marking guide</text>
+
+    <rect x="200" y="280" width="170" height="50" rx="6" class="cp-opt"/>
+    <text x="214" y="304" class="cp-text cp-text-bold">proctoring plugins</text>
+    <text x="214" y="322" class="cp-label">Quilgo · ProctorLink · AutoProctor · SMOWL</text>
+
+    <rect x="380" y="280" width="170" height="50" rx="6" class="cp-opt"/>
+    <text x="394" y="304" class="cp-text cp-text-bold">gradepenalty_duedate</text>
+    <text x="394" y="322" class="cp-label">automatic late penalties</text>
+
+    <rect x="560" y="280" width="220" height="50" rx="6" class="cp-3p"/>
+    <text x="574" y="304" class="cp-text cp-text-bold">plagiarism plugins</text>
+    <text x="574" y="322" class="cp-label">Copyleaks · Turnitin · …</text>
+
+    <!-- Right column extras -->
+    <rect x="600" y="40" width="180" height="50" rx="6" class="cp-3p"/>
+    <text x="614" y="64" class="cp-text cp-text-bold">Byblos portfolio</text>
+    <text x="614" y="82" class="cp-label">submission plugin in mod_assign</text>
+
+    <rect x="600" y="110" width="180" height="50" rx="6" class="cp-opt"/>
+    <text x="614" y="134" class="cp-text cp-text-bold">TinyMCE recorder</text>
+    <text x="614" y="152" class="cp-label">audio / video feedback inline</text>
+
+    <rect x="600" y="180" width="180" height="50" rx="6" class="cp-opt"/>
+    <text x="614" y="204" class="cp-text cp-text-bold">local_nida</text>
+    <text x="614" y="222" class="cp-label">submission / feedback translation</text>
+
+    <!-- Arrows from core to companions -->
+    <path d="M400 220 L105 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M400 220 L285 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M400 220 L465 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M400 220 L670 280" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M520 175 L600 75" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M520 190 L600 135" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M280 175 L200 80" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+    <path d="M520 200 L600 205" class="cp-arrow" marker-end="url(#cp-arrowhead)"/>
+</svg>
+            <figcaption>Green is this plugin, blue the four activity types, yellow and orange the
+            optional plugins. Dashed arrows are run-time checks.</figcaption>
+        </figure>
+        <p>Proctoring services each sit behind a provider class in <code>classes/proctoring/provider/</code>,
+        registered in <code>proctoring\service::PROVIDERS</code>. Services that report findings but no
+        verdict share <code>proctoring\rule</code>, which turns the kind of finding into red, yellow or green.</p>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details" id="dev-penalties">
+    <summary>Late penalties, posting and Friction Feedback</summary>
+    <div>
+        <ul>
+            <li><code>penalty\compat::unified()</code> is true once <code>mod_quiz</code> has core due dates (Moodle 5.3). One release serves both 5.0 and 5.3.</li>
+            <li><code>penalty\service::resync()</code> recalculates a student's penalties. Observers call it on <code>user_graded</code>, quiz attempt submission, assignment extensions, and assignment and quiz overrides.</li>
+            <li><code>penalty\gradebook_writer</code> writes the total deduction to <code>grade_grades.deductedmark</code>; the raw grade is untouched and nothing is overridden.</li>
+            <li>The per-activity switch is in <code>local_unifiedgrader_penset</code> and travels with backup and restore.</li>
+            <li>Posting the class is the grade item's hidden flag; posting a student or a group is <code>grade_grades.hidden</code> on their cell (<code>classes/grades/</code>).</li>
+            <li>A Friction Feedback walk is a row in <code>local_unifiedgrader_friction</code> that holds the cell hidden until the student finishes or <code>task\open_friction</code> opens it.</li>
+            <li><code>dates\student_dates</code> loads, previews and saves the Dates &amp; extensions dialogue through the activities' own APIs.</li>
+        </ul>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details" id="dev-annotations">
+    <summary>Annotations: from marks on screen to a PDF</summary>
+    <div>
+        <p>Documents are drawn with PDF.js. Marks are drawn on a Fabric.js layer over each page and
+        saved per page as JSON in <code>local_unifiedgrader_annot</code>. On save, pdf-lib draws the
+        marks into a real PDF, stored in the <code>annotatedpdf</code> file area for the student to
+        download. All three libraries ship in <code>thirdparty/</code>; nothing is loaded from elsewhere.</p>
+        <figure class="local-unifiedgrader-help-figure">
+<svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Annotation flatten pipeline">
+    <style>
+        .ann-step { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; }
+        .ann-step-store { fill: #d1e7dd; stroke: #198754; stroke-width: 1.5; }
+        .ann-step-flatten { fill: #fff3cd; stroke: #b08800; stroke-width: 1.5; }
+        .ann-text { font-family: -apple-system, sans-serif; font-size: 12px; fill: #212529; }
+        .ann-text-bold { font-weight: bold; font-size: 13px; }
+        .ann-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
+        .ann-arrow { stroke: #6c757d; stroke-width: 1.5; fill: none; }
+    </style>
+    <defs>
+        <marker id="ann-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
             <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d"/>
         </marker>
     </defs>
 
-    <!-- BBB server -->
-    <rect x="20" y="20" width="200" height="120" rx="6" class="bbf-box-bbb"/>
-    <text x="40" y="46" class="bbf-text bbf-text-bold">BigBlueButton server</text>
-    <text x="40" y="68" class="bbf-text">• meeting events log</text>
-    <text x="40" y="88" class="bbf-text">• /statistics/index.html</text>
-    <text x="40" y="108" class="bbf-text">  (per-recording HTML)</text>
-    <text x="40" y="128" class="bbf-label">Activity Score computed client-side</text>
+    <rect x="20" y="80" width="140" height="60" rx="6" class="ann-step"/>
+    <text x="40" y="106" class="ann-text ann-text-bold">PDF.js renders</text>
+    <text x="40" y="124" class="ann-label">page n as canvas</text>
 
-    <!-- Path 1: callback -->
-    <rect x="280" y="20" width="200" height="60" rx="6" class="bbf-box-moodle"/>
-    <text x="300" y="46" class="bbf-text bbf-text-bold">bbb_broker.php</text>
-    <text x="300" y="64" class="bbf-text">action=meeting_events</text>
-    <text x="540" y="50" class="bbf-label">webhook on meeting end</text>
+    <rect x="200" y="80" width="160" height="60" rx="6" class="ann-step"/>
+    <text x="220" y="106" class="ann-text ann-text-bold">Fabric.js overlay</text>
+    <text x="220" y="124" class="ann-label">teacher draws / pins</text>
 
-    <!-- Path 2: scrape -->
-    <rect x="280" y="100" width="200" height="60" rx="6" class="bbf-box-ours"/>
-    <text x="300" y="124" class="bbf-text bbf-text-bold">stats_scraper</text>
-    <text x="300" y="142" class="bbf-text">curl + DOMDocument</text>
-    <text x="540" y="130" class="bbf-label">teacher-triggered (button)</text>
+    <rect x="400" y="80" width="160" height="60" rx="6" class="ann-step-store"/>
+    <text x="420" y="106" class="ann-text ann-text-bold">save_annotations</text>
+    <text x="420" y="124" class="ann-label">JSON per (cmid,user,file,page)</text>
 
-    <!-- Path 3: advgrd -->
-    <rect x="280" y="180" width="200" height="60" rx="6" class="bbf-box-moodle"/>
-    <text x="300" y="204" class="bbf-text bbf-text-bold">bbbext_advgrd evidence</text>
-    <text x="300" y="222" class="bbf-text">grader::record_grade</text>
-    <text x="540" y="210" class="bbf-label">snapshot at grade time</text>
+    <rect x="600" y="20" width="180" height="60" rx="6" class="ann-step-flatten"/>
+    <text x="620" y="46" class="ann-text ann-text-bold">pdf-lib flatten</text>
+    <text x="620" y="64" class="ann-label">embed Fabric → real PDF</text>
 
-    <!-- Storage -->
-    <rect x="540" y="20" width="200" height="60" rx="6" class="bbf-box-moodle"/>
-    <text x="560" y="46" class="bbf-text bbf-text-bold">bigbluebuttonbn_logs</text>
-    <text x="560" y="64" class="bbf-text">log = 'Summary'</text>
+    <rect x="600" y="140" width="180" height="60" rx="6" class="ann-step-store"/>
+    <text x="620" y="166" class="ann-text ann-text-bold">save_annotated_pdf</text>
+    <text x="620" y="184" class="ann-label">filearea = annotatedpdf</text>
 
-    <rect x="540" y="100" width="200" height="60" rx="6" class="bbf-box-ours"/>
-    <text x="560" y="124" class="bbf-text bbf-text-bold">local_unifiedgrader_bbbeng</text>
-    <text x="560" y="142" class="bbf-text">cached scrape rows</text>
+    <path d="M160 110 L200 110" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
+    <path d="M360 110 L400 110" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
+    <path d="M560 110 Q580 110 600 70" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
+    <path d="M690 80 L690 140" class="ann-arrow" marker-end="url(#ann-arrowhead)"/>
 
-    <rect x="540" y="180" width="200" height="60" rx="6" class="bbf-box-moodle"/>
-    <text x="560" y="204" class="bbf-text bbf-text-bold">bbbext_advgrd_grade</text>
-    <text x="560" y="222" class="bbf-text">evidence JSON</text>
-
-    <!-- Adapter -->
-    <rect x="280" y="290" width="460" height="60" rx="6" class="bbf-box-ours"/>
-    <text x="300" y="314" class="bbf-text bbf-text-bold">bbb_adapter::get_engagement_summary()</text>
-    <text x="300" y="332" class="bbf-text">priority: callback (Summary log) → scrape cache → empty</text>
-
-    <!-- Arrows -->
-    <path d="M220 50 L280 50" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
-    <path d="M220 80 Q250 80 280 130" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
-    <path d="M480 50 L540 50" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
-    <path d="M480 130 L540 130" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
-    <path d="M480 210 L540 210" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
-    <path d="M640 80 L640 290" class="bbf-arrow-dashed" marker-end="url(#bbf-arrowhead)"/>
-    <path d="M640 160 L640 290" class="bbf-arrow-dashed" marker-end="url(#bbf-arrowhead)"/>
+    <text x="20" y="180" class="ann-label">Editing path: pages saved as Fabric JSON, restored on switch.</text>
+    <text x="20" y="200" class="ann-label">Flatten path: pdf-lib reads JSON, redraws onto a real PDF for student download.</text>
 </svg>
-<figcaption class="text-muted small">Three paths into the Activity Points card. The adapter prefers callback
-(<code>EVENT_SUMMARY</code>) data; falls back to the cached scrape rows; the
-<code>bbbext_advgrd</code> evidence snapshot is used when a graded record exists.</figcaption>
-</figure>
+            <figcaption>Two paths from the same saved marks: live editing for the teacher, and a flattened PDF for the student.</figcaption>
+        </figure>
+    </div>
+</details>
 
-<h3>Marking guide save lifecycle</h3>
+<details class="local-unifiedgrader-help-details" id="dev-saving">
+    <summary>Saving: auto-save, the offline queue and typing during a save</summary>
+    <div>
+        <p>Every editable field is tracked. Leaving a field starts a 1.5 second timer, then one save
+        goes out through <code>local_unifiedgrader_save_grade</code>. A second save cannot start while
+        one is in flight. Failed saves wait in <code>SaveQueue</code>, backed by IndexedDB, and are retried.</p>
+        <figure class="local-unifiedgrader-help-figure">
+<svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Auto-save state machine">
+    <style>
+        .as-state { fill: #fff; stroke: #495057; stroke-width: 1.5; }
+        .as-clean { fill: #d1e7dd; stroke: #198754; stroke-width: 1.5; }
+        .as-dirty { fill: #fff3cd; stroke: #b08800; stroke-width: 1.5; }
+        .as-flight { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; }
+        .as-error { fill: #f8d7da; stroke: #b02a37; stroke-width: 1.5; }
+        .as-text { font-family: -apple-system, sans-serif; font-size: 13px; fill: #212529; font-weight: bold; }
+        .as-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
+        .as-arrow { stroke: #6c757d; stroke-width: 1.5; fill: none; }
+    </style>
+    <defs>
+        <marker id="as-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d"/>
+        </marker>
+    </defs>
 
-<p>The save / refresh cycle has to handle the case where the teacher
-keeps typing while a save is in flight. The flow is:</p>
+    <ellipse cx="100" cy="140" rx="80" ry="40" class="as-clean"/>
+    <text x="100" y="138" text-anchor="middle" class="as-text">CLEAN</text>
+    <text x="100" y="156" text-anchor="middle" class="as-label">snapshot matches</text>
 
-<figure class="local-unifiedgrader-help-figure my-4">
-<svg viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Marking guide save lifecycle"
-     class="img-fluid" style="max-width: 800px;">
+    <ellipse cx="320" cy="140" rx="80" ry="40" class="as-dirty"/>
+    <text x="320" y="138" text-anchor="middle" class="as-text">DIRTY</text>
+    <text x="320" y="156" text-anchor="middle" class="as-label">debounce timer running</text>
+
+    <ellipse cx="560" cy="140" rx="80" ry="40" class="as-flight"/>
+    <text x="560" y="138" text-anchor="middle" class="as-text">IN FLIGHT</text>
+    <text x="560" y="156" text-anchor="middle" class="as-label">AJAX dispatched</text>
+
+    <ellipse cx="560" cy="40" rx="80" ry="30" class="as-error"/>
+    <text x="560" y="36" text-anchor="middle" class="as-text">RETRY QUEUED</text>
+    <text x="560" y="52" text-anchor="middle" class="as-label">offline / 5xx</text>
+
+    <ellipse cx="720" cy="240" rx="60" ry="30" class="as-clean"/>
+    <text x="720" y="238" text-anchor="middle" class="as-text">CLEAN</text>
+    <text x="720" y="254" text-anchor="middle" class="as-label">snapshot updated</text>
+
+    <path d="M180 140 L240 140" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="190" y="130" class="as-label">user edits</text>
+
+    <path d="M400 140 L480 140" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="410" y="130" class="as-label">focusout · 1.5s</text>
+
+    <path d="M560 100 L560 70" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="570" y="90" class="as-label">network err</text>
+
+    <path d="M620 60 Q700 60 700 140 Q700 160 640 160" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="650" y="100" class="as-label">SaveQueue retries</text>
+
+    <path d="M620 170 Q680 200 700 215" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="630" y="200" class="as-label">200 OK</text>
+
+    <path d="M660 240 Q400 240 320 180" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="380" y="230" class="as-label">_renderGuide reconciles, _saveInFlight=false</text>
+
+    <path d="M180 130 Q200 90 300 100 L320 100" class="as-arrow" marker-end="url(#as-arrowhead)"/>
+    <text x="190" y="80" class="as-label">edits during in-flight save: stay dirty</text>
+</svg>
+            <figcaption>The auto-save states. Edits made while a save is in flight stay dirty, so the next save sends them.</figcaption>
+        </figure>
+        <p>When the response to a save arrives, each rubric or marking-guide field is compared with
+        what was sent. Fields the teacher has changed since, and the field with focus, are left alone.</p>
+        <figure class="local-unifiedgrader-help-figure">
+<svg viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Marking guide save lifecycle">
     <style>
         .mg-step { fill: #e7f1ff; stroke: #0d6efd; stroke-width: 1.5; }
         .mg-step-write { fill: #d1e7dd; stroke: #198754; stroke-width: 1.5; }
@@ -252,57 +377,150 @@ keeps typing while a save is in flight. The flow is:</p>
     <path d="M490 180 L400 220" class="mg-arrow" marker-end="url(#mg-arrowhead)"/>
     <path d="M490 180 L660 220" class="mg-arrow" marker-end="url(#mg-arrowhead)"/>
 </svg>
-<figcaption class="text-muted small">Per-field reconciliation prevents in-flight edits from being clobbered
-by the post-save state refresh. The currently-focused field is never overwritten;
-fields the teacher has changed since the save fired stay put and re-mark dirty.</figcaption>
-</figure>
+            <figcaption>Field-by-field reconciliation after a save.</figcaption>
+        </figure>
+    </div>
+</details>
 
-<h3>Database tables</h3>
+<details class="local-unifiedgrader-help-details" id="dev-bbb">
+    <summary>BigBlueButton engagement data</summary>
+    <div>
+        <p>Activity Points can come from three places. The adapter prefers the session summary that
+        the BigBlueButton server sends to Moodle, then attendance read from the recording
+        (<code>bbb\engagement_service</code>, which reads the recording's dashboard data and falls
+        back to its statistics page), then the evidence stored by <code>bbbext_advgrd</code> when a grade was recorded.</p>
+        <figure class="local-unifiedgrader-help-figure">
+<svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BBB engagement data flow">
+    <style>
+        .bbf-box { fill: #fff; stroke: #495057; stroke-width: 1.5; }
+        .bbf-box-bbb { fill: #fde2cf; stroke: #c54d00; }
+        .bbf-box-moodle { fill: #e7f1ff; stroke: #0d6efd; }
+        .bbf-box-ours { fill: #d1e7dd; stroke: #198754; }
+        .bbf-text { font-family: -apple-system, sans-serif; font-size: 12px; fill: #212529; }
+        .bbf-text-bold { font-weight: bold; font-size: 13px; }
+        .bbf-label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #495057; }
+        .bbf-arrow { stroke: #6c757d; stroke-width: 1.5; fill: none; }
+        .bbf-arrow-dashed { stroke: #6c757d; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    </style>
+    <defs>
+        <marker id="bbf-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d"/>
+        </marker>
+    </defs>
 
-<table class="table table-sm table-bordered">
-    <thead><tr><th>Table</th><th>Scope</th><th>Purpose</th></tr></thead>
-    <tbody>
-        <tr><td><code>local_unifiedgrader_notes</code></td><td>cmid + userid</td><td>Private teacher notes</td></tr>
-        <tr><td><code>local_unifiedgrader_annot</code></td><td>cmid + userid + fileid + pagenum</td><td>Fabric.js JSON per-page annotation snapshots</td></tr>
-        <tr><td><code>local_unifiedgrader_penalty</code></td><td>cmid + userid</td><td>Manual grade penalties</td></tr>
-        <tr><td><code>local_unifiedgrader_fext</code></td><td>cmid + userid</td><td>Forum due-date extensions (no native equivalent)</td></tr>
-        <tr><td><code>local_unifiedgrader_qfb</code></td><td>cmid + userid + attemptnumber</td><td>Per-attempt quiz feedback (text + format + grader)</td></tr>
-        <tr><td><code>local_unifiedgrader_scomm</code></td><td>cmid + userid</td><td>Submission comments (when enabled)</td></tr>
-        <tr><td><code>local_unifiedgrader_bbbeng</code></td><td>cmid + recordingid + userid</td><td>Cached BBB engagement metrics scraped from statistics pages</td></tr>
-        <tr><td><code>local_unifiedgrader_clib</code></td><td>userid + coursecode</td><td>Comment library entries</td></tr>
-        <tr><td><code>local_unifiedgrader_cltag</code></td><td>userid (0 = system)</td><td>Comment library tags</td></tr>
-        <tr><td><code>local_unifiedgrader_clmap</code></td><td>commentid + tagid</td><td>Tag-to-comment many-to-many</td></tr>
-        <tr><td><code>local_unifiedgrader_prefs</code></td><td>userid</td><td>UI preference JSON (e.g. layout-toggle state)</td></tr>
-    </tbody>
-</table>
+    <!-- BBB server -->
+    <rect x="20" y="20" width="200" height="120" rx="6" class="bbf-box-bbb"/>
+    <text x="40" y="46" class="bbf-text bbf-text-bold">BigBlueButton server</text>
+    <text x="40" y="68" class="bbf-text">• meeting events log</text>
+    <text x="40" y="88" class="bbf-text">• recording statistics</text>
+    <text x="40" y="108" class="bbf-text">  (dashboard data or HTML)</text>
+    <text x="40" y="128" class="bbf-label">read per recording</text>
 
-<h3>Hooks &amp; navigation</h3>
+    <!-- Path 1: callback -->
+    <rect x="280" y="20" width="200" height="60" rx="6" class="bbf-box-moodle"/>
+    <text x="300" y="46" class="bbf-text bbf-text-bold">bbb_broker.php</text>
+    <text x="300" y="64" class="bbf-text">action=meeting_events</text>
+    <text x="540" y="50" class="bbf-label">webhook on meeting end</text>
 
-<ul>
-    <li><strong>Settings navigation</strong>: <code>local_unifiedgrader_extend_settings_navigation()</code> in <code>lib.php</code> adds a <em>Grading interface</em> tab to <code>modulesettings</code> for supported activity types.</li>
-    <li><strong>PSR-14 hook</strong> <code>before_standard_top_of_body_html_generation</code> (registered in <code>db/hooks.php</code>, callback in <code>classes/hook_callbacks.php</code>): redirects native <em>Grade</em> buttons to the unified grader for teachers, and injects feedback banners + chat-bubble widgets for students.</li>
-    <li><strong>Pluginfile callback</strong> <code>local_unifiedgrader_pluginfile()</code> serves files for the plugin's fileareas (<code>annotatedpdf</code>, <code>forumfeedback</code>, <code>quizfeedback</code>, <code>bbbfeedback</code>, <code>onlinetextpdf</code>) with capability checks.</li>
-</ul>
+    <!-- Path 2: scrape -->
+    <rect x="280" y="100" width="200" height="60" rx="6" class="bbf-box-ours"/>
+    <text x="300" y="124" class="bbf-text bbf-text-bold">engagement_service</text>
+    <text x="300" y="142" class="bbf-text">dashboard data, HTML fallback</text>
+    <text x="540" y="130" class="bbf-label">Refresh attendance button</text>
 
-<h3>Web services</h3>
+    <!-- Path 3: advgrd -->
+    <rect x="280" y="180" width="200" height="60" rx="6" class="bbf-box-moodle"/>
+    <text x="300" y="204" class="bbf-text bbf-text-bold">bbbext_advgrd evidence</text>
+    <text x="300" y="222" class="bbf-text">grader::record_grade</text>
+    <text x="540" y="210" class="bbf-label">snapshot at grade time</text>
 
-<p>All declared in <code>db/services.php</code>, all marked
-<code>ajax: true</code>. Capability checks happen at the service entry
-point. Notable services:</p>
+    <!-- Storage -->
+    <rect x="540" y="20" width="200" height="60" rx="6" class="bbf-box-moodle"/>
+    <text x="560" y="46" class="bbf-text bbf-text-bold">bigbluebuttonbn_logs</text>
+    <text x="560" y="64" class="bbf-text">log = 'Summary'</text>
 
-<ul>
-    <li><code>local_unifiedgrader_get_submission_data</code> — adapter dispatches; returns <code>hascontent</code>, files, portfolio URL, attempts.</li>
-    <li><code>local_unifiedgrader_save_grade</code> — central save path including penalty application.</li>
-    <li><code>local_unifiedgrader_save_annotations</code> + <code>save_annotated_pdf</code> — annotation persistence.</li>
-    <li><code>local_unifiedgrader_refresh_bbb_engagement</code> — triggers a server-side scrape of BBB statistics pages.</li>
-    <li><code>local_unifiedgrader_clear_all_overrides</code> — single action to clear overrides + extensions for a user.</li>
-</ul>
+    <rect x="540" y="100" width="200" height="60" rx="6" class="bbf-box-ours"/>
+    <text x="560" y="124" class="bbf-text bbf-text-bold">local_unifiedgrader_bbbeng</text>
+    <text x="560" y="142" class="bbf-text">attendance per recording</text>
 
-<h3>Building &amp; testing</h3>
+    <rect x="540" y="180" width="200" height="60" rx="6" class="bbf-box-moodle"/>
+    <text x="560" y="204" class="bbf-text bbf-text-bold">bbbext_advgrd_grade</text>
+    <text x="560" y="222" class="bbf-text">evidence JSON</text>
 
-<ul>
-    <li><strong>Build</strong>: <code>./deploy.sh</code> from the dev folder rsyncs to Moodle, runs <code>npx grunt amd</code>, copies built files back. Run after editing any AMD module.</li>
-    <li><strong>Tests</strong>: <code>vendor/bin/phpunit --testsuite local_unifiedgrader_testsuite</code> from Moodle root (PHP 8.3 via MAMP). 380+ tests, 1000+ assertions.</li>
-    <li><strong>Linting</strong>: ESLint runs as part of <code>grunt amd</code>. Mustache lint via Moodle's <code>moodle-cs</code>.</li>
-</ul>
+    <!-- Adapter -->
+    <rect x="280" y="290" width="460" height="60" rx="6" class="bbf-box-ours"/>
+    <text x="300" y="314" class="bbf-text bbf-text-bold">bbb_adapter::get_engagement_summary()</text>
+    <text x="300" y="332" class="bbf-text">priority: session summary → recording attendance → empty</text>
+
+    <!-- Arrows -->
+    <path d="M220 50 L280 50" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
+    <path d="M220 80 Q250 80 280 130" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
+    <path d="M480 50 L540 50" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
+    <path d="M480 130 L540 130" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
+    <path d="M480 210 L540 210" class="bbf-arrow" marker-end="url(#bbf-arrowhead)"/>
+    <path d="M640 80 L640 290" class="bbf-arrow-dashed" marker-end="url(#bbf-arrowhead)"/>
+    <path d="M640 160 L640 290" class="bbf-arrow-dashed" marker-end="url(#bbf-arrowhead)"/>
+</svg>
+            <figcaption>The three sources of Activity Points, in order of preference.</figcaption>
+        </figure>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details" id="dev-data">
+    <summary>Database tables, caches and file areas</summary>
+    <div>
+        <div class="local-unifiedgrader-help-table">
+        <table class="table-reboot">
+            <thead><tr><th scope="col">Table</th><th scope="col">Holds</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>local_unifiedgrader_annot</code></th><td>Annotations, per activity, student, file and page.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_notes</code></th><td>Teacher notes.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_scomm</code></th><td>Submission comments.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_penalty</code></th><td>Penalties per student and activity.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_penset</code></th><td>The per-activity <em>Apply late penalties</em> switch.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_fext</code></th><td>Forum due date extensions.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_qfb</code></th><td>Quiz feedback, per attempt.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_friction</code>, <code>_frictioncfg</code></th><td>Friction Feedback walks, and the per-activity switch.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_referral</code></th><td>Academic integrity referrals.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_clib</code>, <code>_cltag</code>, <code>_clmap</code>, <code>_clibprop</code></th><td>Comment library: comments, tags, their mapping, and suggestions for system defaults.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_comments</code></th><td>The first version of the comment library, kept for upgrades.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_bbbeng</code></th><td>BigBlueButton attendance and engagement read from recordings.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_segcomment</code></th><td>Comments on a phrase of a translated submission.</td></tr>
+                <tr><th scope="row"><code>local_unifiedgrader_prefs</code></th><td>Each teacher's interface preferences.</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <p><strong>Caches</strong> (<code>db/caches.php</code>): <code>penaltyswitch</code>,
+        <code>newsforum</code>, <code>userprefs</code> and <code>proctoring</code> (fifteen minutes).
+        Grades, submission status and whether feedback is released are always read from the database.</p>
+        <p><strong>File areas</strong>, served by <code>local_unifiedgrader_pluginfile()</code> with
+        capability checks: <code>annotatedpdf</code>, <code>onlinetextpdf</code>,
+        <code>forumfeedback</code>, <code>quizfeedback</code>, <code>bbbfeedback</code>.</p>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details" id="dev-hooks">
+    <summary>Hooks, navigation and web services</summary>
+    <div>
+        <ul>
+            <li><code>local_unifiedgrader_extend_settings_navigation()</code> adds the Unified Grader item to an activity's navigation for users who can grade.</li>
+            <li>The hook <code>before_standard_top_of_body_html_generation</code> (<code>classes/hook_callbacks.php</code>) sends Moodle's own Grade buttons to the grader, and adds the feedback banner and the message thread for students.</li>
+            <li><code>local_unifiedgrader_coursemodule_standard_elements()</code> adds <em>Apply late penalties</em> to activity settings.</li>
+            <li>Web services are declared in <code>db/services.php</code>, all for AJAX, each checking capabilities at its entry point.</li>
+            <li>This page is <code>help.php</code> with <code>templates/help*.mustache</code>; its screenshots are in <code>pix/help</code> and its script is <code>amd/src/help.js</code>.</li>
+        </ul>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details" id="dev-build">
+    <summary>Building and testing</summary>
+    <div>
+        <ul>
+            <li><strong>Build:</strong> <code>./deploy.sh</code> copies the plugin into the Moodle installs, runs <code>npx grunt amd</code>, and copies the built files back. Run it after changing any AMD module.</li>
+            <li><strong>PHPUnit:</strong> <code>vendor/bin/phpunit --testsuite local_unifiedgrader_testsuite</code> from the Moodle root. If it reports that the database cannot be used for testing, run <code>php admin/tool/phpunit/cli/init.php</code> again with the same PHP.</li>
+            <li><strong>Behat:</strong> features are in <code>tests/behat</code>.</li>
+            <li><strong>Coding style:</strong> Moodle's coding standard with <code>phpcs</code>; ESLint runs as part of the AMD build.</li>
+        </ul>
+    </div>
+</details>
 </section>

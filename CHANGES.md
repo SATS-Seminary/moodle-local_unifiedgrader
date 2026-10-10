@@ -2,6 +2,19 @@
 
 ## v3.0.0 (2026100100)
 
+### Documentation
+
+The built-in help page (`help.php`) is rewritten for 3.0.0 on Moodle 5.3.
+
+- **Four parts:** teachers and markers, students, administrators, and developers, with a section navigation that marks where you are, and a start area that routes each reader.
+- **Screenshots:** 51 real screenshots in `pix/help` (about 3 MB), each with alt text and a caption, opening enlarged on click. The empty screenshot placeholders are gone.
+- **3.0 features documented:** posting grades, Friction Feedback, late penalties, Dates & extensions, academic integrity referral, proctoring review priority and the settings index. Every setting and capability is listed with its key, default and meaning.
+- **Corrections:** the annotation tool list, the entry points, the status menu, blind marking (supported), and the `viewall` capability (it does not open the grader). `quizaccess_duedate` is described as legacy.
+- **Troubleshooting** is a list of collapsible entries, including "Conversion fails although the conversion server is up" (the converter's port must be in Moodle's allowed ports).
+- Existing anchors are kept, so the grader's help button and older links still land.
+- The description of "Render online text as PDF" no longer names converter products, in all 13 language packs.
+- `README.md` brought up to 3.0.
+
 ### Proctoring review priority on quizzes
 
 On a proctored quiz, each student in the list carries a red, yellow or green marker for their review priority, and the marking panel has a Proctoring card with the findings behind it and a link to the evidence. Four services are supported, each behind a provider class (`proctoring\provider\*`), so the marker, the card, the web service and the capability are the same for all.

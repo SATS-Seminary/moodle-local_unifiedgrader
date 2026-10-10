@@ -1,133 +1,198 @@
 {{!
     @template local_unifiedgrader/help_section_troubleshooting
 
-    Documentation partial: troubleshooting common issues.
+    Help page partial: troubleshooting, for administrators and teachers.
+    Each entry is a <details> element, so the list stays short until opened.
 
     Example context (json):
     {}
 }}
 <section id="troubleshooting">
-<h2>Troubleshooting</h2>
+<h3>Troubleshooting</h3>
+<p>Open the line that matches what you see.</p>
 
-<dl>
+<h4>Opening the grader</h4>
 
-<dt>The Unified Grader tab doesn't appear on a supported activity</dt>
-<dd>
-    Check that the corresponding <code>enable_*</code> setting is on (e.g.
-    <code>enable_quiz</code>) <em>and</em> that the user has
-    <code>local/unifiedgrader:grade</code> at the activity context.
-    Students don't see the tab; only graders do.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>There is no Unified Grader item on the activity</summary>
+    <div>
+        <ul>
+            <li>The activity type must be switched on under <a href="#settings-general">General settings</a>. Only assignments are on by default.</li>
+            <li>The user must hold <code>local/unifiedgrader:grade</code> in the activity. Non-editing teachers do not have it by default; <code>viewall</code> is not enough.</li>
+            <li>Students never see the item.</li>
+        </ul>
+    </div>
+</details>
 
-<dt>BBB Activity Points card stays stuck on "engagement summary not yet received"</dt>
-<dd>
-    The Moodle plugin setting <em>Register live sessions</em>
-    (<code>mod_bigbluebuttonbn/meetingevents_enabled</code>) is off, or the
-    BBB server isn't keeping events. Site admins see the exact remediation
-    in the warning. Make sure both flags are on, then start a <em>fresh</em>
-    meeting — the analytics callback URL is set at meeting create time, so
-    existing recordings will not be retroactively called back. As a stop-gap,
-    use the <em>Pull engagement data from BBB recordings</em> button to scrape
-    BBB's Statistics page directly.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>A teacher sees only some students, or cannot post the whole class</summary>
+    <div>
+        <p>The activity uses separate groups and the teacher does not have <em>Access all groups</em>.
+        They see and post their own groups. Check also the group selector in the student list, which
+        opens on the teacher's own groups.</p>
+    </div>
+</details>
 
-<dt>Marking guide values reset shortly after I type them</dt>
-<dd>
-    Pre-2.2.0 bug. Update the plugin and try again. The fix lives in the
-    incremental-render path of <code>_renderGuide</code> /
-    <code>_renderRubric</code> and the corresponding payload-shape correction
-    in the BBB adapter's advanced-grading save flow.
-</dd>
+<h4>Preview and conversion</h4>
 
-<dt>BBB recording iframe is blank / "refused to connect"</dt>
-<dd>
-    The BBB CDN's signed cookies didn't propagate. Try the <em>Open in new
-    tab</em> button next to the recording switcher. If that also fails, the
-    recording probably wasn't published yet, or your network blocks the CDN
-    host. Check the BBB activity's recording table — if the recording isn't
-    listed there either, it isn't ready.
-</dd>
+<details class="local-unifiedgrader-help-details" id="ts-conversion-port">
+    <summary>Conversion fails although the conversion server is up</summary>
+    <div>
+        <p><strong>What teachers see:</strong> <em>This file could not be converted to PDF for
+        preview.</em> with a <strong>Retry conversion</strong> button, and retrying does not help.</p>
+        <p><strong>Likely cause:</strong> the converter listens on a non-standard port. Moodle
+        sends the file to it, but Moodle's HTTP security then refuses to download the converted
+        file from that port. The underlying error is <em>The URL is blocked</em>.</p>
+        <p><strong>Fix:</strong> go to <strong>Site administration &gt; General &gt; Security &gt;
+        HTTP security</strong> and add the converter's port to the list of allowed ports. Then ask
+        the teacher to press <strong>Retry conversion</strong>.</p>
+    </div>
+</details>
 
-<dt>The fullscreen button on the BBB player doesn't work, only ours does</dt>
-<dd>
-    Browser security: BBB's native fullscreen control needs every iframe in
-    the chain to declare <code>allow="fullscreen"</code>. Both layers
-    (preview iframe and recording iframe) now do, so this should work in
-    Chromium / Firefox. Some Safari versions still gate fullscreen on a
-    direct user gesture in the topmost frame — our explicit button works
-    around that by requesting fullscreen on the parent frame.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>Word files or online text do not open as PDFs at all</summary>
+    <div>
+        <ul>
+            <li>A document converter must be enabled in Moodle (<strong>Site administration &gt; Plugins &gt; Document converters</strong>) and pass its own test.</li>
+            <li>For online text, <em>Render online text as PDF</em> must also be on. Without it, online text shows inline with a reduced toolbar. That is expected.</li>
+            <li>After the converter comes back, <strong>Retry conversion</strong> clears the failed attempt. There is no need to wait.</li>
+        </ul>
+    </div>
+</details>
 
-<dt>PDF annotations vanished / didn't save</dt>
-<dd>
-    Check the AMD console for save errors — the plugin queues failed saves
-    via <code>SaveQueue</code> and retries. If you see <em>Offline — saved
-    locally</em> in the toolbar status and the connection has since
-    recovered, click <em>Restore</em> on the next page load to recover them.
-    Annotations live in <code>local_unifiedgrader_annot</code>; admins can
-    inspect that table directly if a recovery is needed.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>Annotations did not save</summary>
+    <div>
+        <p>Look at the save status in the header. <em>Offline — saved locally</em> means the
+        connection dropped: the marks are kept in the browser and sent when it returns. If the page
+        was reloaded first, choose <strong>Restore</strong> when the grader offers the unsaved
+        changes. An expired login has the same effect; log in again in another tab.</p>
+    </div>
+</details>
 
-<dt>Group / team submissions don't show all members</dt>
-<dd>
-    By design — Moodle's team-submission model has one canonical
-    submission per team. Saving a grade against the team rep cascades to
-    all members. If the cascade isn't happening, check Moodle's own
-    assignment settings (<em>Apply grades to all team members</em>).
-</dd>
+<h4>Grades and penalties</h4>
 
-<dt>Comment library is empty / I can't add new comments</dt>
-<dd>
-    Capability check — non-managers see the comment library but can only
-    create personal comments unless they have
-    <code>local/unifiedgrader:sharecomments</code>. The plugin shows an
-    offline banner if it can't reach the comment-library web service; that
-    typically means the AJAX session has expired.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>A late submission has no penalty</summary>
+    <div>
+        <ul>
+            <li><em>Apply late penalties</em> must be ticked in the activity's settings. New activities start with it off.</li>
+            <li>Penalty rules must exist for the site, the course or the activity in Moodle's grade penalty settings.</li>
+            <li>The activity needs a due date. A quiz with only a closing date is never late.</li>
+            <li>The student may have an extension or an override: check <strong>Dates &amp; extensions</strong>.</li>
+            <li>On a quiz, the first real attempt decides. If it was on time, later attempts are not penalised.</li>
+            <li>For an assignment with Moodle's own <em>Apply penalties</em> on, while Assignment is still a supported module for Moodle's grade penalties, Moodle applies the penalty and the Unified Grader stands back.</li>
+        </ul>
+    </div>
+</details>
 
-<dt>Late penalty isn't applying</dt>
-<dd>
-    Late penalty integration requires the <code>gradepenalty_duedate</code>
-    plugin. Without it, the badge might still appear (showing days late)
-    but no actual percentage deduction is computed. Manual penalties always
-    work regardless.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>The penalty is for more days than the student was late</summary>
+    <div>
+        <p>Each day that has started counts. A submission 1 day and 23 hours late is charged for
+        2 days. The banner shows the exact lateness; the badge shows the days charged.</p>
+    </div>
+</details>
 
-<dt>Manual grade override doesn't persist when a rubric is configured</dt>
-<dd>
-    Check the admin setting <code>allow_manual_grade_override</code>. With
-    it off, the rubric's computed total wins. With it on, your typed value
-    is re-applied <em>after</em> the rubric save, so consecutive saves keep
-    the override.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>The student cannot see a grade that shows as posted</summary>
+    <div>
+        <ul>
+            <li>With Friction Feedback on, the mark stays hidden until the student finishes the walk, or until the fail-safe releases it.</li>
+            <li>On a quiz, posting one student shows the grade in the gradebook and in the Unified Grader feedback, but the quiz's own review page still follows its review options.</li>
+            <li>Check the eye beside the student in the student list: a class can be partly posted.</li>
+        </ul>
+    </div>
+</details>
 
-<dt>Plagiarism shield doesn't appear</dt>
-<dd>
-    The site-wide <code>$CFG->enableplagiarism</code> must be on, and a
-    plagiarism plugin must return non-empty results from
-    <code>plagiarism_get_links()</code>. The shield is rendered per
-    submission item (post / file); empty results = no shield.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>There is no post-grades control on a quiz</summary>
+    <div>
+        <p><em>Enable post grades for quizzes</em> is off (<a href="#settings-grading">Grading settings</a>).
+        Quiz marks are then shown according to the quiz review options only.</p>
+    </div>
+</details>
 
-<dt>"Cannot use database for testing" when running PHPUnit</dt>
-<dd>
-    The PHPUnit env got into a half-installed state. Run
-    <code>php admin/tool/phpunit/cli/init.php --force</code> from Moodle
-    root with the same PHP binary you'll run tests under (use
-    <code>PATH="..."</code> if you have multiple PHP installs).
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>A typed grade does not stay when a rubric is used</summary>
+    <div>
+        <p><em>Allow manual grade override</em> is off, so the grade always comes from the rubric or
+        marking guide. Switch it on under <a href="#settings-grading">Grading settings</a> if teachers should be able to adjust it.</p>
+    </div>
+</details>
 
-<dt>"Could not open input file: vendor/bin/phpunit"</dt>
-<dd>
-    Wrong cwd — run from Moodle root. The vendor directory is part of
-    Moodle's install, not the plugin.
-</dd>
+<details class="local-unifiedgrader-help-details">
+    <summary>Rubric scores cannot be saved: the grade is locked or overridden</summary>
+    <div>
+        <p>The student's grade is locked or overridden in the gradebook. Unlock it there, or type
+        <code>--</code> in the grade box and save to release an override, then mark again.</p>
+    </div>
+</details>
 
-</dl>
+<h4>Integrity and proctoring</h4>
 
-<hr class="my-4">
-<p class="text-muted small">
-    Have a question that isn't answered here? Open an issue against the
-    plugin's repository, or contact your site administrator.
-</p>
+<details class="local-unifiedgrader-help-details">
+    <summary>No plagiarism card appears</summary>
+    <div>
+        <p>Plagiarism plugins must be enabled on the site and set up for the activity, and the
+        plugin must have returned a result for that file or text. The top of the
+        <a href="#settings-integrity">Academic integrity</a> settings page says whether they are enabled.</p>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>No proctoring marker or card on a proctored quiz</summary>
+    <div>
+        <ul>
+            <li>The service must be ticked under <em>Proctoring services to show</em>.</li>
+            <li>The viewer needs <code>local/unifiedgrader:viewproctoring</code>.</li>
+            <li>The service's Moodle plugin must be installed and in use for that quiz. For SMOWL, the course needs the SMOWL block and the quiz must be switched on in the SMOWL panel; otherwise the card says <em>SMOWL is not active on this quiz</em>.</li>
+            <li><em>Awaiting review</em> is not a fault: the service has not finished. Use the refresh button later.</li>
+        </ul>
+    </div>
+</details>
+
+<h4>BigBlueButton</h4>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>Activity Points are empty or say the summary has not been received</summary>
+    <div>
+        <p>Moodle's BigBlueButton setting <em>Register live sessions</em> is off, or the server is
+        not keeping events (see <a href="#plugin-advgrd">BigBlueButton setup</a>). Summaries are
+        sent only for sessions that start after both are on. For existing recordings use
+        <strong>Refresh attendance</strong>.</p>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>The recording is blank</summary>
+    <div>
+        <p>Try <strong>Open in new tab</strong>. If that fails too, the recording is not published
+        yet, or the network blocks the server that hosts it. Check the activity's own list of recordings.</p>
+    </div>
+</details>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>Every session is listed for a student who attended only some</summary>
+    <div>
+        <p>The grader could not match the student's attendance to the recordings, and says so under
+        the session pills. Press <strong>Refresh attendance</strong> to read attendance from each recording.</p>
+    </div>
+</details>
+
+<h4>Comment library</h4>
+
+<details class="local-unifiedgrader-help-details">
+    <summary>Comments from one course do not appear in another</summary>
+    <div>
+        <p>Comments are filed under a course code taken from the course short name. If the
+        <a href="#settings-library">course code regex</a> is empty or does not match, each course
+        has its own code. Teachers can move comments in <em>Organise my comment library</em>;
+        managers can do so for anyone in <em>Moderate comment libraries</em>.</p>
+    </div>
+</details>
+
+<p class="local-unifiedgrader-help-fine">Still stuck? Contact your site administrator, or report
+the problem to the plugin's maintainers with the Moodle version, the plugin release shown at the
+top of this page, and what you see on screen.</p>
 </section>

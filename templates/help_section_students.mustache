@@ -1,0 +1,131 @@
+{{!
+    @template local_unifiedgrader/help_section_students
+
+    Help page partial: what students see. Written to the student.
+
+    Context variables:
+    * img - object - Screenshot URLs keyed by file name in pix/help.
+
+    Example context (json):
+    {
+        "img": {
+            "student_feedback_view": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/student_feedback_view"
+        }
+    }
+}}
+<section id="students" class="local-unifiedgrader-help-part">
+<header class="local-unifiedgrader-help-part-head">
+    <p class="local-unifiedgrader-help-kicker"><i class="fa fa-graduation-cap" aria-hidden="true"></i> For students</p>
+    <h2>Reading your feedback</h2>
+    <p>Where to find your grade and feedback, and what each part of the feedback page means.
+    Teachers: this is what your students see.</p>
+</header>
+
+{{! ----- Reading feedback ----- }}
+<section id="student-feedback">
+<h3>Find and read your feedback</h3>
+
+<ol class="local-unifiedgrader-help-steps">
+    <li><strong>Open the activity.</strong> When your teacher has posted your grade, a banner
+        appears near the top of the assignment, quiz, forum or BigBlueButton page.</li>
+    <li><strong>Press the button in the banner.</strong> On an assignment it reads
+        <strong>View Annotated Feedback</strong>.</li>
+    <li><strong>Read the feedback page.</strong> It shows your work with your teacher's marks, their comments, and your grade.</li>
+</ol>
+
+<figure class="local-unifiedgrader-help-shot">
+    <a href="{{img.student_assignment_page}}" data-action="help-zoom">
+        <img src="{{img.student_assignment_page}}" width="1300" height="874" loading="lazy"
+             alt="A student's assignment page. A banner under the due date reads View Annotated Feedback, with a button of the same name on its right. The submission status table follows.">
+    </a>
+    <figcaption>The <strong>View Annotated Feedback</strong> banner on your assignment page.</figcaption>
+</figure>
+
+<h4>What is on the feedback page</h4>
+<ul>
+    <li><strong>Your document</strong> with highlights, ticks, crosses and other marks.</li>
+    <li><strong>Margin comments.</strong> Each numbered pin on the page has a card beside it with your teacher's comment.</li>
+    <li><strong>Overall feedback</strong> on the right, and the rubric or marking guide if one was used.</li>
+    <li><strong>Your grade</strong> at the top right.</li>
+    <li><strong>Download feedback PDF</strong>: a copy of your document with the marks printed in, to keep.</li>
+    <li>For a forum you see your posts; for a quiz, your attempt with the marker's comments; for a
+        live session, the recording with comments at the moments they refer to.</li>
+</ul>
+
+<figure class="local-unifiedgrader-help-shot">
+    <a href="{{img.student_feedback_view}}" data-action="help-zoom">
+        <img src="{{img.student_feedback_view}}" width="1300" height="874" loading="lazy"
+             alt="The feedback page: an essay with coloured highlights and a numbered pin linked to a comment card in the margin, the Overall Feedback text on the right, a Download feedback PDF button, and Grade: 68 / 100 (68%) at the top right.">
+    </a>
+    <figcaption>The feedback page: your marked document, a margin comment, overall feedback,
+    your grade and <strong>Download feedback PDF</strong>.</figcaption>
+</figure>
+
+<div class="local-unifiedgrader-help-note">
+    <p><strong>No banner yet?</strong> Your teacher has not posted your grade. Marking may be
+    finished for some students and not others, and grades are sometimes posted on a set date.</p>
+</div>
+</section>
+
+{{! ----- Friction walk ----- }}
+<section id="student-friction">
+<h3>The feedback walk (Friction Feedback)</h3>
+
+<p>In some activities your mark appears only after you have read the feedback. This is called
+Friction Feedback. It takes a minute or two.</p>
+
+<ol class="local-unifiedgrader-help-steps">
+    <li><strong>Open your feedback.</strong> A box appears over the page. It explains: <em>Read the
+        feedback on this step. Your mark follows once you have seen each part.</em></li>
+    <li><strong>Read the step.</strong> A counter shows where you are (<em>1 of 3</em>). Each step
+        is one part of the feedback: a rubric criterion, a marked question, or the overall
+        comment. A ring fills while you read.</li>
+    <li><strong>Press <em>I have seen this</em></strong> when the ring is complete and the button appears.</li>
+    <li><strong>See your mark.</strong> After the last step your grade, the points and the feedback PDF appear.</li>
+</ol>
+
+<div class="local-unifiedgrader-help-shots">
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.friction_timer}}" data-action="help-zoom">
+            <img src="{{img.friction_timer}}" width="1300" height="874" loading="lazy"
+                 alt="The Friction Feedback box over the feedback page: step 1 of 1, Overall feedback, with the teacher's comment and a partly filled timer ring.">
+        </a>
+        <figcaption>Reading a step. The ring is still filling.</figcaption>
+    </figure>
+    <figure class="local-unifiedgrader-help-shot">
+        <a href="{{img.friction_ready}}" data-action="help-zoom">
+            <img src="{{img.friction_ready}}" width="1300" height="874" loading="lazy"
+                 alt="The same box with a green tick in place of the ring and an I have seen this button.">
+        </a>
+        <figcaption>The ring is complete: <strong>I have seen this</strong> is ready.</figcaption>
+    </figure>
+</div>
+
+<ul>
+    <li>The timer pauses if you switch to another tab or window.</li>
+    <li>If you close the page, you continue from the same step next time.</li>
+    <li>If your teacher changes your mark later, you are asked to read the feedback again.</li>
+    <li>If you never open the feedback, your mark is still released after a waiting period set by your institution.</li>
+</ul>
+</section>
+
+{{! ----- Messages and penalties ----- }}
+<section id="student-messages">
+<h3>Messages, late penalties and translation</h3>
+
+<h4>Message your teacher about a piece of work</h4>
+<p>The speech-bubble icon on the activity page and on the feedback page opens a message thread
+about that piece of work. You can write before and after it is graded, and you are notified when
+your teacher replies. On assignments this takes the place of Moodle's own submission comments.</p>
+
+<h4>Late penalties</h4>
+<p>If you submit after the due date and the activity applies late penalties, your feedback page
+lists the penalty and shows your grade after it. Each day that has started counts as a full day.
+If you were given an extension, the penalty is worked out from your extended date.</p>
+
+<h4>Feedback in your language</h4>
+<p>On sites that use the translation service for a course, feedback is shown in your language. A
+notice appears while a translation is still being prepared.</p>
+</section>
+
+</section>
