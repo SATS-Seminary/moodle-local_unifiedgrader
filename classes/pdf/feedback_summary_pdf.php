@@ -32,6 +32,9 @@ require_once($CFG->libdir . '/pdflib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class feedback_summary_pdf extends \pdf {
+    /** @var int Colour the grade is drawn in on the score ring, repeated in the penalty legend. */
+    private int $scorecolor = 0x6C757D;
+
     /** @var int Color for grades >= 75%. */
     private const COLOR_GREEN = 0x28A745;
 
@@ -59,6 +62,20 @@ class feedback_summary_pdf extends \pdf {
     /** @var int Hairline border colour. */
     private const COLOR_BORDER = 0xDEE2E6;
 
+    /**
+     * @var int[] Segment colours for penalties on the score ring, in ring order.
+     *
+     * Deliberately muted, so a penalty never reads as part of the grade: the
+     * grade is drawn in a saturated green, amber or red, and these sit back
+     * from it. They alternate darker and lighter round the ring so neighbours
+     * stay apart for readers with a colour vision deficiency too, where the hue
+     * alone would not carry it. A fifth penalty and beyond share the muted grey.
+     */
+    private const PENALTY_COLORS = [0x5585C4, 0xE09DB8, 0x6F61BD, 0x72C5A6];
+
+    /** @var float Share of the ring's width a penalty segment is drawn at. */
+    private const PENALTY_BAND = 0.55;
+
     /** @var float Corner radius for tiles and chips, in mm. */
     private const RADIUS = 1.6;
 
@@ -85,8 +102,14 @@ class feedback_summary_pdf extends \pdf {
      *   - gradingmethod (string) 'simple', 'rubric', or 'guide'
      *   - rubriccriteria (array)
      *   - guidecriteria (array)
-     *   - penalties (array) Each with 'text' key
+     *   - penaltybreakdown (array) Optional. From feedback_data_helper::penalty_breakdown().
+     *     When it carries a final grade, gradevalue and percentage are that final grade.
+     *   - documentcomments (array) Optional. The marker's written comments on the
+     *     submission that are not drawn on its pages, from
+     *     feedback_data_helper::document_marks(): each with
+     *     'number', 'color', 'page', 'anchortext' and 'html'.
      *   - dategraded (string)
+     *   - dategenerated (string) Optional. When this PDF was produced, shown in the footer.
      *   - plagiarismlinks (array) Optional. Each with 'label' and 'html' keys.
      *   - additionalcontent (string) Optional. HTML content for additional pages
      *     (e.g. rendered quiz attempt). Bootstrap classes are converted to
@@ -123,13 +146,13 @@ class feedback_summary_pdf extends \pdf {
         // at once, and stacking them full width pushed the feedback below the
         // fold on every summary.
         $this->render_grade_and_feedback($data);
-        $this->render_penalties($data);
         // Engagement below the band. On an attendance-graded activity these
         // figures are the evidence the mark rests on, so they stay above the
         // criterion-by-criterion breakdown.
         $this->render_analytics_widgets($data);
         $this->render_plagiarism_section($data);
         $this->render_grading_section($data);
+        $this->render_document_comments($data);
 
         // Timestamped recording comments (BBB). A recording cannot be played
         // from a PDF, so the annotations are listed as text against their
@@ -317,6 +340,8 @@ class feedback_summary_pdf extends \pdf {
             $arccolor = self::COLOR_RED;
         }
 
+        $this->scorecolor = $arccolor;
+
         $radius = 17;
         $thickness = 6;
         $centrex = $x + ($width / 2);
@@ -344,6 +369,8 @@ class feedback_summary_pdf extends \pdf {
                 'color' => $this->hex_to_rgb($arccolor),
             ]);
         }
+
+        $this->render_penalty_segments($data, $centrex, $centrey, $radius, $thickness, $percentage);
 
         // Percentage in the hole.
         $this->set_text_from_hex($hasgrade ? self::COLOR_DARK : self::COLOR_MUTED);
@@ -375,37 +402,190 @@ class feedback_summary_pdf extends \pdf {
         }
 
         $this->SetY($bottom);
+        $this->render_penalty_breakdown($data, $x, $width);
     }
 
     /**
-     * Render penalty badges if any.
+     * The colour a penalty is drawn in, on the ring and in the list beneath it.
+     *
+     * @param int $index Position of the penalty in the breakdown.
+     * @return int
+     */
+    private function penalty_color(int $index): int {
+        return self::PENALTY_COLORS[$index] ?? self::COLOR_MUTED;
+    }
+
+    /**
+     * Draw the penalties on the score ring, one segment each, carrying on from
+     * where the final grade stops.
+     *
+     * The ring then reads as the whole story: the full-width, saturated arc is
+     * the grade the student keeps, each penalty segment is what that penalty
+     * took, the two together are the mark awarded, and the grey is what was
+     * never earned. The number in the hole stays the final grade.
+     *
+     * A penalty is drawn as a narrower band in a muted colour, over the grey
+     * track, so it cannot be mistaken for marks that count.
      *
      * @param array $data
+     * @param float $centrex
+     * @param float $centrey
+     * @param float $radius Radius of the middle of the ring.
+     * @param float $thickness Width of the ring.
+     * @param float $finalpercentage Where the final grade's arc ends.
      */
-    private function render_penalties(array $data): void {
-        if (empty($data['penalties'])) {
+    private function render_penalty_segments(
+        array $data,
+        float $centrex,
+        float $centrey,
+        float $radius,
+        float $thickness,
+        float $finalpercentage
+    ): void {
+        $breakdown = $data['penaltybreakdown'] ?? [];
+        if (empty($breakdown['haspenalties']) || empty($breakdown['hasgrade']) || !isset($breakdown['awardedpercentage'])) {
             return;
         }
 
-        $pagewidth = $this->getPageWidth();
-        $contentwidth = $pagewidth - (self::MARGIN_H * 2);
-        $y = $this->GetY();
-
-        // Build HTML for penalty badges.
-        $html = '<div style="text-align: center;">';
-        foreach ($data['penalties'] as $penalty) {
-            $html .= '<span style="background-color: #FFF3CD; color: #856404; '
-                . 'font-size: 8pt; border-radius: 3px;">'
-                . '&nbsp;&nbsp;' . htmlspecialchars(pdf_text::plain($penalty['text'])) . '&nbsp;&nbsp;'
-                . '</span>&nbsp;&nbsp;';
+        // The penalties share the stretch between the final grade and the mark
+        // awarded. They fill it exactly, unless they came to more than the mark,
+        // when each is drawn in proportion to what it could actually take.
+        $span = max(0.0, (float) $breakdown['awardedpercentage'] - $finalpercentage);
+        $total = array_sum(array_column($breakdown['rows'], 'percentage'));
+        if ($span <= 0 || $total <= 0) {
+            return;
         }
-        $html .= '</div>';
 
-        $this->SetXY(self::MARGIN_H, $y);
-        $this->writeHTMLCell($contentwidth, 0, self::MARGIN_H, $y, $html, 0, 1, false, true, 'C');
-        $this->SetY($this->GetY() + 3);
+        $from = $finalpercentage;
+        $boundaries = [$from];
+        foreach (array_values($breakdown['rows']) as $index => $row) {
+            $to = $from + $span * ($row['percentage'] / $total);
+            // Clockwise from twelve o'clock; TCPDF sweeps anticlockwise, so the
+            // segment runs from its end angle back to its start.
+            $start = 90 - (360 * $to / 100);
+            $end = 90 - (360 * $from / 100);
+            $this->Circle($centrex, $centrey, $radius, $start, $end, 'D', [
+                'width' => $thickness * self::PENALTY_BAND,
+                'cap' => 'butt',
+                'color' => $this->hex_to_rgb($this->penalty_color($index)),
+            ]);
+            $from = $to;
+            $boundaries[] = $from;
+        }
+
+        // A hairline of paper between neighbours, so two segments are told
+        // apart by the gap as well as by their colour.
+        $inner = $radius - ($thickness / 2) - 0.2;
+        $outer = $radius + ($thickness / 2) + 0.2;
+        foreach ($boundaries as $boundary) {
+            if ($boundary <= 0 || $boundary >= 100) {
+                continue;
+            }
+            $angle = deg2rad(90 - (360 * $boundary / 100));
+            $this->Line(
+                $centrex + ($inner * cos($angle)),
+                $centrey - ($inner * sin($angle)),
+                $centrex + ($outer * cos($angle)),
+                $centrey - ($outer * sin($angle)),
+                ['width' => 0.45, 'cap' => 'butt', 'color' => $this->hex_to_rgb(self::COLOR_WHITE)]
+            );
+        }
     }
 
+    /**
+     * List the penalties under the score: what was awarded, what each penalty
+     * took and why, and what is left.
+     *
+     * It sits in the score column because that is where the student reads the
+     * mark, and it doubles as the legend for the ring above it: each penalty
+     * carries the colour of its segment, and the final grade the colour of its
+     * arc. As chips in a row of their own the penalties said "-10% Late" and
+     * nothing else, beside a ring showing a grade they had not been taken from.
+     *
+     * @param array $data
+     * @param float $x Left edge of the score column.
+     * @param float $width Column width.
+     */
+    private function render_penalty_breakdown(array $data, float $x, float $width): void {
+        $breakdown = $data['penaltybreakdown'] ?? [];
+        if (empty($breakdown['haspenalties'])) {
+            return;
+        }
+        $hasgrade = !empty($breakdown['hasgrade']);
+        $amountwidth = 17;
+        // With a grade the list is also the ring's legend: each row opens with
+        // the colour of its segment.
+        $swatch = $hasgrade ? 3.6 : 0.0;
+        $labelx = $x + $swatch;
+        $labelwidth = $width - $amountwidth - $swatch;
+
+        $y = $this->GetY() + 3;
+        $this->set_text_from_hex(self::COLOR_MUTED);
+        $this->SetFont('helvetica', 'B', 7);
+        $this->SetXY($x, $y);
+        $this->Cell($width, 4, \core_text::strtoupper(get_string('penalties', 'local_unifiedgrader')), 0, 1, 'L');
+        $y = $this->GetY() + 0.5;
+        $this->set_draw_from_hex(self::COLOR_BORDER);
+        $this->SetLineWidth(0.2);
+        $this->Line($x, $y, $x + $width, $y);
+        $y += 1.2;
+
+        if ($hasgrade) {
+            $this->set_text_from_hex(self::COLOR_DARK);
+            $this->SetFont('helvetica', 'B', 8.5);
+            $this->SetXY($x, $y);
+            $this->Cell($width - $amountwidth, 5, get_string('penalty_mark_awarded', 'local_unifiedgrader'), 0, 0, 'L');
+            $this->Cell($amountwidth, 5, $breakdown['awarded'], 0, 1, 'R');
+            $y = $this->GetY() + 0.6;
+        }
+
+        foreach (array_values($breakdown['rows']) as $index => $row) {
+            if ($hasgrade) {
+                $this->set_fill_from_hex($this->penalty_color($index));
+                $this->RoundedRect($x, $y + 0.8, 2.4, 2.4, 0.5, '1111', 'F');
+            }
+
+            // The reason is the teacher's own wording for an "other" penalty,
+            // so it wraps rather than being cut to fit.
+            $this->set_text_from_hex(self::COLOR_DARK);
+            $this->SetFont('helvetica', '', 8);
+            $this->MultiCell($labelwidth, 4, pdf_text::plain($row['reason']), 0, 'L', false, 1, $labelx, $y);
+            $bottom = $this->GetY();
+
+            $this->set_text_from_hex(self::COLOR_RED);
+            $this->SetFont('helvetica', 'B', 8);
+            $this->SetXY($labelx + $labelwidth, $y);
+            $this->Cell($amountwidth, 4, $hasgrade ? $row['marks'] : $row['percentdisplay'], 0, 0, 'R');
+
+            // How late, and the percentage the marks came from. With no marks
+            // column the percentage is already on the right.
+            $detail = $hasgrade ? $row['subline'] : $row['detail'];
+            if ($detail !== '') {
+                $this->set_text_from_hex(self::COLOR_MUTED);
+                $this->SetFont('helvetica', '', 6.5);
+                $this->MultiCell($width - $swatch, 3.2, pdf_text::plain($detail), 0, 'L', false, 1, $labelx, $bottom);
+                $bottom = $this->GetY();
+            }
+            $y = $bottom + 0.8;
+        }
+
+        if ($hasgrade) {
+            $this->set_draw_from_hex(self::COLOR_BORDER);
+            $this->SetLineWidth(0.2);
+            $this->Line($x, $y, $x + $width, $y);
+            $y += 1;
+            $this->set_fill_from_hex($this->scorecolor);
+            $this->RoundedRect($x, $y + 1.3, 2.4, 2.4, 0.5, '1111', 'F');
+            $this->set_text_from_hex(self::COLOR_DARK);
+            $this->SetFont('helvetica', 'B', 8.5);
+            $this->SetXY($labelx, $y);
+            $this->Cell($labelwidth, 5, get_string('penalty_final_grade', 'local_unifiedgrader'), 0, 0, 'L');
+            $this->Cell($amountwidth, 5, $breakdown['final'], 0, 1, 'R');
+            $y = $this->GetY();
+        }
+
+        $this->SetY($y);
+    }
 
     /**
      * Render the rubric or marking guide section.
@@ -1145,6 +1325,69 @@ class feedback_summary_pdf extends \pdf {
     }
 
     /**
+     * List the comments the marker wrote on the submission itself.
+     *
+     * These are the comments that could not be set beside the words they are
+     * about: the rest are on the pages of the submission that follow, each as a
+     * card joined to its pin. A comment ends up here when it was made on online
+     * text or on a file that is not in this PDF, or when the site cannot draw on
+     * the pages. With no page to point to, the phrase each is about is quoted.
+     *
+     * @param array $data
+     */
+    private function render_document_comments(array $data): void {
+        $comments = $data['documentcomments'] ?? [];
+        if (!$comments) {
+            return;
+        }
+
+        $contentwidth = $this->getPageWidth() - (self::MARGIN_H * 2);
+        $this->SetY($this->GetY() + 2);
+        $this->render_section_heading(
+            get_string('comments_on_submission', 'local_unifiedgrader'),
+            0xF086, // Icon: comments.
+            null,
+            null,
+            22
+        );
+
+        $rows = '';
+        foreach ($comments as $comment) {
+            $color = preg_match('/^#[0-9a-f]{6}$/i', (string) $comment['color']) ? $comment['color'] : '#0D6EFD';
+            $where = (int) $comment['page'] > 0
+                ? '<br><span style="font-size: 7pt; color: #6C757D;">'
+                    . htmlspecialchars(get_string('feedback_summary_on_page', 'local_unifiedgrader', (int) $comment['page']))
+                    . '</span>'
+                : '';
+            $quote = trim((string) $comment['anchortext']) !== ''
+                ? '<span style="font-size: 8pt; color: #6C757D;"><i>&ldquo;'
+                    . htmlspecialchars(shorten_text(pdf_text::plain($comment['anchortext']), 220, true))
+                    . '&rdquo;</i></span><br>'
+                : '';
+            $rows .= '<tr>'
+                . '<td width="11%" style="font-size: 10pt; color: ' . $color . ';"><b>'
+                . (int) $comment['number'] . '</b>' . $where . '</td>'
+                . '<td width="89%" style="font-size: 9pt; color: #212529;">' . $quote
+                . $this->sanitise_feedback_html(pdf_text::flatten((string) $comment['html'])) . '</td>'
+                . '</tr>'
+                . '<tr><td colspan="2" style="font-size: 2pt; border-bottom: 0.2px solid #DEE2E6;">&nbsp;</td></tr>';
+        }
+
+        $this->writeHTMLCell(
+            $contentwidth,
+            0,
+            self::MARGIN_H,
+            $this->GetY(),
+            '<table cellpadding="2">' . $rows . '</table>',
+            0,
+            1,
+            false,
+            true,
+            'L'
+        );
+    }
+
+    /**
      * Draw the footer on every page.
      *
      * Called by TCPDF for each page as it closes, so it covers the annotation
@@ -1172,7 +1415,7 @@ class feedback_summary_pdf extends \pdf {
         // Graded date (left).
         if (!empty($this->footerdata['dategraded'])) {
             $this->SetXY(self::MARGIN_H, $y);
-            $this->Cell(70, 4, get_string(
+            $this->Cell(62, 4, get_string(
                 'feedback_summary_graded_on',
                 'local_unifiedgrader',
                 $this->footerdata['dategraded']
@@ -1192,12 +1435,16 @@ class feedback_summary_pdf extends \pdf {
             ]
         ), 0, 0, 'C');
 
-        // Generated by (right).
-        $this->SetXY($pagewidth - self::MARGIN_H - 60, $y);
-        $this->Cell(60, 4, get_string(
-            'feedback_summary_generated_by',
-            'local_unifiedgrader'
-        ), 0, 0, 'R');
+        // When this copy was produced (right). The date matters because the
+        // grade behind a saved PDF can change afterwards.
+        if (!empty($this->footerdata['dategenerated'])) {
+            $this->SetXY($pagewidth - self::MARGIN_H - 88, $y);
+            $this->Cell(88, 4, get_string(
+                'feedback_summary_generated_on',
+                'local_unifiedgrader',
+                $this->footerdata['dategenerated']
+            ), 0, 0, 'R');
+        }
     }
 
     /**

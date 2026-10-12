@@ -2,6 +2,36 @@
 
 ## v3.0.0 (2026100100)
 
+### Penalties explained on the student's feedback
+
+A student's feedback page and feedback PDF showed the mark as the marker typed it, with each penalty as a bare "-10% Late" chip beside it. Nothing said what the chips were taken from or what was left, and the figure on the page did not match the gradebook.
+
+- **Feedback page:** a Penalties card sits under the overall feedback, on assignments, forums, quizzes and BigBlueButton. It lists the mark awarded, each penalty with its reason and the marks it cost, and the final grade, with a note that penalties are percentages of the maximum grade. The chips are replaced by one "Penalties: -30%" label that jumps to the card.
+- **Headline grade:** with penalties, the grade at the top of the page is now the final grade, the one in the gradebook.
+- **Feedback PDF:** the grade ring and the fraction under it show the final grade, and the same breakdown is listed beneath them in place of the row of chips. Each penalty is drawn on the ring as its own segment, carrying on from where the final grade stops, in a muted colour and a narrower band so it cannot be read as marks that count. The list is the ring's legend: every row opens with the colour of its segment, and "Mark awarded" and "Final grade" are in bold.
+- **Reasons:** a late penalty reads "Late submission" with how late beneath it; a word count penalty reads "Word count"; a marker's own penalty shows the label they typed, such as "Plagiarism".
+- **Edge cases:** the final grade does not go below zero, and the total shows what was actually deducted. A scale grade lists the penalties without the arithmetic. During a Friction Feedback walk the card stays hidden with the mark.
+- **The PDF button is on every feedback page.** A quiz showed "Download feedback PDF" only when the marker had written overall feedback, so a quiz marked question by question had no PDF at all; an assignment showed it only with a grade. Assignments, forums, quizzes and BigBlueButton now all show it whenever the feedback is released.
+- The arithmetic is in one place, `feedback_data_helper::penalty_breakdown()`, used by the page and the PDF. Seven new strings, in all 13 language packs.
+
+### The marker's marks on the pages of the feedback PDF
+
+On the web a student sees their document with the marker's marks on it: highlights, ticks, crosses, queries, strike-outs, and comments as numbered pins beside the text. None of that reached the feedback PDF, which carried the summary and the bare document.
+
+- **On the pages:** every text-anchored mark is now drawn on the submission's pages in the PDF, on the words it was put on, in the same colours as the web view. A comment is a numbered pin at the start of its phrase.
+- **Comment cards beside the page:** as on the web, each page has a margin on its right, and every comment is set there as a card with its number, the marker's name and what they wrote, joined to its pin by a dotted line. A card starts level with its pin; where pins are close the cards stack, and a crowded page gets smaller type so all of them fit. The marker's name is left off where the assignment hides marker identities.
+- **In the summary:** only a comment that could not be shown beside its words is listed there, under "Comments on your submission", with its number, page and the phrase it is about: a comment on online text, or on a site that cannot draw on the pages. The overall feedback and the rubric or marking guide are as before.
+- **How a mark finds its place:** a mark is stored against a phrase of the document's text, not a position. Ghostscript reports where every character sits, the phrase is found in that (the occurrence nearest where the marker put it, when it occurs more than once), and the mark is drawn there with the page importer Moodle's own PDF annotator uses (`pdf\submission_marks_pdf`, `pdf\page_importer`).
+- **Checked against the browser:** on a five-page test document (two columns of small type, a landscape page, US Letter stored rotated, A5, ligatures, accents, a phrase repeated on one page) and a Word submission, all twenty marks land within 2.1 points (0.7 mm) of where the browser's viewer lays the same phrase out.
+- **Two things that would have broken it:** a page stored rotated cannot be measured letter by letter, so the pages are measured on the same plain copy the marks are drawn on; and rewriting a PDF can lose the text behind a ligature ("tt", "Th"), so the original's text is used wherever the copy lost any.
+- **Best effort:** this needs Ghostscript (the path Moodle already uses for Annotate PDF). Without it the document is left as it was, and the comments are listed in the summary instead. Word submissions use the PDF Moodle converted them to.
+
+### One feedback PDF for every activity
+
+- **Course name in the header:** a new setting on the Grading page, "Course name in the header" (`feedbackpdf_coursename`), chooses between the course full name (the default) and the short name.
+- **Generated date:** the footer of every page now reads "Generated by Unified Grader on" followed by the date and time, beside the date the work was graded. A saved PDF can outlive a change to the grade, and this says when the copy was made.
+- **Same button everywhere:** see the PDF button note under the penalties entry above. Assignments, forums, quizzes and BigBlueButton share one generator, header, score ring and footer; only the pages that follow differ (the annotated submission, the posts, the attempt, or the session figures).
+
 ### Documentation
 
 The built-in help page (`help.php`) is rewritten for 3.0.0 on Moodle 5.3.

@@ -1,0 +1,96 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_unifiedgrader/feedback_penalty_card
+
+    The penalties on a student's grade, shown on their feedback page below the
+    overall feedback: the mark awarded, each penalty with its reason and what it
+    cost, and the final grade. Rendered inside the penaltycard context built by
+    feedback_data_helper::penalty_breakdown().
+
+    Context variables required for this template:
+    * hasgrade - bool - The grade is numeric, so the sum can be shown.
+    * rows - array - Each with reason, subline (how late, and the percentage) and marks.
+    * maxgrade - string - The maximum grade the percentages are taken of.
+    * awarded - string - The mark as the marker gave it.
+    * totalmarks - string - The marks taken off in all.
+    * final - string - The grade left after the penalties.
+    * finalpercentage - int - That grade as a percentage.
+
+    Example context (json):
+    {
+        "hasgrade": true,
+        "rows": [
+            {"reason": "Late submission", "subline": "2 day(s) late · -10%", "marks": "-10"},
+            {"reason": "Word count", "subline": "-5%", "marks": "-5"}
+        ],
+        "maxgrade": "100",
+        "awarded": "60 / 100",
+        "totalmarks": "-15",
+        "final": "45 / 100",
+        "finalpercentage": 45
+    }
+}}
+<div class="card mb-3 local-unifiedgrader-penalty-card" id="local-unifiedgrader-penalty-card" data-region="penalty-card">
+    <div class="card-header py-2">
+        <h6 class="mb-0">
+            <i class="fa fa-minus-circle me-1" aria-hidden="true"></i>
+            {{#str}} penalties, local_unifiedgrader {{/str}}
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0 local-unifiedgrader-penalty-table">
+            <caption class="visually-hidden">{{#str}} penalty_card_caption, local_unifiedgrader {{/str}}</caption>
+            <thead class="visually-hidden">
+                <tr>
+                    <th scope="col">{{#str}} penalty_col_reason, local_unifiedgrader {{/str}}</th>
+                    {{#hasgrade}}<th scope="col">{{#str}} penalty_col_marks, local_unifiedgrader {{/str}}</th>{{/hasgrade}}
+                </tr>
+            </thead>
+            <tbody>
+                {{#hasgrade}}
+                    <tr class="local-unifiedgrader-penalty-awarded">
+                        <th scope="row">{{#str}} penalty_mark_awarded, local_unifiedgrader {{/str}}</th>
+                        <td class="text-end text-nowrap">{{awarded}}</td>
+                    </tr>
+                {{/hasgrade}}
+                {{#rows}}
+                    <tr class="local-unifiedgrader-penalty-row">
+                        <th scope="row">
+                            {{reason}}
+                            <span class="d-block small text-muted fw-normal">{{subline}}</span>
+                        </th>
+                        {{#hasgrade}}<td class="text-end text-nowrap text-danger fw-bold">{{marks}}</td>{{/hasgrade}}
+                    </tr>
+                {{/rows}}
+            </tbody>
+            {{#hasgrade}}
+                <tfoot>
+                    <tr class="local-unifiedgrader-penalty-final">
+                        <th scope="row">{{#str}} penalty_final_grade, local_unifiedgrader {{/str}}</th>
+                        <td class="text-end text-nowrap">{{final}}<span class="d-block small text-muted fw-normal">{{finalpercentage}}%</span></td>
+                    </tr>
+                </tfoot>
+            {{/hasgrade}}
+        </table>
+    </div>
+    {{#hasgrade}}
+        <div class="card-footer py-2 small text-muted">
+            {{#str}} penalty_card_note, local_unifiedgrader, {{maxgrade}} {{/str}}
+        </div>
+    {{/hasgrade}}
+</div>

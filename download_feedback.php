@@ -75,7 +75,7 @@ $activityinfo = $adapter->get_activity_info();
 
 // Parse grade, penalties, and rubric/guide data via shared helper.
 $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
-$penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
+$penaltybreakdown = feedback_data_helper::penalty_breakdown($cmid, (int) $userid, $gradeinfo);
 $gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
 
 // Get feedback text with rewritten pluginfile URLs.
@@ -137,49 +137,18 @@ if ($cm->modname === 'bigbluebuttonbn') {
     $annotations = $report['annotations'];
 }
 
-// Build the summary data array.
-$studentname = fullname(\core_user::get_user($userid));
-// The string strftimedatefull is not a core one — asking for it put a literal
-// "[[strftimedatefull]]" in the PDF footer where the date should be.
-$dategraded = !empty($gradedata['timegraded'])
-    ? userdate($gradedata['timegraded'], get_string('strftimedaydatetime', 'langconfig'))
-    : '';
+// The marks the marker placed in the document itself. They are drawn on the
+// pages of the submission, each written comment as a card beside the page; any
+// comment that cannot be shown there is listed in the summary instead.
+// Assignments only: no other activity has them.
+$documentmarks = ['comments' => [], 'marks' => []];
+if ($cm->modname === 'assign') {
+    $documentmarks = feedback_data_helper::document_marks($cmid, (int) $userid, $context, $attemptnum, current_language());
+}
 
-$summarydata = [
-    // The adapter has already formatted the activity name; formatting it a
-    // second time would escape it twice over. TCPDF writes both of these as
-    // literal text, so neither may arrive HTML-escaped.
-    'activityname' => $activityinfo['name'],
-    'coursename' => format_string($course->fullname, true, ['escape' => false]),
-    'studentname' => $studentname,
-    'gradevalue' => $gradeinfo['gradevalue'],
-    'maxgrade' => $gradeinfo['maxgrade'],
-    'percentage' => $gradeinfo['percentage'],
-    'feedback' => $feedback,
-    'gradingmethod' => $gradinginfo['gradingmethod'],
-    'rubriccriteria' => $gradinginfo['rubriccriteria'],
-    'guidecriteria' => $gradinginfo['guidecriteria'],
-    'penalties' => $penaltyinfo['penalties'],
-    'dategraded' => $dategraded,
-    'plagiarismlinks' => $plagiarismlinks,
-    'additionalcontent' => $additionalcontent,
-    'additionalcontenttitle' => match ($cm->modname) {
-        'quiz' => get_string('quiz_your_attempt', 'local_unifiedgrader'),
-        'forum' => get_string('forum_your_posts', 'local_unifiedgrader'),
-        default => '',
-    },
-    'analytics' => $analytics,
-    'annotations' => $annotations,
-    // Null on a site that has configured no logo — the header then renders
-    // without one rather than failing.
-    'logopath' => feedback_data_helper::resolve_site_logo_path(),
-];
-
-// Generate the summary PDF.
-$summarypdf = new feedback_summary_pdf();
-$summarybytes = $summarypdf->generate($summarydata);
-
-// Find the submission PDF to append after the summary.
+// Find the submission PDF to append after the summary. Done before the summary
+// is built, because the summary lists whichever comments could not be put on
+// the pages.
 // Priority: annotated PDF > original submission file (or its PDF conversion).
 $submissionpdfbytes = null;
 
@@ -232,6 +201,78 @@ if ($fileid > 0) {
         }
     }
 }
+
+// Draw the marker's in-document marks on the pages, where they were placed,
+// each written comment as a card beside the page. Only the marks made on this
+// file: a submission can hold several.
+$placedcomments = [];
+if ($submissionpdfbytes) {
+    $filemarks = array_values(array_filter(
+        $documentmarks['marks'],
+        fn(array $mark): bool => $mark['page'] > 0 && $mark['fileid'] === $fileid,
+    ));
+    $marked = \local_unifiedgrader\pdf\submission_marks_pdf::apply($submissionpdfbytes, $filemarks);
+    $submissionpdfbytes = $marked['pdf'];
+    $placedcomments = $marked['placed'];
+}
+
+// Build the summary data array.
+$studentname = fullname(\core_user::get_user($userid));
+// The string strftimedatefull is not a core one — asking for it put a literal
+// "[[strftimedatefull]]" in the PDF footer where the date should be.
+$dategraded = !empty($gradedata['timegraded'])
+    ? userdate($gradedata['timegraded'], get_string('strftimedaydatetime', 'langconfig'))
+    : '';
+
+$summarydata = [
+    // The adapter has already formatted the activity name; formatting it a
+    // second time would escape it twice over. TCPDF writes both of these as
+    // literal text, so neither may arrive HTML-escaped.
+    'activityname' => $activityinfo['name'],
+    // Full name or short name, as the site chooses: a long full name with a
+    // code, a title and a term is not always what an institution wants here.
+    'coursename' => format_string(
+        get_config('local_unifiedgrader', 'feedbackpdf_coursename') === 'shortname' ? $course->shortname : $course->fullname,
+        true,
+        ['escape' => false, 'context' => context_course::instance($course->id)],
+    ),
+    'studentname' => $studentname,
+    // With penalties, the ring shows the grade the student ends up with; the
+    // breakdown beneath it shows the mark it came from.
+    'gradevalue' => $penaltybreakdown['finalvalue'] ?? $gradeinfo['gradevalue'],
+    'maxgrade' => $gradeinfo['maxgrade'],
+    'percentage' => $penaltybreakdown['finalpercentage'] ?? $gradeinfo['percentage'],
+    'feedback' => $feedback,
+    'gradingmethod' => $gradinginfo['gradingmethod'],
+    'rubriccriteria' => $gradinginfo['rubriccriteria'],
+    'guidecriteria' => $gradinginfo['guidecriteria'],
+    'penaltybreakdown' => $penaltybreakdown,
+    // The comments that are not on a page beside their words: those on online
+    // text, on another file, or on a site that cannot draw on the pages.
+    'documentcomments' => array_values(array_filter(
+        $documentmarks['comments'],
+        fn(array $comment): bool => !in_array($comment['number'], $placedcomments, true),
+    )),
+    'dategraded' => $dategraded,
+    // When this copy was produced: a grade can change after a PDF is saved.
+    'dategenerated' => userdate(time(), get_string('strftimedaydatetime', 'langconfig')),
+    'plagiarismlinks' => $plagiarismlinks,
+    'additionalcontent' => $additionalcontent,
+    'additionalcontenttitle' => match ($cm->modname) {
+        'quiz' => get_string('quiz_your_attempt', 'local_unifiedgrader'),
+        'forum' => get_string('forum_your_posts', 'local_unifiedgrader'),
+        default => '',
+    },
+    'analytics' => $analytics,
+    'annotations' => $annotations,
+    // Null on a site that has configured no logo — the header then renders
+    // without one rather than failing.
+    'logopath' => feedback_data_helper::resolve_site_logo_path(),
+];
+
+// Generate the summary PDF.
+$summarypdf = new feedback_summary_pdf();
+$summarybytes = $summarypdf->generate($summarydata);
 
 // Combine summary + submission PDF if we have one.
 $finalpdf = $summarybytes;

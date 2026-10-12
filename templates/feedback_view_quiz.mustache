@@ -33,8 +33,7 @@
     - downloadfilename: Suggested filename for the feedback PDF download
     - userid: Current student user ID
     - showrightcolumn: Whether to show the right column
-    - haspenalties: Whether penalties exist
-    - penalties: Array of penalty badge objects
+        - penaltycard: The penalty breakdown (see feedback_penalty_card), or null when there are no penalties
     - hasmultipleattempts: Whether there are multiple finished attempts
     - attempts: Array of attempt objects with attemptnumber, label, date, selected, url
     - selectedattempt: Currently selected attempt number
@@ -55,8 +54,7 @@
         "downloadfilename": "feedback.pdf",
         "userid": 2,
         "showrightcolumn": true,
-        "haspenalties": false,
-        "penalties": [],
+        "penaltycard": null,
         "hasmultipleattempts": false,
         "attempts": [],
         "selectedattempt": 1,
@@ -100,13 +98,13 @@
                     </ul>
                 </div>
             {{/hasmultipleattempts}}
-            {{#hasfeedback}}
+            {{#feedbackdownloadurl}}
                 <a href="{{feedbackdownloadurl}}" class="btn btn-sm btn-outline-primary ms-2" download="{{downloadfilename}}"
                    data-region="download-feedback-pdf">
                     <i class="fa fa-download me-1" aria-hidden="true"></i>
                     {{#str}} download_feedback_pdf, local_unifiedgrader {{/str}}
                 </a>
-            {{/hasfeedback}}
+            {{/feedbackdownloadurl}}
         </div>
         <div class="d-flex align-items-center gap-3">
             {{#hascommentsfeature}}
@@ -128,18 +126,16 @@
                     </div>
                 </div>
             {{/hascommentsfeature}}
-            {{#haspenalties}}
-                {{#penalties}}
-                    <span class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
-                        {{text}}
-                    </span>
-                {{/penalties}}
-            {{/haspenalties}}
             {{#gradedisplay}}
                 <span class="badge bg-primary fs-6">
                     {{#str}} grade, local_unifiedgrader {{/str}}: {{gradedisplay}}
                 </span>
             {{/gradedisplay}}
+            {{#penaltycard}}
+                <a href="#local-unifiedgrader-penalty-card" class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
+                    {{headerbadge}}
+                </a>
+            {{/penaltycard}}
         </div>
     </div>
 
@@ -182,6 +178,10 @@
                         </div>
                     </div>
                 {{/hasfeedback}}
+
+                {{#penaltycard}}
+                    {{> local_unifiedgrader/feedback_penalty_card }}
+                {{/penaltycard}}
 
                 {{! Rubric display (read-only) }}
                 {{#hasrubric}}

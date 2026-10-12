@@ -65,8 +65,7 @@
         "hasadvancedgrading": false,
         "gradingmethodname": "",
         "showrightcolumn": true,
-        "haspenalties": false,
-        "penalties": []
+        "penaltycard": null
     }
 }}
 <div class="local-unifiedgrader-feedback" data-region="feedback-viewer"
@@ -103,13 +102,11 @@
         {{#hasaggregatelabel}}
             <span class="text-muted small">{{aggregatelabel}}</span>
         {{/hasaggregatelabel}}
-        {{#haspenalties}}
-            {{#penalties}}
-                <span class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
-                    {{text}}
-                </span>
-            {{/penalties}}
-        {{/haspenalties}}
+        {{#penaltycard}}
+            <a href="#local-unifiedgrader-penalty-card" class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
+                {{headerbadge}}
+            </a>
+        {{/penaltycard}}
     </div>
 
     <div class="row g-3 px-3">
@@ -214,6 +211,10 @@
                         </div>
                     </div>
                 {{/hasfeedback}}
+
+                {{#penaltycard}}
+                    {{> local_unifiedgrader/feedback_penalty_card }}
+                {{/penaltycard}}
 
                 {{! Rubric display (read-only) }}
                 {{#hasrubric}}

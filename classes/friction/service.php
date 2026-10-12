@@ -358,8 +358,7 @@ class service {
 
         // The mark, the points, and the download stay off this page until the walk ends.
         $data['gradedisplay'] = '';
-        $data['haspenalties'] = false;
-        $data['penalties'] = [];
+        $data['penaltycard'] = null;
         $data['feedbackdownloadurl'] = '';
         $data['feedback'] = '';
         $data['hasfeedback'] = false;

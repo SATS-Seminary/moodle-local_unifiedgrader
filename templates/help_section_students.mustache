@@ -12,7 +12,8 @@
             "friction_ready": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/friction_ready",
             "friction_timer": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/friction_timer",
             "student_assignment_page": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/student_assignment_page",
-            "student_feedback_view": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/student_feedback_view"
+            "student_feedback_view": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/student_feedback_view",
+            "student_penalties": "https://moodle.example.com/theme/image.php/boost/local_unifiedgrader/1/help/student_penalties"
         }
     }
 }}
@@ -50,7 +51,7 @@
     <li><strong>Margin comments.</strong> Each numbered pin on the page has a card beside it with your teacher's comment.</li>
     <li><strong>Overall feedback</strong> on the right, and the rubric or marking guide if one was used.</li>
     <li><strong>Your grade</strong> at the top right.</li>
-    <li><strong>Download feedback PDF</strong>: a copy of your document with the marks printed in, to keep.</li>
+    <li><strong>Download feedback PDF</strong>: a copy to keep. It opens with a summary (your grade, the overall feedback, any penalties, and the rubric or marking guide), followed by your document as you see it here: each highlight, tick, cross and query on the words it refers to, and each comment as a numbered pin joined by a dotted line to a card in the right-hand margin.</li>
     <li>For a forum you see your posts; for a quiz, your attempt with the marker's comments; for a
         live session, the recording with comments at the moments they refer to.</li>
 </ul>
@@ -114,17 +115,38 @@ Friction Feedback. It takes a minute or two.</p>
 
 {{! ----- Messages and penalties ----- }}
 <section id="student-messages">
-<h3>Messages, late penalties and translation</h3>
+<h3>Messages, penalties and translation</h3>
 
 <h4>Message your teacher about a piece of work</h4>
 <p>The speech-bubble icon on the activity page and on the feedback page opens a message thread
 about that piece of work. You can write before and after it is graded, and you are notified when
 your teacher replies. On assignments this takes the place of Moodle's own submission comments.</p>
 
-<h4>Late penalties</h4>
-<p>If you submit after the due date and the activity applies late penalties, your feedback page
-lists the penalty and shows your grade after it. Each day that has started counts as a full day.
-If you were given an extension, the penalty is worked out from your extended date.</p>
+<h4>Penalties</h4>
+<p>A penalty takes marks off the mark your teacher awarded: for late work, for going over or under
+the word count, or for another reason your teacher names, such as plagiarism. When your grade
+carries a penalty:</p>
+<ul>
+    <li>The grade at the top of the feedback page is your <strong>final grade</strong>, after
+        penalties. An amber <em>Penalties</em> label beside it shows the total and jumps to the detail.</li>
+    <li>A <strong>Penalties</strong> card under the overall feedback shows the mark awarded, each
+        penalty with its reason and the marks it cost, and the final grade.</li>
+    <li>The feedback PDF shows the same list under the grade ring. On the ring, the wide coloured arc is your final grade, and each penalty is a narrower, paler segment after it; the list beside each colour tells you which penalty it is.</li>
+</ul>
+<p>Each penalty is a percentage of the maximum grade, not of your mark: 10% off an assignment out
+of 100 is 10 marks. Your grade cannot go below zero.</p>
+
+<figure class="local-unifiedgrader-help-shot">
+    <a href="{{img.student_penalties}}" data-action="help-zoom">
+        <img src="{{img.student_penalties}}" width="1300" height="839" loading="lazy"
+             alt="A student's feedback page. The grade at the top reads 30 out of 100 with a Penalties label of minus 30 percent. A Penalties card lists Mark awarded 60 out of 100, Late submission minus 10, Word count minus 5, Plagiarism minus 15, and Final grade 30 out of 100.">
+    </a>
+    <figcaption>The <strong>Penalties</strong> card: the mark awarded, what each penalty cost and why, and the final grade.</figcaption>
+</figure>
+
+<p><strong>Late penalties.</strong> If you submit after the due date and the activity applies late
+penalties, each day that has started counts as a full day. If you were given an extension, the
+penalty is worked out from your extended date.</p>
 
 <h4>Feedback in your language</h4>
 <p>On sites that use the translation service for a course, feedback is shown in your language. A

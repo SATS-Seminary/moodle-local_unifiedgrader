@@ -128,7 +128,6 @@ if ($cm->modname === 'forum') {
     $PAGE->add_body_class('local-unifiedgrader-feedback-page');
 
     // Parse grade, penalties, and rubric/guide data via shared helper.
-    $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
     $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
     $gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
     $gradedisplay = $gradeinfo['gradedisplay'];
@@ -170,10 +169,9 @@ if ($cm->modname === 'forum') {
         'feedbackdownloadurl' => $feedbackdownloadurl,
         'userid' => $userid,
         'showrightcolumn' => $showrightcolumn,
-        'haspenalties' => $penaltyinfo['haspenalties'],
-        'penalties' => $penaltyinfo['penalties'],
     ];
     $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+    $templatedata = feedback_data_helper::with_penalty_card($templatedata, $cmid, (int) $userid, $gradeinfo);
     $templatedata = service::present($adapter, (int) $userid, $templatedata);
     if (!empty($templatedata['frictionactive'])) {
         $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');
@@ -224,7 +222,6 @@ if ($cm->modname === 'quiz') {
     $PAGE->add_body_class('local-unifiedgrader-feedback-page');
 
     // Parse grade and penalties via shared helper.
-    $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
     $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
     $gradedisplay = $gradeinfo['gradedisplay'];
     $gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
@@ -280,8 +277,6 @@ if ($cm->modname === 'quiz') {
         'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
         'userid' => $userid,
         'showrightcolumn' => $showrightcolumn,
-        'haspenalties' => $penaltyinfo['haspenalties'],
-        'penalties' => $penaltyinfo['penalties'],
         'hasmultipleattempts' => $hasmultipleattempts,
         'attempts' => $attemptlist,
         'selectedattempt' => $selectedattempt,
@@ -289,6 +284,7 @@ if ($cm->modname === 'quiz') {
         'commentcount' => $commentcount,
     ];
     $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+    $templatedata = feedback_data_helper::with_penalty_card($templatedata, $cmid, (int) $userid, $gradeinfo);
     $templatedata = service::present($adapter, (int) $userid, $templatedata);
     if (!empty($templatedata['frictionactive'])) {
         $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');
@@ -317,8 +313,6 @@ if ($cm->modname === 'bigbluebuttonbn') {
     $PAGE->set_pagelayout('standard');
     $PAGE->activityheader->disable();
     $PAGE->add_body_class('local-unifiedgrader-feedback-page');
-
-    $penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
     $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
     $gradedisplay = $gradeinfo['gradedisplay'];
     // The rubric or marking guide the mark was built from. Without this the
@@ -355,8 +349,6 @@ if ($cm->modname === 'bigbluebuttonbn') {
         'downloadfilename' => clean_filename($course->shortname . '-' . $activityinfo['name'] . '-feedback.pdf'),
         'userid' => $userid,
         'showrightcolumn' => $showrightcolumn,
-        'haspenalties' => $penaltyinfo['haspenalties'],
-        'penalties' => $penaltyinfo['penalties'],
         'hasmultipleattempts' => false,
         'attempts' => [],
         'selectedattempt' => 0,
@@ -364,6 +356,7 @@ if ($cm->modname === 'bigbluebuttonbn') {
         'commentcount' => $commentcount,
     ];
     $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+    $templatedata = feedback_data_helper::with_penalty_card($templatedata, $cmid, (int) $userid, $gradeinfo);
     $templatedata = service::present($adapter, (int) $userid, $templatedata);
     if (!empty($templatedata['frictionactive'])) {
         $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');
@@ -455,7 +448,6 @@ $PAGE->activityheader->disable();
 $PAGE->add_body_class('local-unifiedgrader-feedback-page');
 
 // Parse grade, penalties, and rubric/guide data via shared helper.
-$penaltyinfo = feedback_data_helper::format_penalties($cmid, $userid);
 $gradeinfo = feedback_data_helper::format_grade($gradedata, $activityinfo);
 $gradinginfo = feedback_data_helper::parse_grading_data($gradedata, $context);
 $gradedisplay = $gradeinfo['gradedisplay'];
@@ -630,8 +622,6 @@ $templatedata = [
     'commentcount' => $commentcount,
     'canpostcomments' => $canpostcomments,
     'showrightcolumn' => $showrightcolumn,
-    'haspenalties' => $penaltyinfo['haspenalties'],
-    'penalties' => $penaltyinfo['penalties'],
     'hasmultipleattempts' => $hasmultipleattempts,
     'attempts' => $attemptlist,
     'hasannotationtranslations' => $annotationtranslations['hasannotations'],
@@ -642,6 +632,7 @@ $templatedata = [
     'translationpendingtext' => $translationpendingtext,
 ];
 $templatedata += feedback_data_helper::grading_template_data($gradinginfo);
+$templatedata = feedback_data_helper::with_penalty_card($templatedata, $cmid, (int) $userid, $gradeinfo);
 $templatedata = service::present($adapter, (int) $userid, $templatedata);
 if (!empty($templatedata['frictionactive'])) {
     $PAGE->requires->js_call_amd('local_unifiedgrader/friction_walk', 'init');

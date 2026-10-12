@@ -1062,6 +1062,51 @@
     font-weight: 500;
 }
 
+/* Student feedback view: the card that works the penalties through to the final grade. */
+.local-unifiedgrader-penalty-badge:hover,
+.local-unifiedgrader-penalty-badge:focus {
+    text-decoration: underline;
+}
+
+.local-unifiedgrader-penalty-card {
+    scroll-margin-top: 5rem;
+}
+
+.local-unifiedgrader-penalty-card .local-unifiedgrader-penalty-table th,
+.local-unifiedgrader-penalty-card .local-unifiedgrader-penalty-table td {
+    padding: 0.5rem 0.75rem;
+    vertical-align: top;
+    font-size: 0.875rem;
+}
+
+/* The amounts take only the room they need, so the reasons get the rest of a narrow column. */
+.local-unifiedgrader-penalty-card .local-unifiedgrader-penalty-table td {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.local-unifiedgrader-penalty-table th {
+    font-weight: 600;
+}
+
+.local-unifiedgrader-penalty-table .local-unifiedgrader-penalty-awarded th,
+.local-unifiedgrader-penalty-table .local-unifiedgrader-penalty-awarded td {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.local-unifiedgrader-penalty-table .local-unifiedgrader-penalty-row th {
+    font-weight: 500;
+}
+
+.local-unifiedgrader-penalty-table tfoot th,
+.local-unifiedgrader-penalty-table tfoot td {
+    border-top: 2px solid var(--bs-border-color, #dee2e6);
+    border-bottom: 0;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
 /* Assignment view — inline submission comments widget. */
 .local-unifiedgrader-inline-comments {
     border: 1px solid var(--bs-border-color, #dee2e6);

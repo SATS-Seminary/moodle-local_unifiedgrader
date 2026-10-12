@@ -184,13 +184,12 @@ final class service_test extends \advanced_testcase {
             'feedback' => '<p>Marked.</p>',
             'hasfeedback' => true,
             'feedbackdownloadurl' => 'https://example.test/download',
-            'haspenalties' => true,
-            'penalties' => [['text' => 'Late']],
+            'penaltycard' => ['haspenalties' => true, 'finaldisplay' => '70 / 100 (70%)'],
         ]);
         $this->assertTrue($page['frictionactive']);
         $this->assertSame('', $page['gradedisplay']);
         $this->assertSame('', $page['feedbackdownloadurl']);
-        $this->assertFalse($page['haspenalties']);
+        $this->assertNull($page['penaltycard']);
         $this->assertStringNotContainsString('80 / 100', $page['frictionstepsjson']);
         $this->assertStringContainsString('Marked.', $page['frictionstepsjson']);
     }

@@ -149,6 +149,24 @@ if ($hassiteconfig) {
         20
     ));
 
+    // The feedback PDF students download: one layout for every activity type.
+    $grading->add(new admin_setting_heading(
+        'local_unifiedgrader/feedbackpdf_heading',
+        get_string('setting_feedbackpdf_heading', 'local_unifiedgrader'),
+        get_string('setting_feedbackpdf_heading_desc', 'local_unifiedgrader'),
+    ));
+
+    $grading->add(new admin_setting_configselect(
+        'local_unifiedgrader/feedbackpdf_coursename',
+        get_string('setting_feedbackpdf_coursename', 'local_unifiedgrader'),
+        get_string('setting_feedbackpdf_coursename_desc', 'local_unifiedgrader'),
+        'fullname',
+        [
+            'fullname' => get_string('fullnamecourse'),
+            'shortname' => get_string('shortnamecourse'),
+        ]
+    ));
+
     // Late penalties. From Moodle 5.3 Unified Grader owns them for
     // assignments, forums and quizzes; before that there is nothing to set.
     if (\local_unifiedgrader\penalty\compat::unified()) {

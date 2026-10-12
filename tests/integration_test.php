@@ -168,6 +168,60 @@ class integration_test extends \advanced_testcase {
         $penaltyinfo = feedback_data_helper::format_penalties($scenario->cm->id, $student->id);
         $this->assertTrue($penaltyinfo['haspenalties']);
         $this->assertCount(2, $penaltyinfo['penalties']);
+
+        // The breakdown a student sees: the mark awarded, what each penalty cost, and what is left.
+        $gradeinfo = ['gradevalue' => 60.0, 'maxgrade' => 80.0, 'percentage' => 75, 'gradedisplay' => '60 / 80 (75%)'];
+        $breakdown = feedback_data_helper::penalty_breakdown($scenario->cm->id, $student->id, $gradeinfo);
+        $this->assertTrue($breakdown['haspenalties']);
+        $this->assertTrue($breakdown['hasgrade']);
+        $this->assertSame('60 / 80', $breakdown['awarded']);
+        $this->assertEquals(75, $breakdown['awardedpercentage']);
+        $this->assertSame(15, $breakdown['totalpercentage']);
+        // Percentages are of the maximum grade: 10% and 5% of 80.
+        $this->assertSame('Word count', $breakdown['rows'][0]['reason']);
+        $this->assertSame('-8', $breakdown['rows'][0]['marks']);
+        $this->assertSame('-10%', $breakdown['rows'][0]['subline']);
+        $this->assertSame('Formatting', $breakdown['rows'][1]['reason']);
+        $this->assertSame('-4', $breakdown['rows'][1]['marks']);
+        $this->assertSame('-12', $breakdown['totalmarks']);
+        $this->assertEquals(48, $breakdown['finalvalue']);
+        $this->assertSame(60, $breakdown['finalpercentage']);
+        $this->assertSame('48 / 80 (60%)', $breakdown['finaldisplay']);
+
+        // The final grade does not go below zero, and the total says what was really taken.
+        $low = feedback_data_helper::penalty_breakdown($scenario->cm->id, $student->id, ['gradevalue' => 5.0] + $gradeinfo);
+        $this->assertEquals(0, $low['finalvalue']);
+        $this->assertSame('-5', $low['totalmarks']);
+
+        // A scale grade has no sum to show: the penalties are listed and nothing else.
+        $scale = feedback_data_helper::penalty_breakdown($scenario->cm->id, $student->id, ['percentage' => null] + $gradeinfo);
+        $this->assertTrue($scale['haspenalties']);
+        $this->assertFalse($scale['hasgrade']);
+        $this->assertSame('', $scale['finaldisplay']);
+        $this->assertSame('', $scale['rows'][0]['marks']);
+
+        // The feedback page: the headline becomes the final grade and the card is added.
+        $data = feedback_data_helper::with_penalty_card(
+            ['gradedisplay' => '60 / 80 (75%)', 'showrightcolumn' => false],
+            $scenario->cm->id,
+            $student->id,
+            $gradeinfo,
+        );
+        $this->assertSame('48 / 80 (60%)', $data['gradedisplay']);
+        $this->assertTrue($data['showrightcolumn']);
+        $this->assertCount(2, $data['penaltycard']['rows']);
+
+        // No penalties: the page is left as it was.
+        $other = $this->getDataGenerator()->create_user();
+        $data = feedback_data_helper::with_penalty_card(
+            ['gradedisplay' => '60 / 80 (75%)', 'showrightcolumn' => false],
+            $scenario->cm->id,
+            $other->id,
+            $gradeinfo,
+        );
+        $this->assertSame('60 / 80 (75%)', $data['gradedisplay']);
+        $this->assertFalse($data['showrightcolumn']);
+        $this->assertNull($data['penaltycard']);
     }
 
     /**
@@ -559,8 +613,23 @@ class integration_test extends \advanced_testcase {
             'gradingmethod' => 'simple',
             'rubriccriteria' => [],
             'guidecriteria' => [],
-            'penalties' => [['text' => '-10% Late']],
+            'penaltybreakdown' => [
+                'haspenalties' => true,
+                'hasgrade' => true,
+                'awarded' => '95 / 100',
+                'awardedpercentage' => 95.0,
+                'final' => '85 / 100',
+                'rows' => [[
+                    'percentage' => 10,
+                    'reason' => 'Late submission',
+                    'detail' => '2 day(s) late',
+                    'subline' => '2 day(s) late · -10%',
+                    'percentdisplay' => '-10%',
+                    'marks' => '-10',
+                ]],
+            ],
             'dategraded' => 'March 4, 2026',
+            'dategenerated' => '5 March 2026, 9:00 AM',
             'plagiarismlinks' => [],
             'additionalcontent' => '',
             'additionalcontenttitle' => '',

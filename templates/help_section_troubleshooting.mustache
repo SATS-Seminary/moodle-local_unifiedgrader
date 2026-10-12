@@ -49,6 +49,25 @@
     </div>
 </details>
 
+<details class="local-unifiedgrader-help-details" id="ts-feedback-pdf-pages">
+    <summary>The feedback PDF has the summary but not the student's document, or the marks are missing from its pages</summary>
+    <div>
+        <p><strong>What students see:</strong> the downloaded PDF stops after the summary page, or
+        the document follows but without the highlights, ticks and numbered pins that show on the
+        web and the comment cards beside them. The comments are listed in the summary instead.</p>
+        <p><strong>Likely cause:</strong> Moodle cannot run Ghostscript. Unified Grader uses it to
+        join the document to the summary and to find where each marked phrase sits on the page.</p>
+        <p><strong>Fix:</strong> install Ghostscript on the server and set its location under
+        <strong>Site administration &gt; Plugins &gt; Activity modules &gt; Assignment &gt; Feedback
+        plugins &gt; Annotate PDF</strong> (<em>Ghostscript path</em>). The <em>Test Ghostscript
+        path</em> link on that page confirms it works. Nothing else needs changing, and PDFs
+        downloaded afterwards include the pages and the marks.</p>
+        <p>A single mark can also be left off a page when its phrase cannot be found in the
+        document's text, for example in a scanned page that has no text. A comment left off this
+        way is listed in the summary.</p>
+    </div>
+</details>
+
 <details class="local-unifiedgrader-help-details">
     <summary>Word files or online text do not open as PDFs at all</summary>
     <div>

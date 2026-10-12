@@ -102,8 +102,7 @@
         "submissionpreviewurl": "https://example.com/preview",
         "hasmultipleattempts": false,
         "attempts": [],
-        "haspenalties": false,
-        "penalties": []
+        "penaltycard": null
     }
 }}
 <div class="local-unifiedgrader-feedback" data-region="feedback-viewer"
@@ -144,12 +143,13 @@
                     </ul>
                 </div>
             {{/hasmultipleattempts}}
-            {{#gradedisplay}}
-                <a href="{{feedbackdownloadurl}}" class="btn btn-sm btn-outline-primary ms-2" download="{{downloadfilename}}">
+            {{#feedbackdownloadurl}}
+                <a href="{{feedbackdownloadurl}}" class="btn btn-sm btn-outline-primary ms-2" download="{{downloadfilename}}"
+                   data-region="download-feedback-pdf">
                     <i class="fa fa-download me-1" aria-hidden="true"></i>
                     {{#str}} download_feedback_pdf, local_unifiedgrader {{/str}}
                 </a>
-            {{/gradedisplay}}
+            {{/feedbackdownloadurl}}
         </div>
         <div class="d-flex align-items-center gap-3">
             {{#hascommentsfeature}}
@@ -194,13 +194,11 @@
                     {{#str}} grade, local_unifiedgrader {{/str}}: {{gradedisplay}}
                 </span>
             {{/gradedisplay}}
-            {{#haspenalties}}
-                {{#penalties}}
-                    <span class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
-                        {{text}}
-                    </span>
-                {{/penalties}}
-            {{/haspenalties}}
+            {{#penaltycard}}
+                <a href="#local-unifiedgrader-penalty-card" class="badge bg-warning text-dark local-unifiedgrader-penalty-badge">
+                    {{headerbadge}}
+                </a>
+            {{/penaltycard}}
         </div>
     </div>
 
@@ -265,6 +263,12 @@
                         </div>
                     </div>
                 {{/hasfeedback}}
+
+                {{#penaltycard}}
+                    <div class="{{#hasfeedback}}mt-3{{/hasfeedback}}">
+                        {{> local_unifiedgrader/feedback_penalty_card }}
+                    </div>
+                {{/penaltycard}}
 
                 {{! Translated annotation comments keyed by document page (local_nida) }}
                 {{#hasannotationtranslations}}

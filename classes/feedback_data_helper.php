@@ -110,19 +110,48 @@ class feedback_data_helper {
      * @return array {haspenalties: bool, penalties: array}
      */
     public static function format_penalties(int $cmid, int $userid): array {
-        $penalties = penalty_manager::get_penalties($cmid, $userid);
         $penaltybadges = [];
-
-        foreach ($penalties as $p) {
-            if ($p['category'] === 'late') {
-                $label = get_string('penalty_late', 'local_unifiedgrader');
-            } else if ($p['category'] === 'wordcount') {
-                $label = get_string('penalty_wordcount', 'local_unifiedgrader');
-            } else {
-                $label = $p['label'] ?: get_string('penalty_other', 'local_unifiedgrader');
-            }
+        foreach (self::penalty_rows($cmid, $userid) as $row) {
             $penaltybadges[] = [
-                'text' => '-' . $p['percentage'] . '% ' . $label,
+                'text' => '-' . $row['percentage'] . '% ' . $row['reason'],
+            ];
+        }
+
+        return [
+            'haspenalties' => !empty($penaltybadges),
+            'penalties' => $penaltybadges,
+        ];
+    }
+
+    /**
+     * The penalties on a student's grade, each with the reason a student can read.
+     *
+     * A late penalty carries how late in its label ("2 day(s) late"), which is
+     * detail rather than the reason; a teacher's own penalty carries the reason
+     * itself ("Plagiarism").
+     *
+     * @param int $cmid Course module ID
+     * @param int $userid User ID
+     * @return array[] Each {category: string, reason: string, detail: string, percentage: int}
+     */
+    private static function penalty_rows(int $cmid, int $userid): array {
+        $rows = [];
+
+        foreach (penalty_manager::get_penalties($cmid, $userid) as $p) {
+            $detail = '';
+            if ($p['category'] === 'late') {
+                $reason = get_string('penalty_late', 'local_unifiedgrader');
+                $detail = (string) $p['label'];
+            } else if ($p['category'] === 'wordcount') {
+                $reason = get_string('penalty_wordcount', 'local_unifiedgrader');
+            } else {
+                $reason = $p['label'] ?: get_string('penalty_other', 'local_unifiedgrader');
+            }
+            $rows[] = [
+                'category' => in_array($p['category'], ['late', 'wordcount'], true) ? $p['category'] : 'other',
+                'reason' => $reason,
+                'detail' => $detail,
+                'percentage' => (int) $p['percentage'],
             ];
         }
 
@@ -157,8 +186,11 @@ class feedback_data_helper {
                         }
                         $pct = (int) round($totalpenalty);
                         if ($pct > 0) {
-                            $penaltybadges[] = [
-                                'text' => '-' . $pct . '% ' . get_string('penalty_late', 'local_unifiedgrader'),
+                            $rows[] = [
+                                'category' => 'late',
+                                'reason' => get_string('penalty_late', 'local_unifiedgrader'),
+                                'detail' => get_string('penalty_late_days', 'local_unifiedgrader', (int) $dayslate),
+                                'percentage' => $pct,
                             ];
                         }
                     }
@@ -166,10 +198,109 @@ class feedback_data_helper {
             }
         }
 
-        return [
-            'haspenalties' => !empty($penaltybadges),
-            'penalties' => $penaltybadges,
+        // Late first, then word count, then the marker's own, so the card, the
+        // PDF list and the segments of its ring always read in the same order.
+        $order = ['late' => 0, 'wordcount' => 1, 'other' => 2];
+        usort($rows, fn(array $a, array $b): int => $order[$a['category']] <=> $order[$b['category']]);
+
+        return $rows;
+    }
+
+    /**
+     * Work a student's penalties through to the grade they end up with.
+     *
+     * The feedback page and the feedback PDF both showed the mark as the marker
+     * typed it, with the penalties as bare "-10% Late" chips beside it. Nothing
+     * said what the chips were taken from or what was left, and the figure on
+     * the page did not match the one in the gradebook. This lays the sum out:
+     * the mark awarded, each penalty with its reason and what it cost, and the
+     * final grade.
+     *
+     * Penalties are percentages of the maximum grade, summed, and the result
+     * does not go below zero: the same arithmetic the marking panel shows the
+     * teacher. A scale grade has no arithmetic to show, so the rows are listed
+     * without marks.
+     *
+     * @param int $cmid Course module ID
+     * @param int $userid User ID
+     * @param array $gradeinfo From format_grade()
+     * @return array {haspenalties: bool, hasgrade: bool, rows: array[], maxgrade: string,
+     *     awarded: string, awardedpercentage: float|null, totalpercentage: int, totalmarks: string, finalvalue: float|null,
+     *     finalpercentage: int|null, final: string, finaldisplay: string, headerbadge: string}
+     */
+    public static function penalty_breakdown(int $cmid, int $userid, array $gradeinfo): array {
+        $rows = self::penalty_rows($cmid, $userid);
+        $maxgrade = (float) $gradeinfo['maxgrade'];
+        $hasgrade = $gradeinfo['gradevalue'] !== null && $gradeinfo['percentage'] !== null && $maxgrade > 0;
+
+        $totalpercentage = 0;
+        foreach ($rows as $i => $row) {
+            $totalpercentage += $row['percentage'];
+            $rows[$i]['percentdisplay'] = '-' . $row['percentage'] . '%';
+            // Under the reason: how late, where that applies, and the percentage the marks came from.
+            $rows[$i]['subline'] = ($row['detail'] !== '' ? $row['detail'] . ' · ' : '') . $rows[$i]['percentdisplay'];
+            $rows[$i]['marks'] = $hasgrade ? '-' . round(($row['percentage'] / 100) * $maxgrade, 2) : '';
+        }
+
+        $breakdown = [
+            'haspenalties' => !empty($rows),
+            'hasgrade' => $hasgrade,
+            'rows' => $rows,
+            'maxgrade' => (string) round($maxgrade, 2),
+            'awarded' => '',
+            'awardedpercentage' => null,
+            'totalpercentage' => $totalpercentage,
+            'totalmarks' => '',
+            'finalvalue' => null,
+            'finalpercentage' => null,
+            'final' => '',
+            'finaldisplay' => '',
+            'headerbadge' => get_string('penalty_header_badge', 'local_unifiedgrader', $totalpercentage),
         ];
+        if (!$rows || !$hasgrade) {
+            return $breakdown;
+        }
+
+        $awarded = (float) $gradeinfo['gradevalue'];
+        $final = round(max(0, $awarded - ($totalpercentage / 100) * $maxgrade), 2);
+        $finalpercentage = (int) round(($final / $maxgrade) * 100);
+
+        $breakdown['awarded'] = round($awarded, 2) . ' / ' . round($maxgrade, 2);
+        $breakdown['awardedpercentage'] = max(0.0, min(100.0, ($awarded / $maxgrade) * 100));
+        // What was actually taken off, which is less than the sum of the rows
+        // when the penalties come to more than the mark.
+        $breakdown['totalmarks'] = '-' . round($awarded - $final, 2);
+        $breakdown['finalvalue'] = $final;
+        $breakdown['finalpercentage'] = $finalpercentage;
+        $breakdown['final'] = $final . ' / ' . round($maxgrade, 2);
+        $breakdown['finaldisplay'] = $breakdown['final'] . ' (' . $finalpercentage . '%)';
+        return $breakdown;
+    }
+
+    /**
+     * Put the penalty card into a feedback page's template data.
+     *
+     * With penalties on the grade, the headline becomes the grade the student
+     * ends up with (the one in the gradebook), the card that explains it is
+     * added, and the right-hand column is shown even when it would otherwise be
+     * empty, because that is where the card sits.
+     *
+     * @param array $data Template data for one of the feedback_view templates
+     * @param int $cmid Course module ID
+     * @param int $userid User ID
+     * @param array $gradeinfo From format_grade()
+     * @return array
+     */
+    public static function with_penalty_card(array $data, int $cmid, int $userid, array $gradeinfo): array {
+        $breakdown = self::penalty_breakdown($cmid, $userid, $gradeinfo);
+        $data['penaltycard'] = $breakdown['haspenalties'] ? $breakdown : null;
+        if ($breakdown['haspenalties']) {
+            $data['showrightcolumn'] = true;
+            if ($breakdown['finaldisplay'] !== '') {
+                $data['gradedisplay'] = $breakdown['finaldisplay'];
+            }
+        }
+        return $data;
     }
 
     /**
@@ -650,6 +781,104 @@ class feedback_data_helper {
             return $empty;
         }
         return ['hassegmentcomments' => true, 'comments' => $comments];
+    }
+
+    /**
+     * The marker's in-document marks for the feedback PDF.
+     *
+     * Two views of the same rows. 'marks' is every mark with where it belongs,
+     * for drawing on the pages of the submission, a written comment carrying its
+     * text and author for the card beside the page. 'comments' is the written
+     * comments only, numbered as their pins are, for the summary to list any
+     * that could not be put on a page.
+     *
+     * The numbering and the wording come from build_segment_comment_translations(),
+     * so a pin carries the same number on the page, in the list and on the web,
+     * and a student reading in another language gets the translated comment.
+     *
+     * @param int $cmid Course module ID.
+     * @param int $userid Student user ID.
+     * @param \context $context Module context.
+     * @param int $attempt The attempt number.
+     * @param string $lang The viewer's language code.
+     * @return array {comments: array[], marks: array[]}
+     */
+    public static function document_marks(int $cmid, int $userid, \context $context, int $attempt, string $lang): array {
+        global $DB;
+
+        $result = ['comments' => [], 'marks' => []];
+        if (!$DB->get_manager()->table_exists('local_unifiedgrader_segcomment')) {
+            return $result;
+        }
+        $rows = $DB->get_records(
+            'local_unifiedgrader_segcomment',
+            ['cmid' => $cmid, 'userid' => $userid, 'attemptnumber' => $attempt],
+            'page ASC, startoffset ASC, timecreated ASC',
+        );
+        if (!$rows) {
+            return $result;
+        }
+
+        $written = self::build_segment_comment_translations($cmid, $userid, $context, $attempt, $lang)['comments'];
+
+        // Who wrote each comment, as the web view shows it, unless the
+        // assignment keeps its markers' names from students.
+        $authors = [];
+        $cm = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+        $hidegrader = $cm && $cm->modname === 'assign'
+            && $DB->get_field('assign', 'hidegrader', ['id' => $cm->instance]);
+        if (!$hidegrader) {
+            $authorids = array_unique(array_map(fn(\stdClass $row): int => (int) $row->authorid, $rows));
+            $namefields = implode(', ', \core_user\fields::get_name_fields());
+            foreach ($DB->get_records_list('user', 'id', $authorids, '', 'id, ' . $namefields) as $author) {
+                $authors[(int) $author->id] = fullname($author);
+            }
+        }
+
+        $number = 0;
+        foreach ($rows as $row) {
+            $marktype = segment_comment_manager::normalise_marktype((string) ($row->marktype ?? 'comment'));
+            $color = segment_comment_manager::normalise_color($row->color ?? null) ?? '#0f6cbf';
+            $pin = null;
+            $text = '';
+            // The same test the list builder applies, so the two stay in step.
+            if ($marktype === 'comment' && trim((string) $row->commenttext) !== '') {
+                $entry = $written[$number] ?? null;
+                $number++;
+                $pin = $number;
+                $anchor = trim((string) $row->anchortext);
+                $html = $entry['displayhtml'] ?? format_text(
+                    (string) $row->commenttext,
+                    (int) $row->commentformat,
+                    ['context' => $context, 'para' => false],
+                );
+                // The card on the page is plain text: what the comment says, without its markup.
+                $text = trim(html_to_text(\local_unifiedgrader\pdf\pdf_text::flatten($html), 0, false));
+                $result['comments'][] = [
+                    'number' => $number,
+                    'color' => $color,
+                    'page' => (int) $row->page,
+                    'anchortext' => \core_text::strlen($anchor) >= 2 ? $anchor : '',
+                    'html' => $html,
+                ];
+            } else if ($marktype === 'comment') {
+                // A comment pin with nothing written has nothing to point to.
+                continue;
+            }
+            $result['marks'][] = [
+                'fileid' => (int) $row->fileid,
+                'page' => (int) $row->page,
+                'startoffset' => (int) $row->startoffset,
+                'anchortext' => (string) $row->anchortext,
+                'marktype' => $marktype,
+                'color' => $color,
+                'number' => $pin,
+                'text' => $text,
+                'author' => $authors[(int) $row->authorid] ?? '',
+            ];
+        }
+
+        return $result;
     }
 
     /**
