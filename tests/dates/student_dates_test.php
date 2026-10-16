@@ -19,8 +19,14 @@ namespace local_unifiedgrader\dates;
 use local_unifiedgrader\external\get_student_dates;
 use local_unifiedgrader\external\preview_student_dates;
 use local_unifiedgrader\external\save_student_dates;
+use local_unifiedgrader\penalty\activity_settings;
 use local_unifiedgrader\penalty\compat;
 use core_external\external_api;
+
+defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
+require_once($CFG->dirroot . '/rating/lib.php');
 
 /**
  * The "Dates & extensions" dialogue's loading, preview and saving.
@@ -193,6 +199,41 @@ final class student_dates_test extends \advanced_testcase {
 
         save_student_dates::execute((int) $s->cm->id, $userid, $ext, []);
         $this->assertTrue($DB->record_exists('local_unifiedgrader_fext', ['cmid' => $s->cm->id, 'userid' => $userid]));
+    }
+
+    /**
+     * A rated forum previews its late penalty when it takes one, and says why when it does not.
+     */
+    public function test_rated_forum_preview(): void {
+        if (!compat::unified()) {
+            $this->markTestSkipped('Penalties on rated forums need Moodle 5.3 or later.');
+        }
+        $this->setAdminUser();
+        $this->add_penalty_rules();
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader');
+        $due = time() - 2 * DAYSECS;
+
+        $average = $gen->create_grading_scenario('forum', [
+            'modparams' => ['grade_forum' => 0, 'assessed' => RATING_AGGREGATE_AVERAGE, 'scale' => 10, 'duedate' => $due],
+        ]);
+        // Late penalties are opt-in on a rated forum.
+        activity_settings::set_enabled((int) $average->cm->id, true);
+        $userid = (int) $average->students[0]->id;
+        $gen->create_forum_post($average->activity, $userid);
+        $preview = (new student_dates((int) $average->cm->id, $userid))->preview('');
+        $this->assertSame('warning', $preview['tone']);
+        $this->assertStringContainsString('10%', $preview['title']);
+        $this->assertStringNotContainsString(get_string('dates_forum_rated_nopenalty', 'local_unifiedgrader'), $preview['body']);
+
+        $maximum = $gen->create_grading_scenario('forum', [
+            'modparams' => ['grade_forum' => 0, 'assessed' => RATING_AGGREGATE_MAXIMUM, 'scale' => 10, 'duedate' => $due],
+        ]);
+        $userid = (int) $maximum->students[0]->id;
+        $gen->create_forum_post($maximum->activity, $userid);
+        $preview = (new student_dates((int) $maximum->cm->id, $userid))->preview('');
+        $this->assertSame('warning', $preview['tone']);
+        $this->assertSame(get_string('dates_status_late_nopenalty_title', 'local_unifiedgrader'), $preview['title']);
+        $this->assertStringContainsString(get_string('dates_forum_rated_nopenalty', 'local_unifiedgrader'), $preview['body']);
     }
 
     /**

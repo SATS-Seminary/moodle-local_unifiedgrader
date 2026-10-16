@@ -26,6 +26,7 @@ namespace local_unifiedgrader\dates;
 
 use local_unifiedgrader\adapter\adapter_factory;
 use local_unifiedgrader\adapter\base_adapter;
+use local_unifiedgrader\adapter\forum_adapter;
 use local_unifiedgrader\adapter\quiz_adapter;
 use local_unifiedgrader\penalty\compat;
 use local_unifiedgrader\penalty\service;
@@ -293,7 +294,8 @@ class student_dates {
                 $row['overridden'] = $state['extension'] > 0;
                 $row['value'] = $state['extension'] > 0 ? self::to_local($state['extension']) : '';
             } else if ($this->cm->modname === 'forum' && $key === 'cutoffdate') {
-                // A forum's cut-off cannot be set per student.
+                // A forum's cut-off cannot be set per student; an extension past it
+                // lets the student post until the extension ends.
                 $row['note'] = $classvalue > 0 ? get_string('dates_forum_cutoff_note', 'local_unifiedgrader') : '';
             } else {
                 $current = $state['student'][$key] ?? null;
@@ -391,13 +393,25 @@ class student_dates {
                 $result['title'] = get_string('dates_status_late_nopenalty_title', 'local_unifiedgrader');
                 $result['body'] = get_string('dates_status_late_body', 'local_unifiedgrader', $a);
             }
+
+            // A rated forum that takes no penalty: say why, rather than leave the
+            // teacher to wonder whether the penalty was forgotten.
+            if (
+                $this->adapter instanceof forum_adapter
+                && $this->adapter->get_grading_mode() === forum_adapter::MODE_RATING
+                && compat::unified()
+                && !$this->adapter->rating_penalties_apply()
+            ) {
+                $result['body'] = trim($result['body'] . ' ' . get_string('dates_forum_rated_nopenalty', 'local_unifiedgrader'));
+            }
         }
 
         return $this->with_forum_cutoff_warning($result, $state, $ext);
     }
 
     /**
-     * Warn when a forum extension passes the forum's cut-off, which it cannot move.
+     * Say what happens when a forum extension passes the forum's cut-off: the
+     * student can post until their extension ends (see forum_cutoff_access).
      *
      * @param array $result The preview so far.
      * @param array $state From current_state().
@@ -414,7 +428,7 @@ class student_dates {
             );
             $result['body'] = trim($result['body'] . ' ' . $warning);
             if ($result['tone'] === 'none') {
-                $result['tone'] = 'warning';
+                $result['tone'] = 'neutral';
                 $result['title'] = get_string('dates_forum_cutoff_title', 'local_unifiedgrader');
                 $result['body'] = $warning;
             }

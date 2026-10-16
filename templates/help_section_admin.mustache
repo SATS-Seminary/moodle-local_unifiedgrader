@@ -289,6 +289,14 @@ the whole site. The others are checked in the activity, so they can be changed f
 one activity. The grader also respects Moodle's own rules: a teacher without <em>Access all
 groups</em> in a separate-groups activity sees and posts only their own groups.</p>
 
+<p><strong>The Forum extension role.</strong> Unified Grader creates one role of its own,
+<em>Forum extension (Unified Grader)</em>. It holds a single capability, Moodle's
+<code>mod/forum:canoverridecutoff</code> (post to forums after their cut-off date), and it cannot
+be assigned by hand. Unified Grader gives it to a student in one forum when their extension runs
+past that forum's cut-off, and removes it when the extension ends. It shows in the student's roles
+for that forum while it lasts. Do not edit or delete it; if it is deleted, it is created again when
+next needed.</p>
+
 <p>A marker who can open the report form but cannot <code>refer</code> gets a plain
 <em>Report academic impropriety</em> link in the plagiarism card: the form, without the flag.</p>
 </section>

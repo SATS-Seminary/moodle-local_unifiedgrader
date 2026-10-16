@@ -405,7 +405,9 @@ sees the mark. <a href="#student-friction">See what the student sees</a>.</p>
     <li>Choose 5%, 10%, 15%, 20% or <strong>Custom</strong>.</li>
     <li><strong>Active penalties</strong> lists what applies to this student. Remove one you added from there.</li>
 </ul>
-<p>These penalties are not offered when the activity is graded on a scale, or on a rated forum.</p>
+<p>These penalties are not offered when the activity is graded on a scale. A forum graded by post
+ratings is offered them only when its ratings are points combined by average or sum (see
+<a href="#integration-forum">Forums</a>).</p>
 </section>
 
 {{! ----- Dates and extensions ----- }}
@@ -450,6 +452,18 @@ forums with whole-forum grading.</p>
     <li>If an extension passes the cut-off or closing date, that date moves with it, and its row says so.</li>
     <li><strong>Remove all overrides</strong> returns the student to the class dates.</li>
 </ul>
+
+<h4>Forums: extensions past the cut-off date</h4>
+<p>Moodle cannot set a forum's cut-off date for one student, so the cut-off row keeps the class
+date. An extension that runs past it still works: the student is given a temporary role in that
+forum only, <em>Forum extension (Unified Grader)</em>, which lets them post until their extension
+ends. Nobody else is affected. The role goes when the extension ends (checked every 15 minutes), or
+straight away if you remove the extension or bring it back before the cut-off. Moodle's own notice
+that the cut-off has passed still shows on the forum page, but the student's <em>Reply</em> links
+are there and their posts are accepted.</p>
+<p>A forum graded by post ratings has <strong>Dates &amp; extensions</strong> too, for this
+reason. If its ratings are points combined by average or sum, the dialogue shows the late penalty
+as it does for any forum. Otherwise it takes no late penalty and the dialogue says so.</p>
 <p>The footer shows how many changes are waiting to be saved.</p>
 </section>
 

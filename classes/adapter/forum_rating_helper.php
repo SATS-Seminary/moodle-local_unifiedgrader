@@ -82,6 +82,24 @@ class forum_rating_helper {
     }
 
     /**
+     * Whether late and manual penalties can apply to a forum graded by post ratings.
+     *
+     * Penalties are percentages of the maximum grade taken off the grade, which
+     * needs a grade that is arithmetic. So the ratings must be points (a
+     * positive forum.scale is the points maximum, a negative one a scale id),
+     * and combined by average or sum. A count is a participation tally, and
+     * with maximum or minimum one post decides the whole grade, so a late
+     * penalty means nothing there.
+     *
+     * @param \stdClass $forum Raw forum DB record.
+     * @return bool
+     */
+    public static function penalties_apply(\stdClass $forum): bool {
+        return (int) $forum->scale > 0
+            && in_array((int) $forum->assessed, [RATING_AGGREGATE_AVERAGE, RATING_AGGREGATE_SUM], true);
+    }
+
+    /**
      * The aggregation method in force (a RATING_AGGREGATE_* constant).
      *
      * @return int
@@ -448,6 +466,12 @@ class forum_rating_helper {
         $forumrecord->cmidnumber = $this->cm->idnumber;
         forum_update_grades($forumrecord, $userid);
 
+        // Core has just reset the deduction beside the new aggregate. The
+        // user_graded observer puts it back whenever the grade moved; this
+        // covers the rating that left the aggregate where it was, which raises
+        // no event.
+        \local_unifiedgrader\penalty\service::resync((int) $this->cm->id, $userid, false);
+
         $stats = $this->count_post_stats([$userid]);
         if (($stats[$userid]['rated'] ?? 0) > 0) {
             return;
@@ -503,6 +527,9 @@ class forum_rating_helper {
      * Read rather than recomputed: aggregating post ratings into a user grade
      * is mod_forum's job, and second-guessing it is how the two drift apart.
      *
+     * This is the ratings aggregate, before any penalty: where the gradebook
+     * holds a deduction beside it, the raw grade is returned and not the final
+     * one, as it is for every other activity the grader shows a mark for.
      * @param int $userid
      * @return float|null
      */
@@ -514,6 +541,21 @@ class forum_rating_helper {
         $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $userid]);
         if (!$grade || $grade->finalgrade === null) {
             return null;
+        }
+        return self::before_deduction($grade);
+    }
+
+    /**
+     * A gradebook cell's value before the penalty deduction recorded beside it.
+     *
+     * An overridden cell is a value a teacher typed, so that is what it is.
+     *
+     * @param object $grade A grade_grades row, or a grade_grade.
+     * @return float
+     */
+    private static function before_deduction(object $grade): float {
+        if ((float) $grade->deductedmark > 0 && empty($grade->overridden) && $grade->rawgrade !== null) {
+            return (float) $grade->rawgrade;
         }
         return (float) $grade->finalgrade;
     }
@@ -609,13 +651,13 @@ class forum_rating_helper {
         [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'u');
         $params['itemid'] = $item->id;
 
-        $sql = "SELECT userid, finalgrade
+        $sql = "SELECT userid, finalgrade, rawgrade, deductedmark, overridden
                   FROM {grade_grades}
                  WHERE itemid = :itemid AND finalgrade IS NOT NULL AND userid {$insql}";
 
         $grades = [];
         foreach ($DB->get_records_sql($sql, $params) as $row) {
-            $grades[(int) $row->userid] = (float) $row->finalgrade;
+            $grades[(int) $row->userid] = self::before_deduction($row);
         }
         return $grades;
     }

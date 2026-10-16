@@ -135,6 +135,12 @@ class feedback_data_helper {
      * @return array[] Each {category: string, reason: string, detail: string, percentage: int}
      */
     private static function penalty_rows(int $cmid, int $userid): array {
+        // A rated forum whose ratings cannot take a penalty has none to show,
+        // whatever rows a past setting left behind: none is taken off its grade.
+        if (self::is_rated_forum_without_penalties($cmid)) {
+            return [];
+        }
+
         $rows = [];
 
         foreach (penalty_manager::get_penalties($cmid, $userid) as $p) {
@@ -204,6 +210,26 @@ class feedback_data_helper {
         usort($rows, fn(array $a, array $b): int => $order[$a['category']] <=> $order[$b['category']]);
 
         return $rows;
+    }
+
+    /**
+     * Whether an activity is a forum graded by post ratings that takes no penalties.
+     *
+     * @param int $cmid Course module ID
+     * @return bool
+     */
+    private static function is_rated_forum_without_penalties(int $cmid): bool {
+        global $DB;
+
+        $cm = get_coursemodule_from_id('forum', $cmid, 0, false, IGNORE_MISSING);
+        if (!$cm) {
+            return false;
+        }
+        $forum = $DB->get_record('forum', ['id' => $cm->instance], 'id, grade_forum, assessed, scale');
+        return $forum
+            && (int) $forum->grade_forum === 0
+            && (int) $forum->assessed > 0
+            && !\local_unifiedgrader\adapter\forum_rating_helper::penalties_apply($forum);
     }
 
     /**

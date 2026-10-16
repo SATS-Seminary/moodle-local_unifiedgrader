@@ -29,7 +29,7 @@
  * @return bool
  */
 function xmldb_local_unifiedgrader_upgrade($oldversion) {
-    global $DB;
+    global $CFG, $DB;
 
     $dbman = $DB->get_manager();
 
@@ -526,6 +526,17 @@ function xmldb_local_unifiedgrader_upgrade($oldversion) {
         \local_unifiedgrader\friction\service::reveal_completed_hidden();
 
         upgrade_plugin_savepoint(true, 2026100201, 'local', 'unifiedgrader');
+    }
+
+    if ($oldversion < 2026101500) {
+        // The role that lets a student with a forum extension post after the
+        // forum's cut-off. Created now so administrators can see it; it is also
+        // created on first use should it ever be deleted.
+        \local_unifiedgrader\dates\forum_cutoff_access::roleid();
+        // Extensions granted before this release that already pass the cut-off.
+        \local_unifiedgrader\dates\forum_cutoff_access::reconcile();
+
+        upgrade_plugin_savepoint(true, 2026101500, 'local', 'unifiedgrader');
     }
 
     return true;

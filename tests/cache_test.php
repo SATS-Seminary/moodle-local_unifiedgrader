@@ -40,7 +40,12 @@ final class cache_test extends \advanced_testcase {
      */
     private function create_forum(string $type = 'general'): \stdClass {
         $course = $this->getDataGenerator()->create_course();
-        $forum = $this->getDataGenerator()->create_module('forum', ['course' => $course->id, 'type' => $type]);
+        // Graded as a whole, so the late penalty switch is on by default.
+        $forum = $this->getDataGenerator()->create_module('forum', [
+            'course' => $course->id,
+            'type' => $type,
+            'grade_forum' => 100,
+        ]);
         return get_coursemodule_from_instance('forum', $forum->id, $course->id, false, MUST_EXIST);
     }
 

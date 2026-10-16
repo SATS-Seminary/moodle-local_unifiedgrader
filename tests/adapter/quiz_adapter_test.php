@@ -206,6 +206,9 @@ final class quiz_adapter_test extends \advanced_testcase {
         if (!method_exists('\quizaccess_duedate\override_manager', 'refresh_calendar_events')) {
             $this->markTestSkipped('quizaccess_duedate v2.0 or later is not installed.');
         }
+        // From Moodle 5.3 the extension is core's own quiz override, which this
+        // test would then save a second time, even where the plugin is still installed.
+        $this->skip_on_moodle_53();
 
         $timeclose = time() + DAYSECS * 7;
         $s = $this->create_scenario(['modparams' => ['timeclose' => $timeclose]]);

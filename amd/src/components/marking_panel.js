@@ -862,28 +862,30 @@ export default class extends BaseComponent {
         // so there is no box to type into and no rubric to fill. The ratings
         // section below is the grading control; feedback stays as it is.
         if (state.activity?.gradingmode === 'rating') {
-            if (gradeSection) {
-                gradeSection.classList.add('d-none');
-            }
             if (rubricSection) {
                 rubricSection.classList.add('d-none');
             }
-            // Penalties and extensions are withheld here rather than left to
-            // misbehave: the gradebook value belongs to core, recomputed from
-            // the ratings on every change, so a deduction would either be
-            // overwritten by the next rating or stick as an override that
-            // silently diverges from the ratings it claims to reflect.
+            // Penalties are shown only where the server says the forum takes
+            // them: ratings that are points, combined by average or sum. Only
+            // the penalty controls then stay in the grade card, without the
+            // grade box. For any other rated forum the whole card is hidden:
+            // a deduction would have no clear meaning on the grade.
+            const penalised = state.activity?.ratingpenaltieseligible === true;
+            if (gradeSection) {
+                gradeSection.classList.toggle('d-none', !penalised);
+            }
+            [this.selectors.SIMPLE_GRADE, this.selectors.SCALE_GRADE].forEach((selector) => {
+                this.getElement(selector)?.classList.add('d-none');
+            });
             const penaltyBtn = this.getElement(this.selectors.TOGGLE_PENALTIES);
             const badgesEl = this.getElement(this.selectors.PENALTY_BADGES);
             const finalGradeEl = this.getElement(this.selectors.FINAL_GRADE_DISPLAY);
-            if (penaltyBtn) {
-                penaltyBtn.classList.add('d-none');
-            }
-            if (badgesEl) {
-                badgesEl.classList.add('d-none');
-            }
-            if (finalGradeEl) {
-                finalGradeEl.classList.add('d-none');
+            penaltyBtn?.classList.toggle('d-none', !penalised);
+            badgesEl?.classList.toggle('d-none', !penalised);
+            if (penalised) {
+                this._updateFinalGradeDisplay();
+            } else {
+                finalGradeEl?.classList.add('d-none');
             }
             this._renderFeedbackAndSnapshot(state, true, isFreshRender);
             return;
@@ -1517,8 +1519,13 @@ export default class extends BaseComponent {
 
         const penalties = this._getPenaltiesArray();
         const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
-        const rawGrade = gradeInput ? parseFloat(gradeInput.value) : NaN;
-        const maxgrade = parseFloat(gradeInput?.max) || 100;
+        let rawGrade = gradeInput ? parseFloat(gradeInput.value) : NaN;
+        let maxgrade = parseFloat(gradeInput?.max) || 100;
+        if (this.reactive.state.activity?.gradingmode === 'rating') {
+            // A rated forum has no grade box: the mark is the ratings aggregate.
+            rawGrade = parseFloat(this.reactive.state.grade?.grade);
+            maxgrade = parseFloat(this.reactive.state.activity.maxgrade) || 100;
+        }
 
         // Include the external late penalty (quiz duedate plugin / assign penalty framework).
         const latePct = this._getLatePenaltyPct();

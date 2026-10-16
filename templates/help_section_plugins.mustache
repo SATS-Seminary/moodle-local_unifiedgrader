@@ -195,6 +195,7 @@ enabled, none of this appears.</p>
     <thead><tr><th scope="col">Task</th><th scope="col">Runs</th><th scope="col">What it does</th></tr></thead>
     <tbody>
         <tr><th scope="row"><code>open_friction</code></th><td data-label="Runs">Daily</td><td>Releases marks that Friction Feedback has held past either time limit.</td></tr>
+        <tr><th scope="row"><code>expire_forum_extensions</code></th><td data-label="Runs">Every 15 minutes</td><td>Ends a student's access to post in a forum after its cut-off once their extension is over, and starts it where a cut-off was moved inside an extension already granted. See <a href="#feature-overrides">Dates and extensions</a>.</td></tr>
         <tr><th scope="row"><code>migrate_penalties</code></th><td data-label="Runs">Hourly, once</td><td>On Moodle 5.3, keeps the late penalty switch each quiz had under the legacy quiz due date rule.</td></tr>
         <tr><th scope="row"><code>resync_penalties</code></th><td data-label="Runs">When needed</td><td>Recalculates an activity's penalties after its settings change.</td></tr>
     </tbody>

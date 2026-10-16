@@ -141,6 +141,22 @@ class forum_adapter extends base_adapter {
     }
 
     /**
+     * Whether penalties apply to this forum's ratings grade.
+     *
+     * Only on Moodle 5.3, where Unified Grader owns late penalties, and only for
+     * a forum graded by post ratings whose ratings are points combined by
+     * average or sum (see forum_rating_helper::penalties_apply()). Whole-forum
+     * grading has its own rules and is not decided here.
+     *
+     * @return bool
+     */
+    public function rating_penalties_apply(): bool {
+        return compat::unified()
+            && $this->is_rating_mode()
+            && forum_rating_helper::penalties_apply($this->forumrecord);
+    }
+
+    /**
      * The rating helper, built on first use.
      *
      * @return forum_rating_helper
@@ -228,6 +244,9 @@ class forum_adapter extends base_adapter {
             'gradingmode' => $this->gradingmode,
             'ratingaggregatelabel' => $aggregatelabel,
             'ratingaggregatemethod' => $aggregatemethod,
+            // Whether a rated forum takes penalties, so the client need not work
+            // out the rule itself. Always false outside rating mode.
+            'ratingpenaltieseligible' => $this->rating_penalties_apply(),
             'canrate' => $canrate,
             'teamsubmission' => false,
             'blindmarking' => false,
@@ -1851,10 +1870,16 @@ SCRIPT;
         require_once($CFG->dirroot . '/mod/forum/lib.php');
 
         // In rating mode the gradebook value belongs to core, recomputed from
-        // the {rating} rows on every change. Pushing a penalised figure here
-        // would be overwritten by the next rating — or, worse, stick as an
-        // override and silently diverge from the ratings it claims to reflect.
+        // the {rating} rows on every change, so there is no raw mark to push.
+        // Where penalties apply, the deduction is recorded beside whatever core
+        // computed; core resets it on the next rating and the user_graded
+        // observer puts it back. Elsewhere (and before Moodle 5.3) a rated
+        // forum is left alone, with any deduction a settings change left behind
+        // cleared by the same call.
         if ($this->is_rating_mode()) {
+            if (compat::unified()) {
+                $this->apply_gradebook_deduction($userid);
+            }
             return;
         }
 
@@ -2095,16 +2120,18 @@ SCRIPT;
     }
 
     /**
-     * The maximum whole-forum grade, which penalty percentages are taken of.
+     * The maximum grade penalty percentages are taken of.
      *
-     * 0 in rating mode, where the gradebook value belongs to the ratings, and
-     * for a scale (a negative grade_for_forum is a scale id).
+     * The whole-forum maximum, or for a rated forum that takes penalties the
+     * points maximum of its ratings. 0 for a rated forum that does not, and for
+     * a scale (a negative grade_for_forum is a scale id), so no deduction is
+     * ever worked out there.
      *
      * @return float
      */
     protected function get_penalty_max_grade(): float {
         if ($this->is_rating_mode()) {
-            return 0.0;
+            return $this->rating_penalties_apply() ? (float) $this->forumrecord->scale : 0.0;
         }
         return max(0.0, (float) $this->forum->get_grade_for_forum());
     }
@@ -2161,6 +2188,13 @@ SCRIPT;
 
         // No penalty for scale-based grading.
         if ((int) $this->forum->get_grade_for_forum() < 0) {
+            return null;
+        }
+
+        // A forum graded by post ratings takes a penalty only when its ratings
+        // are points combined by average or sum. Say so here, so the Dates &
+        // extensions dialogue does not predict a penalty that will never be taken.
+        if ($this->is_rating_mode() && !$this->rating_penalties_apply()) {
             return null;
         }
 
@@ -2269,6 +2303,9 @@ SCRIPT;
                 'timemodified' => $now,
             ]);
         }
+
+        // An extension past the forum's cut-off lets the student post until it ends.
+        \local_unifiedgrader\dates\forum_cutoff_access::sync((int) $this->cm->id, $userid);
     }
 
     /**
@@ -2283,5 +2320,8 @@ SCRIPT;
             'cmid' => (int) $this->cm->id,
             'userid' => $userid,
         ]);
+
+        // With the extension gone, so is any access after the cut-off it gave.
+        \local_unifiedgrader\dates\forum_cutoff_access::sync((int) $this->cm->id, $userid);
     }
 }

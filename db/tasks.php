@@ -43,4 +43,15 @@ $tasks = [
         'month' => '*',
         'dayofweek' => '*',
     ],
+    [
+        // Ends the access a forum extension gives after the forum's cut-off,
+        // so a student can post for at most a quarter of an hour too long.
+        'classname' => '\local_unifiedgrader\task\expire_forum_extensions',
+        'blocking' => 0,
+        'minute' => '*/15',
+        'hour' => '*',
+        'day' => '*',
+        'month' => '*',
+        'dayofweek' => '*',
+    ],
 ];

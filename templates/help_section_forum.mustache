@@ -54,8 +54,11 @@ matching controls. If both are set, whole-forum grading is used.</p>
 </figure>
 
 <h5>Mark a rated forum</h5>
-<p>On a rated forum the grade box, rubric and penalties are hidden. In their place is a
-<strong>Post ratings</strong> list.</p>
+<p>On a rated forum the grade box and rubric are hidden. In their place is a
+<strong>Post ratings</strong> list. Penalties are offered only when the ratings can take them
+(see below). Late penalties are off on a rated forum until you tick <strong>Apply late
+penalties</strong> in the forum's settings, so they apply only where you chose them from the
+start.</p>
 <ul>
     <li>There is one row per post, each with a rating menu. Above the list is the result the gradebook will receive.</li>
     <li>The menu holds <em>your</em> rating. The figure beside it is the combined rating from everyone who rated that post.</li>
@@ -75,16 +78,29 @@ matching controls. If both are set, whole-forum grading is used.</p>
 </figure>
 
 <div class="local-unifiedgrader-help-note">
-    <p><strong>Why penalties and extensions are hidden on rated forums.</strong> Moodle recalculates
-    the grade from the ratings each time one changes, so a deduction would be overwritten.</p>
+    <p><strong>Which rated forums take penalties.</strong> A penalty is a percentage of the maximum
+    grade taken off the grade. That needs a grade that is arithmetic, so a rated forum takes
+    penalties only when its ratings are <em>points</em> (not a scale such as stars or words) and the
+    <em>Aggregate type</em> is <em>Average of ratings</em> or <em>Sum of ratings</em>. With
+    <em>Count of ratings</em> the grade only tallies participation, and with <em>Maximum rating</em>
+    or <em>Minimum rating</em> a single post decides the whole grade, so a late penalty would mean
+    nothing. On any other rated forum the <strong>Penalties</strong> button and the final grade line
+    are hidden and no penalty is taken.</p>
+    <p>On a forum that takes them, the penalty comes off the combined rating, never below zero. The
+    ratings themselves are untouched: the gradebook keeps the combined rating and records the
+    deduction beside it, and puts it back whenever a rating changes. If you change the
+    <em>Aggregate type</em> or the rating scale so that the forum no longer qualifies, the
+    deductions are removed again.</p>
 </div>
 
 <h5>Due dates, extensions and late posts</h5>
-<p>With whole-forum grading and a due date, a student is late when they post after the due date.
+<p>With a due date, a student is late when their first post comes after the due date. This applies
+to whole-forum grading, and to a rated forum that takes penalties.
 <a href="#feature-penalties">Late penalties</a> apply when the forum has
 <em>Apply late penalties</em> ticked, and you can give one student more time from
 <a href="#feature-overrides">Dates &amp; extensions</a>. Your grade is stored as you typed it; the
-penalty is recorded beside it in the gradebook.</p>
+penalty is recorded beside it in the gradebook. On a rated forum the same goes for the combined
+rating.</p>
 
 <p>If a plagiarism plugin is in use, each post shows its result, and attachments are listed in the
 <strong>Plagiarism</strong> card on the right (see <a href="#feature-referral">Academic integrity</a>).</p>

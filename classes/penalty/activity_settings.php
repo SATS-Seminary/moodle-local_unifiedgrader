@@ -111,7 +111,11 @@ class activity_settings {
             case 'assign':
                 return (bool) $DB->get_field('assign', 'gradepenalty', ['id' => (int) $cm->instance]);
             case 'forum':
-                return true;
+                // On for a forum graded as a whole, as it always was. Off for one
+                // graded by post ratings: those took no late penalty before
+                // Unified Grader 3.0, so a course already running, or an old one,
+                // must not gain penalties it never had. A teacher opts in per forum.
+                return (int) $DB->get_field('forum', 'grade_forum', ['id' => (int) $cm->instance]) !== 0;
             case 'quiz':
                 return self::quizaccess_penalty_enabled((int) $cm->instance);
             default:

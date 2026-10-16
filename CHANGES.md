@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.0.0 (2026100100)
+## v3.0.0 (2026101600)
 
 ### Penalties explained on the student's feedback
 
@@ -13,6 +13,26 @@ A student's feedback page and feedback PDF showed the mark as the marker typed i
 - **Edge cases:** the final grade does not go below zero, and the total shows what was actually deducted. A scale grade lists the penalties without the arithmetic. During a Friction Feedback walk the card stays hidden with the mark.
 - **The PDF button is on every feedback page.** A quiz showed "Download feedback PDF" only when the marker had written overall feedback, so a quiz marked question by question had no PDF at all; an assignment showed it only with a grade. Assignments, forums, quizzes and BigBlueButton now all show it whenever the feedback is released.
 - The arithmetic is in one place, `feedback_data_helper::penalty_breakdown()`, used by the page and the PDF. Seven new strings, in all 13 language packs.
+
+### Forum extensions past the cut-off date
+
+A forum's cut-off date applies to everyone, and Moodle has no per-student override for it, so an extension past the cut-off only moved the date a late penalty was counted from; the student still could not post.
+
+- **The student can post until their extension ends.** Moodle has a capability for posting after a forum's cut-off (`mod/forum:canoverridecutoff`), held by teachers. Unified Grader now creates a role holding only that, *Forum extension (Unified Grader)*, and gives it to the student in that one forum when their extension runs past the cut-off. Nobody else is affected.
+- **It ends with the extension.** A new scheduled task, `expire_forum_extensions`, runs every 15 minutes and takes the role away once the extension is over. Removing the extension, or bringing it back before the cut-off, takes it away at once. If a teacher moves the cut-off earlier than an extension already granted, the task gives the student the role.
+- **Made in the plugin's name.** The role cannot be assigned by hand, and the assignments are marked as Unified Grader's, so they are never confused with roles a person gave. The upgrade creates the role and gives it to any student whose existing extension already passes the cut-off.
+- **Rated forums get Dates & extensions back.** It was hidden on forums graded by post ratings because they take no late penalty. It now appears there too, for the cut-off, and the dialogue no longer predicts a late penalty for them.
+- The cut-off row and status line in the dialogue now say the student can post until their extension ends, in all 13 language packs.
+
+### Penalties on forums graded by post ratings
+
+Penalties were switched off for every forum graded by rating its posts, because Moodle works the grade out from the ratings and rewrites it each time one changes. They now apply to the rated forums where a penalty means something. Moodle 5.3 only.
+
+- **Which forums.** The ratings must be points (not a scale such as stars or words), and the aggregate type must be average or sum. A count only tallies participation, and with maximum or minimum a single post decides the grade, so those take no penalty and the Penalties button stays hidden. The rule is `forum_rating_helper::penalties_apply()`, and the grader gets the answer as `ratingpenaltieseligible` in the activity info.
+- **Same arithmetic as everywhere.** Lateness is measured from the student's first post against their due date or extension. Late, word count and other penalties are percentages of the points maximum, summed, and taken off the combined rating, never below zero. The marking panel shows the badges and the final grade beside the Post ratings card.
+- **Kept in the gradebook.** The combined rating stays as Moodle computed it and the deduction is recorded beside it. Moodle clears that deduction every time a post is rated or re-rated, so it is put back after each rating change. The mark awarded shown to the teacher and the student is the combined rating; the final grade matches the gradebook.
+- **Settings changes.** Changing the aggregate type or the scale so a forum no longer qualifies removes its deductions, and its late and other penalty rows stop being shown. Changing it back applies them again. The Dates & extensions dialogue previews the late penalty on a qualifying forum, and on one that does not, says why there is none.
+- **Opt-in.** A rated forum takes late penalties only once a teacher ticks *Apply late penalties* in its settings; it is off by default, so courses already running and past courses gain no penalties they never had. Forums graded as a whole keep it on by default, as before. One new string, in all 13 language packs; the help explains which forums qualify.
 
 ### The marker's marks on the pages of the feedback PDF
 
