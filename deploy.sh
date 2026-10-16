@@ -47,11 +47,10 @@ done
 # shipped to the rest as-is, so every install runs byte-identical built JS and
 # the artifacts committed to the repo are the ones production will run.
 #
-# Keep the install matching production first. When the 5.0.7 install is retired
-# at the end of 2026, drop its line and 5.3 becomes the build host on its own.
+# The plugin requires Moodle 5.1 or later, so the 5.0.7 install is no longer a
+# target. Add a 5.1 or 5.2 install here if one is set up locally.
 MOODLE_DIRS=(
-    "/Users/mathieu/Sites/moodle/prod507"   # Moodle 5.0.7 — matches production.
-    "/Users/mathieu/Sites/moodle/dev53"     # Moodle 5.3 — future LTS.
+    "/Users/mathieu/Sites/moodle/dev53"     # Moodle 5.3 — the release we develop on.
 )
 
 # Defense-in-depth: verify SHA-256 of bundled third-party libs against the
@@ -248,10 +247,9 @@ if [ "$DO_DEPLOY" -eq 0 ]; then
     exit 0
 fi
 
-# Where a given install keeps its plugins. Moodle 5.3 moved the webroot into
-# public/, so plugins live at <root>/public/local/... there while 5.0 and
-# earlier keep <root>/local/... . Detected from the tree rather than configured,
-# so adding an install of either vintage to MOODLE_DIRS needs no extra thought.
+# Where a given install keeps its plugins. Moodle 5.1 moved the webroot into
+# public/, so plugins live at <root>/public/local/... . Older trees keep
+# <root>/local/...; detected from the tree rather than configured.
 plugin_dir_for() {
     if [ -f "$1/public/version.php" ]; then
         echo "$1/public/local/unifiedgrader"
@@ -297,13 +295,12 @@ rsync -av --delete \
   "$DEV_DIR/" "$BUILD_PLUGIN_DIR/"
 
 echo ""
-# Grunt runs from the webroot and takes a path relative to it, which is the
-# same string either way once the public/ prefix is stripped.
-BUILD_GRUNT_DIR="$BUILD_DIR"
-[ -f "$BUILD_DIR/public/version.php" ] && BUILD_GRUNT_DIR="$BUILD_DIR/public"
+# Grunt runs from the Moodle root, where Gruntfile.js stays, and takes the
+# plugin's path relative to it: public/local/unifiedgrader from 5.1.
+BUILD_GRUNT_ROOT="${BUILD_PLUGIN_DIR#"$BUILD_DIR"/}"
 
-echo "Building AMD modules in $BUILD_GRUNT_DIR..."
-if ! (cd "$BUILD_GRUNT_DIR" && npx grunt amd --root=local/unifiedgrader); then
+echo "Building AMD modules in $BUILD_DIR ($BUILD_GRUNT_ROOT)..."
+if ! (cd "$BUILD_DIR" && npx grunt amd --root="$BUILD_GRUNT_ROOT"); then
     echo "AMD build failed. Aborting before the other installs are touched."
     exit 1
 fi
@@ -331,8 +328,9 @@ done
 echo ""
 echo "Purging Moodle caches..."
 for dir in "${MOODLE_DIRS[@]}"; do
+    # The CLI scripts stay at <root>/admin/cli even where the webroot moved
+    # into public/.
     cli="$dir/admin/cli/purge_caches.php"
-    [ -f "$dir/public/version.php" ] && cli="$dir/public/admin/cli/purge_caches.php"
     echo "  $dir"
     php "$cli"
 done
