@@ -55,6 +55,7 @@ Feature: Grading a rating-based forum
     And the following "mod_forum > posts" exist:
       | parentsubject | user     | subject      | message          |
       | Best topic    | student1 | Stu's best   | My strongest go. |
+      | Best topic    | student2 | Pat's best   | My best attempt. |
     When I am on the Unified Grader for activity "Best Forum"
     And the post ratings list has loaded
     Then I should see "Post ratings"
