@@ -2,6 +2,11 @@
 
 ## v3.0.0 (2026101600)
 
+### Requirements
+
+- **Moodle 5.1 or later** (`requires` 2025100600); Moodle 5.0 is no longer supported, and sites on it stay on release 2.13. Moodle 5.3 is the release this one is developed, tested and documented on. On 5.1 and 5.2, which have no core quiz due date, late penalties and quiz due dates behave as they did in 2.13.
+- CI tests Moodle 5.3 (PostgreSQL on PHP 8.3 and 8.4, MariaDB on PHP 8.3), 5.2 (MariaDB, PHP 8.3) and 5.1 (PostgreSQL, PHP 8.2), on the `MOODLE_50x_STABLE` branches now that 5.3 has one.
+
 ### Penalties explained on the student's feedback
 
 A student's feedback page and feedback PDF showed the mark as the marker typed it, with each penalty as a bare "-10% Late" chip beside it. Nothing said what the chips were taken from or what was left, and the figure on the page did not match the gradebook.

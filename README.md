@@ -40,7 +40,7 @@ See [CHANGES.md](CHANGES.md) for the full history.
 ## Requirements
 
 - **Moodle 5.3** is the version this release is developed, tested and documented on.
-- The plugin still installs on Moodle 5.0 (`requires` 2025041400). There, late penalties and quiz due dates behave as they did in release 2.13.
+- **Moodle 5.1** is the minimum (`requires` 2025100600). On 5.1 and 5.2, which have no core quiz due date, late penalties and quiz due dates behave as they did in release 2.13. Moodle 5.0 is not supported; stay on release 2.13 there.
 - A PHP version supported by your Moodle release.
 - Moodle's cron, for the scheduled tasks.
 

@@ -23,9 +23,9 @@ jobs:
 
     services:
       postgres:
-        # Moodle 5.3 requires PostgreSQL 17; 5.0 requires 14 or newer, so one
-        # image serves both. The 5.3 job failed its install step on postgres:16
-        # with "version 17 is required and you are running 16.15".
+        # Moodle 5.3 requires PostgreSQL 17; 5.1 and 5.2 need 15 and 16, so one
+        # image serves all three. The 5.3 job failed its install step on
+        # postgres:16 with "version 17 is required and you are running 16.15".
         image: postgres:17
         env:
           POSTGRES_USER: 'postgres'
@@ -35,8 +35,8 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
 
       mariadb:
-        # Moodle 5.3 requires MariaDB 11.4; 5.0 requires 10.11 or newer, so
-        # this one image covers both branches too.
+        # Moodle 5.3 requires MariaDB 11.4; 5.1 and 5.2 need 10.11 or newer,
+        # so this one image covers every branch too.
         image: mariadb:11.4
         env:
           # No MYSQL_USER here: root already exists, and asking the newer images
@@ -59,22 +59,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 5.0 is what production runs, so it gets the full PHP x database grid.
-        php: ['8.2', '8.3']
-        moodle-branch: ['MOODLE_500_STABLE']
+        # Moodle 5.3 is the release this plugin is developed and documented
+        # on, so it gets both databases and PHP 8.3 and 8.4.
+        php: ['8.3', '8.4']
+        moodle-branch: ['MOODLE_503_STABLE']
         database: [pgsql, mariadb]
+        exclude:
+          - php: '8.4'
+            database: mariadb
         include:
-          # Moodle 5.3 is the LTS we move to around December 2026. It is still
-          # in development, so it lives on main rather than a MOODLE_503_STABLE
-          # branch, and it moved the webroot into public/ — moodle-plugin-ci
-          # needs 4.5.11 or newer to install a plugin into that layout.
-          #
-          # One combination rather than a second full grid: this is an early
-          # warning that the plugin still builds and passes on 5.3, and CI
-          # minutes here are finite. Widen it when 5.3 becomes the target.
-          - php: '8.3'
-            moodle-branch: 'main'
+          # Moodle 5.1 is the minimum (version.php requires 2025100600), on
+          # its lowest PHP. 5.1 and 5.2 have no core quiz due date, so these
+          # jobs are the ones that run the pre-5.3 penalty path
+          # (penalty\compat::unified() is false there).
+          - php: '8.2'
+            moodle-branch: 'MOODLE_501_STABLE'
             database: 'pgsql'
+          - php: '8.3'
+            moodle-branch: 'MOODLE_502_STABLE'
+            database: 'mariadb'
 
     steps:
       - name: Check out repository code

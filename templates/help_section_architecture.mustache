@@ -178,7 +178,7 @@
     <summary>Late penalties, posting and Friction Feedback</summary>
     <div>
         <ul>
-            <li><code>penalty\compat::unified()</code> is true once <code>mod_quiz</code> has core due dates (Moodle 5.3). One release serves both 5.0 and 5.3.</li>
+            <li><code>penalty\compat::unified()</code> is true once <code>mod_quiz</code> has core due dates (Moodle 5.3). One release serves 5.1, 5.2 and 5.3.</li>
             <li><code>penalty\service::resync()</code> recalculates a student's penalties. Observers call it on <code>user_graded</code>, quiz attempt submission, assignment extensions, and assignment and quiz overrides.</li>
             <li><code>penalty\gradebook_writer</code> writes the total deduction to <code>grade_grades.deductedmark</code>; the raw grade is untouched and nothing is overridden.</li>
             <li>The per-activity switch is in <code>local_unifiedgrader_penset</code> and travels with backup and restore.</li>

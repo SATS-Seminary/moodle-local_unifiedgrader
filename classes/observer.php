@@ -64,8 +64,8 @@ class observer {
         }
         // Decided before the penalty resync. That resync writes another grade
         // history row and fires this event again, and a new cell only looks new
-        // until then. The seal itself runs on Moodle 5.0 as well, where the
-        // penalty resync below does not.
+        // until then. The seal itself runs before Moodle 5.3 as well, where
+        // the penalty resync below does not.
         $seal = grades\release::should_seal($event);
 
         if (penalty\compat::unified() && !penalty\service::is_syncing()) {
