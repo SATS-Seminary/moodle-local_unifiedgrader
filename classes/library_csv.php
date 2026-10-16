@@ -43,6 +43,15 @@ class library_csv {
     private const TAG_SEPARATOR = '|';
 
     /**
+     * @var string Escape character for fputcsv() and fgetcsv().
+     *
+     * PHP's long-standing default, passed explicitly because PHP 8.4
+     * deprecates leaving it out. Kept so files exported earlier read back
+     * the same.
+     */
+    private const CSV_ESCAPE = '\\';
+
+    /**
      * Export one owner's library (optionally restricted to one course code).
      *
      * @param int $userid The owner.
@@ -115,16 +124,16 @@ class library_csv {
         $fh = fopen('php://temp', 'r+');
         fputcsv($fh, $includeowner
             ? ['ownerid', 'ownername', 'coursecode', 'shared', 'tags', 'content']
-            : ['coursecode', 'shared', 'tags', 'content']);
+            : ['coursecode', 'shared', 'tags', 'content'], ',', '"', self::CSV_ESCAPE);
 
         foreach ($records as $r) {
             $tags = implode(self::TAG_SEPARATOR, $tagnames[(int) $r->id] ?? []);
+            $row = [$r->coursecode, $r->shared, $tags, $r->content];
             if ($includeowner) {
                 $ownername = isset($r->firstname) ? trim($r->firstname . ' ' . $r->lastname) : '';
-                fputcsv($fh, [$r->userid, $ownername, $r->coursecode, $r->shared, $tags, $r->content]);
-            } else {
-                fputcsv($fh, [$r->coursecode, $r->shared, $tags, $r->content]);
+                array_unshift($row, $r->userid, $ownername);
             }
+            fputcsv($fh, $row, ',', '"', self::CSV_ESCAPE);
         }
 
         rewind($fh);
@@ -161,7 +170,7 @@ class library_csv {
         fwrite($fh, $csvcontent);
         rewind($fh);
 
-        $header = fgetcsv($fh);
+        $header = fgetcsv($fh, null, ',', '"', self::CSV_ESCAPE);
         if ($header === false) {
             fclose($fh);
             return ['imported' => 0, 'skipped' => 0, 'errors' => [get_string('clibcsv_empty_file', 'local_unifiedgrader')]];
@@ -186,7 +195,7 @@ class library_csv {
         $now = time();
         $rownum = 1;
 
-        while (($row = fgetcsv($fh)) !== false) {
+        while (($row = fgetcsv($fh, null, ',', '"', self::CSV_ESCAPE)) !== false) {
             $rownum++;
 
             if (count($row) === 1 && trim((string) $row[0]) === '') {

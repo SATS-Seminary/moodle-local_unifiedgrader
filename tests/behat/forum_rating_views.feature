@@ -41,7 +41,23 @@ Feature: Grading a rating-based forum
     And I should see "Average of ratings"
     # The grade is derived from the ratings, so there is nothing to type into.
     And "[data-action=\"grade-input\"]" "css_element" should not be visible
-    # And no penalty control, because the gradebook value is core's to compute.
+
+  Scenario: A forum graded by its highest rating has no penalty control
+    # assessed=3 is RATING_AGGREGATE_MAXIMUM: one post decides the grade, so
+    # no penalty applies on any Moodle version. (Points with average or sum
+    # take penalties on Moodle 5.3; that is covered by PHPUnit.)
+    Given the following "activities" exist:
+      | activity | name       | intro      | course    | idnumber | assessed | scale | grade_forum |
+      | forum    | Best Forum | Discuss it | ratedtalk | bestf1   | 3        | 5     | 0           |
+    And the following "mod_forum > discussions" exist:
+      | forum  | user     | name       | message          |
+      | bestf1 | teacher1 | Best topic | Your best reply. |
+    And the following "mod_forum > posts" exist:
+      | parentsubject | user     | subject      | message          |
+      | Best topic    | student1 | Stu's best   | My strongest go. |
+    When I am on the Unified Grader for activity "Best Forum"
+    And the post ratings list has loaded
+    Then I should see "Post ratings"
     And "[data-action=\"toggle-penalties\"]" "css_element" should not be visible
 
   Scenario: Rating a post from the marking panel updates the running total

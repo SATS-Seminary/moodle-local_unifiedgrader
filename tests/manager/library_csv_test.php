@@ -36,9 +36,9 @@ final class library_csv_test extends \advanced_testcase {
         $fh = fopen('php://temp', 'r+');
         fwrite($fh, $csv);
         rewind($fh);
-        $header = fgetcsv($fh);
+        $header = fgetcsv($fh, null, ',', '"', '\\');
         $rows = [];
-        while (($row = fgetcsv($fh)) !== false) {
+        while (($row = fgetcsv($fh, null, ',', '"', '\\')) !== false) {
             $rows[] = array_combine($header, $row);
         }
         fclose($fh);
