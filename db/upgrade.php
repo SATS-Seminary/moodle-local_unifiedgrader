@@ -539,5 +539,23 @@ function xmldb_local_unifiedgrader_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026101500, 'local', 'unifiedgrader');
     }
 
+    if ($oldversion < 2026101601) {
+        // Link each assignment comment to core's submission comment (issue #24).
+        $table = new xmldb_table('local_unifiedgrader_scomm');
+        $field = new xmldb_field('corecommentid', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'timemodified');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $index = new xmldb_index('ix_corecommentid', XMLDB_INDEX_NOTUNIQUE, ['corecommentid']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+        // Linking, importing and pushing need the assignment API, which is
+        // not safe to use mid-upgrade; a task does it after.
+        \core\task\manager::queue_adhoc_task(new \local_unifiedgrader\task\sync_assign_comments(), true);
+
+        upgrade_plugin_savepoint(true, 2026101601, 'local', 'unifiedgrader');
+    }
+
     return true;
 }

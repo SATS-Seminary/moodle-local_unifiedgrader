@@ -145,6 +145,7 @@ export const init = (containerId) => {
             status: '',
             content: '',
             hascontent: false,
+            othercontent: '',
             files: [],
             onlinetext: '',
             onlinetexthtml: '',

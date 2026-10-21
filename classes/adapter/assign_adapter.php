@@ -504,11 +504,17 @@ class assign_adapter extends base_adapter {
 
         $onlinetext = $this->get_onlinetext($submission);
 
-        // Get submission comment count from our custom table.
+        // Get submission comment count from our custom table, after bringing
+        // in any comment made in core's submissions list or grader.
+        \local_unifiedgrader\assign_comment_sync::import_missing((int) $this->cm->id, $userid);
         $commentcount = submission_comment_manager::count_comments($this->cm->id, $userid);
 
         // Check whether any non-file submission plugins have actual student content.
+        // Online text is shown inline on its own, so the other plugins with
+        // content (a YouTube link, say) are named separately: the grader gives
+        // them their own view, or they would be hidden behind the text.
         $hascontent = false;
+        $othercontent = [];
         foreach ($this->assign->get_submission_plugins() as $plugin) {
             if (
                 $plugin->is_enabled() && $plugin->is_visible()
@@ -516,7 +522,9 @@ class assign_adapter extends base_adapter {
                     && !$plugin->is_empty($submission)
             ) {
                 $hascontent = true;
-                break;
+                if (!in_array($plugin->get_type(), ['onlinetext', 'byblos'], true)) {
+                    $othercontent[] = $plugin->get_name();
+                }
             }
         }
 
@@ -541,6 +549,7 @@ class assign_adapter extends base_adapter {
             'status' => $submission->status,
             'content' => $this->get_submission_content($submission),
             'hascontent' => $hascontent,
+            'othercontent' => implode(', ', $othercontent),
             'files' => $files,
             'onlinetext' => $onlinetext,
             'onlinetexthtml' => $this->get_onlinetext_html($submission),

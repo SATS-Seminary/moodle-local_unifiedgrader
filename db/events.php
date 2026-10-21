@@ -45,6 +45,15 @@ $observers = [
         'eventname' => '\mod_assign\event\submission_removed',
         'callback' => '\local_unifiedgrader\observer::handle_submission_removed',
     ],
+    // Assignment comments made in core's submissions list or grader.
+    [
+        'eventname' => '\assignsubmission_comments\event\comment_created',
+        'callback' => '\local_unifiedgrader\observer::handle_assign_comment_created',
+    ],
+    [
+        'eventname' => '\assignsubmission_comments\event\comment_deleted',
+        'callback' => '\local_unifiedgrader\observer::handle_assign_comment_deleted',
+    ],
     [
         'eventname' => '\core\event\course_module_deleted',
         'callback' => '\local_unifiedgrader\observer::handle_course_module_deleted',

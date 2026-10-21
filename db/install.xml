@@ -226,12 +226,14 @@
         <FIELD NAME="content" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="Comment text"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="corecommentid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="On an assignment, the core submission comment (comments.id) this one is kept in step with"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="ix_cmid_userid" UNIQUE="false" FIELDS="cmid, userid"/>
+        <INDEX NAME="ix_corecommentid" UNIQUE="false" FIELDS="corecommentid"/>
         <INDEX NAME="ix_authorid" UNIQUE="false" FIELDS="authorid"/>
       </INDEXES>
     </TABLE>

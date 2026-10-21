@@ -294,6 +294,58 @@ final class assign_adapter_test extends \advanced_testcase {
     }
 
     /**
+     * Online text alone is not "other content": the grader shows it inline.
+     */
+    public function test_get_submission_data_othercontent_leaves_out_online_text(): void {
+        $this->resetAfterTest();
+        $s = $this->create_scenario(['modparams' => ['assignsubmission_onlinetext_enabled' => 1]]);
+        $student = $s->scenario->students[0];
+        $this->setUser($student);
+        $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader')
+            ->create_assign_submission($s->scenario->activity, $student->id, '<p>My essay.</p>');
+
+        $this->setUser($s->scenario->teacher);
+        $data = $s->adapter->get_submission_data($student->id);
+
+        $this->assertTrue($data['hascontent']);
+        $this->assertSame('', $data['othercontent']);
+    }
+
+    /**
+     * Online text plus a YouTube link names the YouTube plugin, so the grader gives it a pill.
+     *
+     * Before, the online text was shown inline and the YouTube link not at all.
+     */
+    public function test_get_submission_data_othercontent_names_youtube_beside_online_text(): void {
+        global $DB;
+        if (!\core_component::get_component_directory('assignsubmission_ytsubmission')) {
+            $this->markTestSkipped('assignsubmission_ytsubmission is not installed.');
+        }
+        $this->resetAfterTest();
+        $s = $this->create_scenario(['modparams' => [
+            'assignsubmission_onlinetext_enabled' => 1,
+            'assignsubmission_ytsubmission_enabled' => 1,
+        ]]);
+        $student = $s->scenario->students[0];
+        $this->setUser($student);
+        $submission = $this->getDataGenerator()->get_plugin_generator('local_unifiedgrader')
+            ->create_assign_submission($s->scenario->activity, $student->id, '<p>My reflection.</p>');
+        $DB->insert_record('assignsubmission_ytsubmission', [
+            'assignment' => $s->scenario->activity->id,
+            'submissionid' => $submission->id,
+            'youtubeid' => 'dQw4w9WgXcQ',
+            'videourl' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'timemodified' => time(),
+        ]);
+
+        $this->setUser($s->scenario->teacher);
+        $data = $s->adapter->get_submission_data($student->id);
+
+        $this->assertSame(get_string('ytsubmission', 'assignsubmission_ytsubmission'), $data['othercontent']);
+        $this->assertNotSame('', $data['onlinetexthtml']);
+    }
+
+    /**
      * Test get_grade_data with no grade.
      */
     public function test_get_grade_data_no_grade(): void {

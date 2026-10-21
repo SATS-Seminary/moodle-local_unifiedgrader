@@ -42,6 +42,9 @@ use mod_quiz\quiz_attempt;
 $cmid = required_param('cmid', PARAM_INT);
 $userid = required_param('userid', PARAM_INT);
 $attemptnum = optional_param('attempt', 0, PARAM_INT);
+// Leave the online text out when the grader already shows it inline beside
+// this page, so only the other plugins' content (a YouTube link, say) shows.
+$skiponlinetext = optional_param('skiponlinetext', false, PARAM_BOOL);
 
 // Load course module and validate access.
 [$course, $cm] = get_course_and_cm_from_cmid($cmid);
@@ -97,6 +100,9 @@ if ($cm->modname === 'assign') {
     if ($submission) {
         foreach ($assign->get_submission_plugins() as $plugin) {
             if ($plugin->is_enabled() && $plugin->is_visible()) {
+                if ($skiponlinetext && $plugin->get_type() === 'onlinetext') {
+                    continue;
+                }
                 $pluginhtml = $plugin->view($submission);
                 if (!empty(trim($pluginhtml))) {
                     echo '<div class="submission-plugin mb-3">' . $pluginhtml . '</div>';

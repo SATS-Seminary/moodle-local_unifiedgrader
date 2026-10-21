@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.0.1 (2026101601)
+
+### Fixed: assignment comments made outside Unified Grader (issue #24)
+
+- Assignment comments posted in core's submissions list or grader now appear in Unified Grader and send its notifications, and Unified Grader's comments now appear in core. Deleting one deletes both.
+- The upgrade links existing comments and copies the missing ones both ways, without notifying.
+
+### Fixed: a YouTube link hidden behind online text
+
+- When an assignment had online text and another submission type such as a YouTube link, the grader showed only the text. Each now has its own pill, and the two can be shown side by side in the split view.
+
 ## v3.0.0 (2026101600)
 
 ### Requirements

@@ -226,6 +226,26 @@ class observer {
     }
 
     /**
+     * Copy a comment made in core's assignment submission comments into Unified Grader.
+     *
+     * Also sends Unified Grader's notification, which core does not.
+     *
+     * @param \assignsubmission_comments\event\comment_created $event
+     */
+    public static function handle_assign_comment_created(\assignsubmission_comments\event\comment_created $event): void {
+        assign_comment_sync::import_core_comment((int) $event->objectid);
+    }
+
+    /**
+     * Remove Unified Grader's copies of an assignment comment deleted in core.
+     *
+     * @param \assignsubmission_comments\event\comment_deleted $event
+     */
+    public static function handle_assign_comment_deleted(\assignsubmission_comments\event\comment_deleted $event): void {
+        assign_comment_sync::core_comment_deleted((int) $event->objectid);
+    }
+
+    /**
      * Keep a quiz grade item visible once a feedback walk has revealed it.
      *
      * The quiz writes the item's hidden flag from its review options on every

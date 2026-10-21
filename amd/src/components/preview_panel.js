@@ -204,7 +204,68 @@ export default class extends BaseComponent {
         // (e.g. ytsubmission's YouTube player, online text, etc.).
         if (hasContent || submission.status === 'submitted') {
             this._showSubmissionContent();
+            if (this._hasOtherContent()) {
+                this._highlightFileButton('content');
+            }
             return;
+        }
+    }
+
+    /**
+     * Whether an assignment has content besides its online text and files.
+     *
+     * Online text is rendered inline, so another submission plugin's content (a
+     * YouTube link, say) would otherwise never be shown. When there is some, it
+     * gets its own pill and pane source ('othercontent').
+     *
+     * @return {boolean}
+     */
+    _hasOtherContent() {
+        const state = this.reactive.state;
+        return state.activity?.type === 'assign'
+            && !!state.submission?.onlinetexthtml
+            && !!state.submission?.othercontent;
+    }
+
+    /**
+     * The URL of the page that renders a submission's plugins.
+     *
+     * @param {boolean} skipOnlineText Leave the online text out (it is shown inline).
+     * @return {?string}
+     */
+    _submissionPreviewUrl(skipOnlineText = false) {
+        const state = this.reactive.state;
+        const cmid = state.activity?.cmid;
+        const userid = state.submission?.userid;
+        if (!cmid || !userid) {
+            return null;
+        }
+        let url = `${M.cfg.wwwroot}/local/unifiedgrader/preview_submission.php`
+            + `?cmid=${cmid}&userid=${userid}`;
+        // Include attempt number for quiz multi-attempt support.
+        const attemptnumber = state.submission?.attemptnumber;
+        if (attemptnumber !== undefined && attemptnumber !== null && attemptnumber >= 0) {
+            url += `&attempt=${attemptnumber}`;
+        }
+        if (skipOnlineText) {
+            url += '&skiponlinetext=1';
+        }
+        return url;
+    }
+
+    /**
+     * Show an assignment's other submission content (not the online text) in the iframe.
+     */
+    _showOtherContent() {
+        this._setPixelToolbar(false);
+        this.getElement(this.selectors.PDF_VIEWER_WRAPPER).classList.add('d-none');
+        this.getElement(this.selectors.TEXT_ANNOT_VIEW)?.classList.add('d-none');
+        this.getElement(this.selectors.FORUM_CONTEXT_VIEW)?.classList.add('d-none');
+        this._removePortfolioPopout();
+        const url = this._submissionPreviewUrl(true);
+        if (url) {
+            this.getElement(this.selectors.PREVIEW_IFRAME).src = url;
+            this.getElement(this.selectors.DOCUMENT_PREVIEW).classList.remove('d-none');
         }
     }
 
@@ -230,7 +291,8 @@ export default class extends BaseComponent {
 
         // Show the pill bar whenever a portfolio is present (so it has a pill),
         // there is other content, or there are files to choose between.
-        if (files.length === 0 && !hasPortfolio) {
+        const hasOther = this._hasOtherContent();
+        if (files.length === 0 && !hasPortfolio && !hasOther) {
             wrapper.classList.add('d-none');
             return;
         }
@@ -275,7 +337,7 @@ export default class extends BaseComponent {
 
         // Add a content pill when there is both content and file attachments,
         // so the teacher can switch between viewing content and previewing files.
-        if (hasContent && files.length > 0) {
+        if (hasContent && (files.length > 0 || hasOther)) {
             const contentPill = document.createElement('span');
             contentPill.className = 'btn-group btn-group-sm';
             contentPill.dataset.fileid = 'content';
@@ -289,11 +351,20 @@ export default class extends BaseComponent {
             contentBtn.appendChild(contentIcon);
             const contentLabel = document.createElement('span');
             contentLabel.className = 'small';
-            const stringKey = isForum ? 'forum_posts_pill' : 'submission_content_pill';
-            contentLabel.textContent = isForum ? 'Posts' : 'Submission';
-            getString(stringKey, 'local_unifiedgrader')
-                .then((str) => { contentLabel.textContent = str; })
-                .catch(() => {});
+            if (hasOther) {
+                // Beside another content pill, this one is just the online text.
+                contentIcon.className = 'fa fa-file-alt';
+                contentLabel.textContent = 'Online text';
+                getString('pluginname', 'assignsubmission_onlinetext')
+                    .then((str) => { contentLabel.textContent = str; })
+                    .catch(() => {});
+            } else {
+                const stringKey = isForum ? 'forum_posts_pill' : 'submission_content_pill';
+                contentLabel.textContent = isForum ? 'Posts' : 'Submission';
+                getString(stringKey, 'local_unifiedgrader')
+                    .then((str) => { contentLabel.textContent = str; })
+                    .catch(() => {});
+            }
             contentBtn.appendChild(contentLabel);
             contentBtn.addEventListener('click', () => {
                 // Save annotations before switching to content view.
@@ -307,6 +378,36 @@ export default class extends BaseComponent {
 
             contentPill.appendChild(contentBtn);
             list.appendChild(contentPill);
+        }
+
+        // The other submission plugins' content, named after the plugins.
+        if (hasOther) {
+            const otherPill = document.createElement('span');
+            otherPill.className = 'btn-group btn-group-sm';
+            otherPill.dataset.fileid = 'othercontent';
+
+            const otherBtn = document.createElement('button');
+            otherBtn.type = 'button';
+            otherBtn.className = 'btn btn-sm btn-outline-secondary d-flex align-items-center gap-1';
+            const otherIcon = document.createElement('i');
+            otherIcon.className = 'fa fa-desktop';
+            otherIcon.setAttribute('aria-hidden', 'true');
+            otherBtn.appendChild(otherIcon);
+            const otherLabel = document.createElement('span');
+            otherLabel.className = 'small';
+            otherLabel.textContent = this.reactive.state.submission.othercontent;
+            otherBtn.appendChild(otherLabel);
+            otherBtn.addEventListener('click', () => {
+                if (this._pdfViewer) {
+                    this._pdfViewer.saveAnnotationsNow();
+                }
+                this._showOtherContent();
+                this._currentFileId = null;
+                this._highlightFileButton('othercontent');
+            });
+
+            otherPill.appendChild(otherBtn);
+            list.appendChild(otherPill);
         }
 
         files.forEach((file) => {
@@ -443,7 +544,7 @@ export default class extends BaseComponent {
         // attached alongside a TinyMCE-recorded video is one file plus the online
         // text, which is exactly the case this view is for.
         const previewable = (files || []).filter((f) => this._isPreviewable(f));
-        const sources = previewable.length + (hasContent ? 1 : 0);
+        const sources = previewable.length + (hasContent ? 1 : 0) + (this._hasOtherContent() ? 1 : 0);
         const available = sources >= 2;
         btn.classList.toggle('d-none', !available);
 
@@ -505,6 +606,12 @@ export default class extends BaseComponent {
             const previous = files2.find((f) => parseInt(f.fileid, 10) === parseInt(this._currentFileId, 10));
             if (previous) {
                 this._previewFile(previous);
+            } else if (this.reactive.state.submission?.hascontent) {
+                // Nothing but submission content to go back to.
+                this._showSubmissionContent();
+                if (this._hasOtherContent()) {
+                    this._highlightFileButton('content');
+                }
             }
             return;
         }
@@ -548,6 +655,9 @@ export default class extends BaseComponent {
         // TinyMCE-recorded video lives), else whatever the first file is.
         if (media) {
             this.showFileInPane(media, 'a');
+        } else if (this._hasOtherContent()) {
+            // A YouTube link or the like is the recording; the text goes below.
+            this.showOtherContentInPane('a');
         } else if (hasContent) {
             this.showContentInPane('a');
         } else if (files[0]) {
@@ -609,21 +719,44 @@ export default class extends BaseComponent {
             this._trackPaneMediaHeight(textHost);
         } else {
             const iframe = el.querySelector('[data-region="split-iframe"]');
-            const cmid = state.activity?.cmid;
-            const userid = state.submission?.userid;
-            if (iframe && cmid && userid) {
-                let url = `${M.cfg.wwwroot}/local/unifiedgrader/preview_submission.php`
-                    + `?cmid=${cmid}&userid=${userid}`;
-                const attemptnumber = state.submission?.attemptnumber;
-                if (attemptnumber !== undefined && attemptnumber !== null && attemptnumber >= 0) {
-                    url += `&attempt=${attemptnumber}`;
-                }
+            const url = this._submissionPreviewUrl();
+            if (iframe && url) {
                 iframe.src = url;
                 el.querySelector('[data-region="split-doc"]')?.classList.remove('d-none');
             }
         }
 
         this._paneFile[pane] = 'content';
+    }
+
+    /**
+     * Show an assignment's other submission content (not the online text) in a pane.
+     *
+     * @param {string} pane 'a' (top) or 'b' (bottom).
+     */
+    showOtherContentInPane(pane) {
+        const el = this._paneEl(pane);
+        if (!el) {
+            return;
+        }
+        ['split-pdf', 'split-doc', 'split-text', 'split-pane-empty'].forEach((region) => {
+            el.querySelector(`[data-region="${region}"]`)?.classList.add('d-none');
+        });
+        const icon = el.querySelector('[data-region="split-pane-icon"]');
+        if (icon) {
+            icon.className = 'fa fa-desktop';
+        }
+        const select = el.querySelector('[data-region="split-pane-select"]');
+        if (select) {
+            select.value = 'othercontent';
+        }
+        const iframe = el.querySelector('[data-region="split-iframe"]');
+        const url = this._submissionPreviewUrl(true);
+        if (iframe && url) {
+            iframe.src = url;
+            el.querySelector('[data-region="split-doc"]')?.classList.remove('d-none');
+        }
+        this._paneFile[pane] = 'othercontent';
     }
 
     /**
@@ -732,13 +865,26 @@ export default class extends BaseComponent {
 
             // Submission content is a first-class pane source: a recording made
             // with the TinyMCE recorder lives inside the online text, not in a file.
+            const hasOther = this._hasOtherContent();
             if (hasContent) {
                 const opt = document.createElement('option');
                 opt.value = 'content';
                 const isForum = this.reactive.state.activity?.type === 'forum';
-                getString(isForum ? 'forum_posts_pill' : 'submission_content_pill', 'local_unifiedgrader')
-                    .then((s) => { opt.textContent = s; return s; })
-                    .catch(() => { opt.textContent = 'Submission'; });
+                if (hasOther) {
+                    getString('pluginname', 'assignsubmission_onlinetext')
+                        .then((s) => { opt.textContent = s; return s; })
+                        .catch(() => { opt.textContent = 'Online text'; });
+                } else {
+                    getString(isForum ? 'forum_posts_pill' : 'submission_content_pill', 'local_unifiedgrader')
+                        .then((s) => { opt.textContent = s; return s; })
+                        .catch(() => { opt.textContent = 'Submission'; });
+                }
+                select.appendChild(opt);
+            }
+            if (hasOther) {
+                const opt = document.createElement('option');
+                opt.value = 'othercontent';
+                opt.textContent = this.reactive.state.submission.othercontent;
                 select.appendChild(opt);
             }
 
@@ -761,6 +907,10 @@ export default class extends BaseComponent {
                     const value = select.value;
                     if (value === 'content') {
                         this.showContentInPane(pane);
+                        return;
+                    }
+                    if (value === 'othercontent') {
+                        this.showOtherContentInPane(pane);
                         return;
                     }
                     const id = parseInt(value, 10) || 0;
@@ -904,6 +1054,9 @@ export default class extends BaseComponent {
             return this.reactive.state.activity?.type === 'assign'
                 && !!this.reactive.state.submission?.onlinetexthtml;
         }
+        if (this._paneFile[pane] === 'othercontent') {
+            return false;
+        }
         const files = this.reactive.state.submission?.files || [];
         const file = files.find((f) => parseInt(f.fileid, 10) === this._paneFile[pane]);
         return this._isAnnotatable(file);
@@ -1024,16 +1177,8 @@ export default class extends BaseComponent {
         }
 
         const iframe = this.getElement(this.selectors.PREVIEW_IFRAME);
-        const cmid = this.reactive.state.activity?.cmid;
-        const userid = this.reactive.state.submission?.userid;
-        if (cmid && userid) {
-            let url = `${M.cfg.wwwroot}/local/unifiedgrader/preview_submission.php`
-                + `?cmid=${cmid}&userid=${userid}`;
-            // Include attempt number for quiz multi-attempt support.
-            const attemptnumber = this.reactive.state.submission?.attemptnumber;
-            if (attemptnumber !== undefined && attemptnumber !== null && attemptnumber >= 0) {
-                url += `&attempt=${attemptnumber}`;
-            }
+        const url = this._submissionPreviewUrl();
+        if (url) {
             iframe.src = url;
             docPreview.classList.remove('d-none');
         }

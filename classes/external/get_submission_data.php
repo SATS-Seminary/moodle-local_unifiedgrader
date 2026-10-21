@@ -117,6 +117,12 @@ class get_submission_data extends external_api {
                 VALUE_DEFAULT,
                 false,
             ),
+            'othercontent' => new external_value(
+                PARAM_TEXT,
+                'Names of the submission plugins with content other than online text and files',
+                VALUE_DEFAULT,
+                '',
+            ),
             'files' => new external_multiple_structure(
                 new external_single_structure([
                     'fileid' => new external_value(PARAM_INT, 'File ID'),
