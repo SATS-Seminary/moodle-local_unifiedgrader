@@ -154,8 +154,10 @@ if ($cm->modname === 'quiz') {
 $frictionmode = \local_unifiedgrader\friction\service::mode($cmid);
 $frictionsitedefault = (bool) get_config('local_unifiedgrader', 'friction_enable');
 $frictionapplies = $frictionmode === 'inherit' ? $frictionsitedefault : $frictionmode === 'on';
-$frictiontitle = get_string('friction_title_' . ($frictionapplies ? 'on' : 'off') . ($frictionmode === 'inherit' ? '_default' : ''),
-    'local_unifiedgrader');
+$frictiontitle = get_string(
+    'friction_title_' . ($frictionapplies ? 'on' : 'off') . ($frictionmode === 'inherit' ? '_default' : ''),
+    'local_unifiedgrader'
+);
 
 // Prepare template context.
 $templatedata = [
