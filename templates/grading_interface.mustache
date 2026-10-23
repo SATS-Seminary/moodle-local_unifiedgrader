@@ -62,6 +62,11 @@
         "activityurl": "https://example.com",
         "submissionsurl": "https://example.com",
         "showpostgrades": true,
+        "frictionmode": "inherit",
+        "frictioninherit": true,
+        "frictionsitedefault": false,
+        "frictionapplies": false,
+        "frictiontitle": "Friction feedback: off (site default)",
         "showschedulepost": true
     }
 }}
@@ -182,8 +187,8 @@
                         data-bs-toggle="dropdown"
                         data-action="post-grades-status"
                         aria-expanded="false">
-                    <i class="fa"></i>
-                    <span class="d-none d-md-inline ms-1"></span>
+                    <i class="fa" aria-hidden="true"></i>
+                    <span class="visually-hidden"></span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" data-region="post-grades-menu">
                     <li>
@@ -254,25 +259,45 @@
         </div>
         {{/showpostgrades}}
 
+        {{! Friction Feedback: an icon that shows whether the walk applies here,
+            with the three choices in its menu. Site default shows the site's state. }}
         <div class="d-flex align-items-center px-2 border-start" data-region="friction-mode">
-            <label class="small text-muted mb-0 me-2 text-nowrap" for="ug-friction-mode-{{uniqid}}">
-                <i class="fa fa-book fa-fw" aria-hidden="true"></i>
-                {{#str}} friction_mode, local_unifiedgrader {{/str}}
-            </label>
-            <select id="ug-friction-mode-{{uniqid}}"
-                    class="form-select form-select-sm"
-                    data-action="friction-mode"
-                    data-cmid="{{cmid}}">
-                <option value="inherit" {{#frictioninherit}}selected{{/frictioninherit}}>
-                    {{#str}} friction_mode_inherit, local_unifiedgrader {{/str}}
-                </option>
-                <option value="on" {{#frictionon}}selected{{/frictionon}}>
-                    {{#str}} friction_mode_on, local_unifiedgrader {{/str}}
-                </option>
-                <option value="off" {{#frictionoff}}selected{{/frictionoff}}>
-                    {{#str}} friction_mode_off, local_unifiedgrader {{/str}}
-                </option>
-            </select>
+            <div class="dropdown">
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                        data-action="friction-mode"
+                        data-cmid="{{cmid}}"
+                        data-mode="{{frictionmode}}"
+                        data-sitedefault="{{#frictionsitedefault}}on{{/frictionsitedefault}}{{^frictionsitedefault}}off{{/frictionsitedefault}}"
+                        title="{{frictiontitle}}"
+                        aria-label="{{frictiontitle}}"
+                        aria-expanded="false">
+                    <i class="fa fa-stairs fa-fw {{^frictionapplies}}ug-icon-struck{{/frictionapplies}}" aria-hidden="true"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">{{#str}} friction_mode, local_unifiedgrader {{/str}}</h6></li>
+                    <li>
+                        <button class="dropdown-item" type="button" data-value="inherit" aria-current="{{#frictioninherit}}true{{/frictioninherit}}{{^frictioninherit}}false{{/frictioninherit}}">
+                            <i class="fa fa-check fa-fw me-1 {{^frictioninherit}}invisible{{/frictioninherit}}" aria-hidden="true"></i>
+                            {{#frictionsitedefault}}{{#str}} friction_mode_inherit_on, local_unifiedgrader {{/str}}{{/frictionsitedefault}}
+                            {{^frictionsitedefault}}{{#str}} friction_mode_inherit_off, local_unifiedgrader {{/str}}{{/frictionsitedefault}}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item" type="button" data-value="on" aria-current="{{#frictionon}}true{{/frictionon}}{{^frictionon}}false{{/frictionon}}">
+                            <i class="fa fa-check fa-fw me-1 {{^frictionon}}invisible{{/frictionon}}" aria-hidden="true"></i>
+                            {{#str}} friction_mode_on, local_unifiedgrader {{/str}}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item" type="button" data-value="off" aria-current="{{#frictionoff}}true{{/frictionoff}}{{^frictionoff}}false{{/frictionoff}}">
+                            <i class="fa fa-check fa-fw me-1 {{^frictionoff}}invisible{{/frictionoff}}" aria-hidden="true"></i>
+                            {{#str}} friction_mode_off, local_unifiedgrader {{/str}}
+                        </button>
+                    </li>
+                </ul>
+            </div>
         </div>
 
         <div class="d-flex align-items-center px-2 border-start">

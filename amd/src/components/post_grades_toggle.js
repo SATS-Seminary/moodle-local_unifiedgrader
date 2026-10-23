@@ -317,7 +317,7 @@ export default class extends BaseComponent {
             // Grades are visible.
             btn.className = 'btn btn-sm btn-outline-success dropdown-toggle';
             if (icon) {
-                icon.className = 'fa fa-eye';
+                icon.className = 'fa fa-users';
             }
             if (label) {
                 label.textContent = await getString('grades_posted', 'local_unifiedgrader');
@@ -373,6 +373,11 @@ export default class extends BaseComponent {
             if (hideGrades) {
                 hideGrades.classList.add('disabled');
             }
+        }
+
+        // The button shows only the icon; the status is its tooltip.
+        if (label) {
+            btn.title = label.textContent;
         }
     }
 

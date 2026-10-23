@@ -727,6 +727,23 @@
     transition: transform 0.2s ease;
 }
 
+/* Friction Feedback toggle: a slash through the icon when it is off,
+   drawn like Font Awesome's own -slash icons (there is no stairs-slash). */
+.ug-icon-struck {
+    position: relative;
+}
+
+.ug-icon-struck::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -10%;
+    width: 120%;
+    border-top: 2px solid currentColor;
+    box-shadow: 0 1px 0 var(--bs-body-bg, #fff);
+    transform: rotate(45deg);
+}
+
 /* Friction Feedback: one step, then the mark. */
 .local-unifiedgrader-friction {
     position: fixed;

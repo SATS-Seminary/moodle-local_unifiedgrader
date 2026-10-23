@@ -152,6 +152,10 @@ if ($cm->modname === 'quiz') {
 }
 
 $frictionmode = \local_unifiedgrader\friction\service::mode($cmid);
+$frictionsitedefault = (bool) get_config('local_unifiedgrader', 'friction_enable');
+$frictionapplies = $frictionmode === 'inherit' ? $frictionsitedefault : $frictionmode === 'on';
+$frictiontitle = get_string('friction_title_' . ($frictionapplies ? 'on' : 'off') . ($frictionmode === 'inherit' ? '_default' : ''),
+    'local_unifiedgrader');
 
 // Prepare template context.
 $templatedata = [
@@ -203,6 +207,10 @@ $templatedata = [
     'frictioninherit' => $frictionmode === 'inherit',
     'frictionon' => $frictionmode === 'on',
     'frictionoff' => $frictionmode === 'off',
+    'frictionmode' => $frictionmode,
+    'frictionsitedefault' => $frictionsitedefault,
+    'frictionapplies' => $frictionapplies,
+    'frictiontitle' => $frictiontitle,
     'coursecode' => \local_unifiedgrader\course_code_helper::extract_code($course->shortname),
     'coursefullname' => format_string($course->fullname, true, ['escape' => false]),
     'enablereportform' => !empty(get_config('local_unifiedgrader', 'enable_report_form')),

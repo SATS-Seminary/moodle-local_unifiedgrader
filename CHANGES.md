@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.0.2 (2026102300)
+
+### A narrower grading header
+
+- The post grades button shows only its icon: an eye when posted to some students, a group when posted to the class, an eye with a slash when hidden, and a clock when scheduled. Hover over it to see the status.
+- Friction Feedback is a stairs icon, crossed out when it is off for the activity. Its menu holds the three choices, and the tooltip says when the setting comes from the site default.
+
 ## v3.0.1 (2026101601)
 
 ### Fixed: assignment comments made outside Unified Grader (issue #24)

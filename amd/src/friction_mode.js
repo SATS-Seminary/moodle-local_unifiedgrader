@@ -23,33 +23,63 @@
 
 import Ajax from 'core/ajax';
 import Notification from 'core/notification';
+import {getString} from 'core/str';
 
 /**
- * Save the select when the teacher changes it.
+ * Show a mode on the button: the icon, its tooltip, and the ticked menu item.
+ *
+ * @param {HTMLElement} button The toggle button.
+ * @param {string} mode inherit, on, or off
+ */
+const show = async(button, mode) => {
+    const inherit = mode === 'inherit';
+    const applies = inherit ? button.dataset.sitedefault === 'on' : mode === 'on';
+    const title = await getString(
+        'friction_title_' + (applies ? 'on' : 'off') + (inherit ? '_default' : ''),
+        'local_unifiedgrader'
+    );
+    button.dataset.mode = mode;
+    button.title = title;
+    button.setAttribute('aria-label', title);
+    button.querySelector('.fa-stairs').classList.toggle('ug-icon-struck', !applies);
+    button.parentElement.querySelectorAll('[data-value]').forEach((item) => {
+        const current = item.dataset.value === mode;
+        item.setAttribute('aria-current', current ? 'true' : 'false');
+        item.querySelector('.fa-check').classList.toggle('invisible', !current);
+    });
+};
+
+/**
+ * Save the mode when the teacher picks one from the menu.
  */
 export const init = () => {
-    const select = document.querySelector('[data-action="friction-mode"]');
-    if (!select || select.dataset.bound) {
+    const button = document.querySelector('[data-action="friction-mode"]');
+    if (!button || button.dataset.bound) {
         return;
     }
-    select.dataset.bound = '1';
-    select.addEventListener('change', async() => {
-        const previous = select.dataset.previous || select.value;
-        select.dataset.previous = select.value;
-        select.disabled = true;
+    button.dataset.bound = '1';
+    button.parentElement.addEventListener('click', async(e) => {
+        const item = e.target.closest('[data-value]');
+        if (!item || item.dataset.value === button.dataset.mode) {
+            return;
+        }
+        const previous = button.dataset.mode;
+        const mode = item.dataset.value;
+        button.disabled = true;
+        await show(button, mode);
         try {
             await Ajax.call([{
                 methodname: 'local_unifiedgrader_set_friction_mode',
                 args: {
-                    cmid: Number(select.dataset.cmid),
-                    mode: select.value,
+                    cmid: Number(button.dataset.cmid),
+                    mode: mode,
                 },
             }])[0];
         } catch (error) {
-            select.value = previous;
+            await show(button, previous);
             Notification.exception(error);
         } finally {
-            select.disabled = false;
+            button.disabled = false;
         }
     });
 };
