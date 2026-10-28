@@ -58,6 +58,9 @@ export const init = (containerId) => {
     const userid = parseInt(container.dataset.userid, 10);
     const maxgrade = parseFloat(container.dataset.maxgrade) || 100;
     const gradingmethod = container.dataset.gradingmethod || 'simple';
+    // Set only when there is nobody to grade: the rubric or marking guide,
+    // shown read-only so a course builder can still check it.
+    const previewdefinition = container.dataset.previewdefinition || '';
     const canviewnotes = container.dataset.canviewnotes === '1';
     const canmanagenotes = container.dataset.canmanagenotes === '1';
     const canrefer = container.dataset.canrefer === '1';
@@ -164,7 +167,7 @@ export const init = (containerId) => {
             questioncomments: '[]',
             feedbackformat: 1,
             rubricdata: '',
-            gradingdefinition: '',
+            gradingdefinition: previewdefinition,
             timegraded: 0,
             grader: 0,
         },

@@ -122,6 +122,15 @@ if ($userid && !\local_unifiedgrader\access::can_access_student($context, $useri
 }
 $initialuserid = $userid ?: ($participants[0]['id'] ?? 0);
 
+// With nobody to grade (a blueprint course, or an empty group) no student ever
+// loads, and the rubric or marking guide only arrives with a student's grade
+// data. Send the definition with the page so the panel can show it read-only.
+$previewdefinition = '';
+if (!$initialuserid && empty($activityinfo['gradingdisabled'])) {
+    $definition = $adapter->get_grading_definition();
+    $previewdefinition = $definition ? json_encode($definition) : '';
+}
+
 // Capability flags for the template.
 $canviewall = has_capability('local/unifiedgrader:viewall', $context);
 $canviewnotes = has_capability('local/unifiedgrader:viewnotes', $context);
@@ -164,6 +173,7 @@ $templatedata = [
     'cmid' => $cmid,
     'courseid' => $course->id,
     'userid' => $initialuserid,
+    'previewdefinition' => $previewdefinition,
     'activityinfojson' => json_encode($activityinfo),
     'participantsjson' => json_encode($participants),
     'activityname' => $activityinfo['name'],

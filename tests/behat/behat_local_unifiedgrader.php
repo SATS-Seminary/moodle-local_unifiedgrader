@@ -351,6 +351,33 @@ class behat_local_unifiedgrader extends behat_base {
     }
 
     /**
+     * Attach a small text file to a forum post.
+     *
+     * Core's forum post generator records only that a post has attachments, and
+     * stores no file.
+     *
+     * @Given /^the forum post "(?P<subject>(?:[^"]|\\")*)" has the attachment "(?P<filename>[^"]+)"$/
+     * @param string $subject Post subject.
+     * @param string $filename File name.
+     */
+    public function the_forum_post_has_the_attachment(string $subject, string $filename): void {
+        global $DB;
+        $post = $DB->get_record('forum_posts', ['subject' => $this->unescape_argument($subject)], '*', MUST_EXIST);
+        $discussion = $DB->get_record('forum_discussions', ['id' => $post->discussion], 'forum', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('forum', $discussion->forum, 0, false, MUST_EXIST);
+        get_file_storage()->create_file_from_string([
+            'contextid' => \context_module::instance($cm->id)->id,
+            'component' => 'mod_forum',
+            'filearea' => 'attachment',
+            'itemid' => $post->id,
+            'filepath' => '/',
+            'filename' => $filename,
+            'userid' => $post->userid,
+        ], 'Notes attached to the post.');
+        $DB->set_field('forum_posts', 'attachment', 1, ['id' => $post->id]);
+    }
+
+    /**
      * Open the student feedback page for the activity with the given name.
      *
      * view_feedback.php builds a separate page per activity type, and each

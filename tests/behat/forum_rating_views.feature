@@ -100,6 +100,21 @@ Feature: Grading a rating-based forum
     Then "[data-action=\"forum-view-mode\"][data-mode=\"flat\"].active" "css_element" should exist
     And "[data-region=\"forum-context-view\"]" "css_element" should not be visible
 
+  Scenario: A student with an attachment opens on their posts, with the view controls
+    Given the forum post "Stu replies" has the attachment "notes.txt"
+    When I am on the Unified Grader for activity "Rated Forum"
+    And the post ratings list has loaded
+    Then "[data-region=\"forum-view-toolbar\"]" "css_element" should be visible
+    And I should see "Post 1 of 1"
+    And I should see "notes.txt"
+
+    # Previewing the attachment puts the controls away; the Posts pill brings them back.
+    When I click on "notes.txt" "button"
+    Then "[data-region=\"forum-view-toolbar\"]" "css_element" should not be visible
+    When I click on "Posts" "button"
+    Then "[data-region=\"forum-view-toolbar\"]" "css_element" should be visible
+    And I should see "Post 1 of 1"
+
   Scenario: The chosen post view is remembered for next time
     When I am on the Unified Grader for activity "Rated Forum"
     And the post ratings list has loaded

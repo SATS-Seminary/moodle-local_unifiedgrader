@@ -2154,6 +2154,71 @@ export default class extends BaseComponent {
 
         section.classList.remove('d-none');
         this._suppressAutoSave = false;
+
+        // Nobody to grade: the definition came with the page so a course
+        // builder can check it. Show it, but nothing in it can be used.
+        if (!state.currentUser?.id) {
+            this._showGradingPreview();
+        } else {
+            this._clearGradingPreview();
+        }
+    }
+
+    /**
+     * Make the rubric or marking guide a read-only preview, for a page with no
+     * student to grade. Disables its controls, the grade box and the save
+     * button, and says why above the criteria.
+     */
+    _showGradingPreview() {
+        const body = this.getElement(this.selectors.RUBRIC_BODY);
+        if (!body || body.querySelector('[data-region="grading-preview-note"]')) {
+            return;
+        }
+        body.querySelectorAll('button, input, select, textarea').forEach((el) => {
+            el.disabled = true;
+        });
+        const note = document.createElement('div');
+        note.className = 'alert alert-info small m-2';
+        note.dataset.region = 'grading-preview-note';
+        getString('gradingpreview', 'local_unifiedgrader').then((s) => {
+            note.textContent = s;
+            return s;
+        }).catch(() => {});
+        body.prepend(note);
+
+        const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
+        if (gradeInput) {
+            gradeInput.disabled = true;
+        }
+        const saveBtn = this.getElement(this.selectors.SAVE_GRADE_BTN);
+        if (saveBtn) {
+            saveBtn.disabled = true;
+        }
+    }
+
+    /**
+     * Undo the read-only preview once a student is open, e.g. after switching
+     * from an empty group. The rubric may be reused as it is, so its controls
+     * would otherwise stay disabled.
+     */
+    _clearGradingPreview() {
+        const body = this.getElement(this.selectors.RUBRIC_BODY);
+        const note = body?.querySelector('[data-region="grading-preview-note"]');
+        if (!note) {
+            return;
+        }
+        note.remove();
+        body.querySelectorAll('button, input, select, textarea').forEach((el) => {
+            el.disabled = false;
+        });
+        const gradeInput = this.getElement(this.selectors.GRADE_INPUT);
+        if (gradeInput) {
+            gradeInput.disabled = false;
+        }
+        const saveBtn = this.getElement(this.selectors.SAVE_GRADE_BTN);
+        if (saveBtn) {
+            saveBtn.disabled = false;
+        }
     }
 
     /**
@@ -3649,6 +3714,11 @@ export default class extends BaseComponent {
         if (this._autoSaveTimer) {
             clearTimeout(this._autoSaveTimer);
             this._autoSaveTimer = null;
+        }
+
+        // A read-only preview with no student open has nobody to save for.
+        if (!this.reactive.state.currentUser?.id) {
+            return;
         }
 
         // Refuse to save when the manual grade exceeds the activity max.

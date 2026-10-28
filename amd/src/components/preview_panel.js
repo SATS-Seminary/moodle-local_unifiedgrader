@@ -114,6 +114,29 @@ export default class extends BaseComponent {
     }
 
     /**
+     * Word the empty preview: with no student open there is nobody to grade
+     * (a blueprint course, or an empty group), which is not the same as a
+     * student who has not submitted.
+     *
+     * @param {object} state Current state.
+     */
+    _setNoSubmissionText(state) {
+        const textEl = this.getElement('[data-region="no-submission-text"]');
+        if (!textEl) {
+            return;
+        }
+        let key = 'nosubmission';
+        if (!state.currentUser?.id) {
+            const group = String(state.filters?.group ?? '0');
+            key = group !== '0' ? 'nostudents_group' : 'nostudents';
+        }
+        getString(key, 'local_unifiedgrader').then((s) => {
+            textEl.textContent = s;
+            return s;
+        }).catch(() => {});
+    }
+
+    /**
      * Render submission content.
      *
      * @param {object} args Watcher args.
@@ -150,6 +173,7 @@ export default class extends BaseComponent {
                 || !submission.status) {
             noSubEl.classList.remove('d-none');
             noSubEl.classList.add('d-flex');
+            this._setNoSubmissionText(state);
             return;
         }
 
@@ -188,7 +212,9 @@ export default class extends BaseComponent {
             return;
         }
 
-        if (files.length > 0) {
+        // A forum's posts are the submission and attachments ride along with them,
+        // so open on the posts (and their view controls); the files have pills.
+        if (files.length > 0 && !isForum) {
             // Auto-preview the first previewable file.
             const firstPreviewable = files.find(f => this._isPreviewable(f));
             if (firstPreviewable) {
@@ -204,7 +230,7 @@ export default class extends BaseComponent {
         // (e.g. ytsubmission's YouTube player, online text, etc.).
         if (hasContent || submission.status === 'submitted') {
             this._showSubmissionContent();
-            if (this._hasOtherContent()) {
+            if (this._hasOtherContent() || (isForum && files.length > 0)) {
                 this._highlightFileButton('content');
             }
             return;
@@ -371,8 +397,9 @@ export default class extends BaseComponent {
                 if (this._pdfViewer) {
                     this._pdfViewer.saveAnnotationsNow();
                 }
-                this._showSubmissionContent();
                 this._currentFileId = null;
+                this._updateForumToolbar(this.reactive.state);
+                this._showSubmissionContent();
                 this._highlightFileButton('content');
             });
 
@@ -521,6 +548,8 @@ export default class extends BaseComponent {
         }
 
         this._currentFileId = file.fileid;
+        // Hides the forum view controls, and the paged or thread view with them.
+        this._updateForumToolbar(this.reactive.state);
 
         // Highlight the active file button in the right-panel selector.
         this._highlightFileButton(file.fileid);

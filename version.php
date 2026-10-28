@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_unifiedgrader';
-$plugin->version   = 2026102300; // YYYYMMDDXX format.
-$plugin->release   = '3.0.2';
+$plugin->version   = 2026102900; // YYYYMMDDXX format.
+$plugin->release   = '3.0.3';
 $plugin->requires  = 2025100600; // Moodle 5.1+.
 $plugin->maturity  = MATURITY_STABLE;

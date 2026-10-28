@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.0.3 (2026102900)
+
+### Fixed: a course with no students looked as if its rubric was missing
+
+- In a course with nobody to grade, such as a blueprint, the grader showed "No submission" and an empty marking panel. It now says there are no students to grade, in the activity or in the selected group.
+- The rubric or marking guide is shown read-only, marked as a preview, so a course developer can check it.
+
+### Fixed: forum view options missing for a student with an attachment
+
+- A forum student who had attached a file opened on the attachment, so the flat, paged and thread options were hidden. The grader now opens on the posts, and the attachments stay in their pills.
+- Going back to Posts from an attachment brings the options back.
+
 ## v3.0.2 (2026102300)
 
 ### A narrower grading header
