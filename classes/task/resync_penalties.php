@@ -41,7 +41,7 @@ class resync_penalties extends \core\task\adhoc_task {
         $data = $this->get_custom_data();
         $cmid = (int) ($data->cmid ?? 0);
         $cm = $cmid ? get_coursemodule_from_id('', $cmid) : false;
-        if (!$cm) {
+        if (!$cm || !\local_unifiedgrader\adapter\adapter_factory::is_supported($cm->modname)) {
             return;
         }
 

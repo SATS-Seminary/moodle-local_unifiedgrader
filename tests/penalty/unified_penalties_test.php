@@ -285,6 +285,21 @@ final class unified_penalties_test extends \advanced_testcase {
     }
 
     /**
+     * With the quiz type switched off in the plugin settings, submitting and resyncing do nothing and say nothing.
+     */
+    public function test_quiz_type_disabled_is_skipped_quietly(): void {
+        $s = $this->quiz_scenario();
+        $userid = (int) $s->students[0]->id;
+        set_config('enable_quiz', 0, 'local_unifiedgrader');
+
+        $this->submit_quiz_attempt($s, $userid, [1 => 'True', 2 => 'True'], $this->duedate + 3 * DAYSECS);
+        service::resync((int) $s->cm->id, $userid);
+
+        $this->assertDebuggingNotCalled();
+        $this->assertNull($this->late_pct($s, $userid));
+    }
+
+    /**
      * A quiz without a due date is never late; the close time is not a due date.
      */
     public function test_quiz_without_due_date_is_never_late(): void {

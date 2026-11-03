@@ -72,7 +72,14 @@ class service {
             return;
         }
 
-        $adapter ??= adapter_factory::create($cmid);
+        if ($adapter === null) {
+            // The activity type may be switched off in the plugin settings; then there is nothing to sync.
+            $cm = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+            if (!$cm || !adapter_factory::is_supported($cm->modname)) {
+                return;
+            }
+            $adapter = adapter_factory::create($cmid);
+        }
         if (!activity_settings::supports($adapter->get_type())) {
             return;
         }

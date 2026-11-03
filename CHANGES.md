@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.0.4 (2026110300)
+
+### Fixed: debugging messages from quizzes when the quiz type is switched off
+
+- With "Enable for quizzes" off, submitting or grading a quiz attempt raised "This activity type is not supported by the Unified Grader." from the late-penalty observers. They now leave activity types that are switched off alone, as does the background penalty resync.
+
 ## v3.0.3 (2026102900)
 
 ### Fixed: a course with no students looked as if its rubric was missing
